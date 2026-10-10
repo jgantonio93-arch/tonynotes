@@ -78,6 +78,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     private lateinit var selectionBar: View
     private lateinit var selectionLabel: TextView
     private lateinit var zoomLabel: TextView
+    private lateinit var ephemeralPill: TextView
 
     private lateinit var textEditor: InlineTextEditor
     private lateinit var stage: FrameLayout
@@ -182,6 +183,24 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             addView(hintBody)
         }
         stage.addView(emptyHint, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+
+        ephemeralPill = TextView(this).apply {
+            textSize = 14f
+            typeface = Ui.MEDIUM
+            setTextColor(Ui.ON_ACCENT)
+            gravity = Gravity.CENTER
+            minHeight = dpi(40f)
+            setPadding(dpi(16f), 0, dpi(16f), 0)
+            setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, icon(Icon.CLOSE, Ui.ON_ACCENT, 18f), null)
+            compoundDrawablePadding = dpi(8f)
+            background = ripple(pill(Ui.ACCENT, 0), pill(Color.WHITE, 0))
+            Ui.run { softShadow(6f) }
+            visibility = View.GONE
+            setOnClickListener { setEphemeral(null) }
+        }
+        stage.addView(ephemeralPill, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
+            bottomMargin = dpi(18f)
+        })
 
         selectionBar = buildSelectionBar()
         selectionBar.visibility = View.GONE
@@ -577,7 +596,25 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     private fun penActive(highlighter: Boolean) =
         canvasView.tool == InfiniteCanvasView.Tool.PEN && (canvasView.pen.type == BrushType.HIGHLIGHTER) == highlighter
 
+    /** Ponteiro laser / tinta que some (null = escrita normal). */
+    internal fun setEphemeral(mode: InfiniteCanvasView.Ephemeral?) {
+        canvasView.ephemeral = mode
+        if (mode != null) {
+            if (textEditor.isActive) textEditor.finish()
+            closeTray()
+            canvasView.tool = InfiniteCanvasView.Tool.PEN
+        }
+        ephemeralPill.text = when (mode) {
+            InfiniteCanvasView.Ephemeral.LASER -> "Ponteiro laser"
+            InfiniteCanvasView.Ephemeral.VANISH -> "Tinta que some"
+            null -> ""
+        }
+        ephemeralPill.visibility = if (mode != null) View.VISIBLE else View.GONE
+        refresh()
+    }
+
     private fun setTool(tool: InfiniteCanvasView.Tool) {
+        if (canvasView.ephemeral != null) setEphemeral(null)
         if (textEditor.isActive) textEditor.finish()
         closeTray()
         canvasView.tool = tool
@@ -585,6 +622,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     }
 
     private fun setPen(p: PenSettings) {
+        if (canvasView.ephemeral != null) setEphemeral(null)
         prefs.savePen(p)
         prefs.currentType = p.type
         canvasView.pen = p
@@ -887,6 +925,8 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
                 Panels.showPage(this, canvasView, prefs) { onStateChanged() }
             },
             SheetItem(if (Ui.isDark) Icon.MOON else Icon.SUN, "Tema (claro ou noturno)") { Ui.showThemeMenu(this) },
+            SheetItem(Icon.TOUCH, "Ponteiro laser (some na hora)") { setEphemeral(InfiniteCanvasView.Ephemeral.LASER) },
+            SheetItem(Icon.EDIT, "Tinta que some (para explicar)") { setEphemeral(InfiniteCanvasView.Ephemeral.VANISH) },
             SheetItem(Icon.PDF, "Importar PDF") { pickPdf() },
             SheetItem(Icon.SELECT_ALL, "Selecionar tudo") { canvasView.selectAll(); refresh() },
             SheetItem(Icon.EXPORT, "Exportar como imagem") { exportPng() },

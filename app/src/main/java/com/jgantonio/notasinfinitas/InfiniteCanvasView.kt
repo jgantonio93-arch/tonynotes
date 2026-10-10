@@ -9,6 +9,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.os.Build
+import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
 import java.io.File
@@ -70,6 +71,13 @@ class InfiniteCanvasView(context: Context) : View(context) {
     var eraserHighlighterOnly = false
     /** O marca-texto ganha a altura da escrita à mão que está embaixo dele. */
     var highlighterFitsWriting = true
+
+    /** Modos de apresentação: o traço não fica na nota (ponteiro laser e tinta que some). */
+    enum class Ephemeral { LASER, VANISH }
+    var ephemeral: Ephemeral? = null
+    private class Fading(val stroke: StrokeElement, val start: Long, val life: Long)
+    private val fading = ArrayList<Fading>()
+    internal val fadingCountForTests get() = fading.size
     /** Seleção por retângulo (em vez de laço livre). */
     var selectRect = false
     /** Inclui itens que só encostam no laço/retângulo. */
@@ -1134,11 +1142,13 @@ class InfiniteCanvasView(context: Context) : View(context) {
         when (gesture) {
             Gesture.DRAW -> {
                 var p = pen()
+                if (ephemeral == Ephemeral.LASER) p = PenSettings(BrushType.PEN, LASER_COLOR, 3.5f, 100)
+                else if (ephemeral == Ephemeral.VANISH && p.type == BrushType.HIGHLIGHTER) p = p.copy(type = BrushType.PEN, size = 4f, opacity = 100)
                 if (p.type == BrushType.HIGHLIGHTER && highlighterFitsWriting) {
                     writingHeightAt(wx(x), wy(y))?.let { h -> p = p.copy(size = h * 1.15f / unit) }
                 }
                 // Front buffer só para tinta opaca (translúcida/textura ficaria diferente ao "secar").
-                wetActive = lowLatency && wetInk?.ready == true && p.alpha >= 255 &&
+                wetActive = ephemeral == null && lowLatency && wetInk?.ready == true && p.alpha >= 255 &&
                     p.type != BrushType.PENCIL && p.type != BrushType.HIGHLIGHTER
                 wetSent = 0
                 predN = 0
@@ -1371,7 +1381,12 @@ class InfiniteCanvasView(context: Context) : View(context) {
                 if (wetActive) pendingWetClear = true
                 wetActive = false
                 liveInk?.invalidate()
-                if (b != null && b.n > 0) {
+                val mode = ephemeral
+                if (b != null && b.n > 0 && mode != null) {
+                    // Não entra na nota: some sozinho (o laser rápido, a tinta depois de um tempo).
+                    fading.add(Fading(b.build(), SystemClock.uptimeMillis(), if (mode == Ephemeral.LASER) LASER_LIFE else VANISH_LIFE))
+                    invalidate()
+                } else if (b != null && b.n > 0) {
                     var stroke = b.build()
                     if (autoShapes) {
                         ShapeRecognizer.recognize(stroke, 24f * density / scale)?.let { stroke = it }
@@ -1625,6 +1640,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
                 drawElement(canvas, e, scale, sync = false)
             }
         }
+        if (fading.isNotEmpty()) drawFading(canvas)
         if (liveInk == null && !wetActive) builder?.let { StrokeRenderer.drawBuilder(canvas, it, predXs, predYs, predN) }
         if (crop != null) drawCrop(canvas, crop)
         canvas.restore()
@@ -1836,6 +1852,23 @@ class InfiniteCanvasView(context: Context) : View(context) {
         }
     }
 
+    /** Traços do laser e da tinta que some, cada vez mais transparentes até sumir. */
+    private fun drawFading(canvas: Canvas) {
+        val now = SystemClock.uptimeMillis()
+        fading.removeAll { now - it.start >= it.life }
+        for (f in fading) {
+            val t = (now - f.start).toFloat() / f.life
+            // Fica inteiro por um tempo e depois some suave.
+            val k = if (t < 0.55f) 1f else 1f - (t - 0.55f) / 0.45f
+            val s = f.stroke
+            if (s.color == LASER_COLOR) {
+                drawElement(canvas, StrokeElement(s.type, s.color, (70 * k).toInt(), s.xs, s.ys, FloatArray(s.n) { s.ws[it] * 3.2f }), scale, sync = false)
+            }
+            drawElement(canvas, StrokeElement(s.type, s.color, (s.alpha * k).toInt().coerceAtLeast(1), s.xs, s.ys, s.ws), scale, sync = false)
+        }
+        if (fading.isNotEmpty()) postInvalidateOnAnimation()
+    }
+
     /** Modelo da folha no PDF exportado (os fundos simples continuam de fora, como antes). */
     fun drawTemplateForExport(canvas: Canvas, page: RectF) {
         if (PageTemplates.isTemplate(pageStyle)) PageTemplates.draw(canvas, pageStyle, page, isDarkPaperColor(paperColor), 0.6f)
@@ -1844,6 +1877,9 @@ class InfiniteCanvasView(context: Context) : View(context) {
     private fun isDarkPaperColor(c: Int) = 0.299 * Color.red(c) + 0.587 * Color.green(c) + 0.114 * Color.blue(c) < 128
 
     companion object {
+        val LASER_COLOR = Color.rgb(255, 45, 70)
+        private const val LASER_LIFE = 900L
+        private const val VANISH_LIFE = 3500L
         private const val MIN_SCALE = 0.03f
         private const val MAX_SCALE = 8f
         private const val MAX_UNDO = 300

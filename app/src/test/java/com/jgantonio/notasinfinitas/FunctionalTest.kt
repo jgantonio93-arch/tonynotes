@@ -496,6 +496,31 @@ class FunctionalTest {
     }
 
     @Test
+    fun laser_e_tinta_que_some_nao_ficam_na_nota() {
+        editor.setEphemeral(InfiniteCanvasView.Ephemeral.LASER)
+        drag(line(200f, 700f, 900f, 700f))
+        assertEquals(0, strokes().size)
+        assertEquals(1, canvas.fadingCountForTests)
+        editor.setEphemeral(InfiniteCanvasView.Ephemeral.VANISH)
+        drag(line(200f, 800f, 900f, 800f))
+        assertEquals(0, strokes().size)
+        editor.setEphemeral(null)
+        drag(line(200f, 900f, 900f, 900f))
+        assertEquals(1, strokes().size)
+    }
+
+    @Test
+    fun modelo_cornell_salva_e_exporta() {
+        canvas.setPageLayout(true, false, false, true, 1)
+        canvas.pageStyle = PageStyle.CORNELL
+        drag(line(200f, 900f, 700f, 900f))
+        val bmp = canvas.renderToBitmap(600, 800)
+        assertNotNull(bmp)
+        val data = canvas.snapshot()
+        assertEquals(PageStyle.CORNELL, data.style)
+    }
+
+    @Test
     fun lapis_desenha_com_textura() {
         canvas.pen = PenSettings.default(BrushType.PENCIL, Color.BLACK).copy(size = 12f)
         drag(line(200f, 700f, 900f, 700f))
