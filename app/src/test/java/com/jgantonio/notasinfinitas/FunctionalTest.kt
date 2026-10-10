@@ -371,6 +371,21 @@ class FunctionalTest {
         assertEquals(1, items().size)
     }
 
+    @Test
+    fun destrava_todas_as_paginas_do_pdf_de_uma_vez() {
+        val pages = PdfImporter.layout((1..3).map { PdfImporter.Page("p$it.jpg", 595, 842) }, PdfImporter.Layout.VERTICAL, 0f, 0f)
+        canvas.addPages(pages)
+        assertEquals(3, canvas.lockedPdfPageCount)
+        canvas.setAllPdfPagesLocked(false)
+        assertEquals(0, canvas.lockedPdfPageCount)
+        assertEquals("ficam selecionadas juntas", 3, canvas.selectedItems.size)
+        canvas.undo()
+        assertEquals("desfazer trava de novo", 3, canvas.lockedPdfPageCount)
+        canvas.setAllPdfPagesLocked(false)
+        canvas.setAllPdfPagesLocked(true)
+        assertEquals(3, canvas.lockedPdfPageCount)
+    }
+
     // ---- Ajudantes ----------------------------------------------------------------------
 
     private fun findEdit(): EditText = findAll(editor.window.decorView).filterIsInstance<EditText>().single()

@@ -512,6 +512,23 @@ class InfiniteCanvasView(context: Context) : View(context) {
         editImages { it.with(locked = locked) }
     }
 
+    /** Quantas páginas de PDF a nota tem e quantas estão travadas. */
+    val pdfPageCount get() = elements.count { it is ImageElement && it.pdfPage > 0 }
+    val lockedPdfPageCount get() = elements.count { it is ImageElement && it.pdfPage > 0 && it.locked }
+
+    /**
+     * Trava ou destrava todas as páginas de PDF de uma vez (uma ação de desfazer).
+     * Destravadas, elas ficam selecionadas juntas para mover ou redimensionar.
+     */
+    fun setAllPdfPagesLocked(locked: Boolean) {
+        val pairs = elements.filter { it is ImageElement && it.pdfPage > 0 && it.locked != locked }
+            .map { it to (it as ImageElement).with(locked = locked) }
+        if (pairs.isEmpty()) return
+        replaceAll(pairs)
+        if (locked) clearSelection()
+        else setSelection(elements.filter { it is ImageElement && it.pdfPage > 0 })
+    }
+
     /** Troca o arquivo da imagem selecionada mantendo posição, largura e efeitos. */
     fun replaceSelectedImage(file: String, imgW: Int, imgH: Int) {
         val img = selectedImage ?: return

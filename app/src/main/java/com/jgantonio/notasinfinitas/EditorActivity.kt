@@ -791,6 +791,9 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         })
         if (canvasView.selectionLocked) {
             row.addView(pillButton(Icon.UNLOCK, "Destravar") { canvasView.setLocked(false) })
+            if (canvasView.lockedPdfPageCount > 1 && items.any { it is ImageElement && it.pdfPage > 0 }) {
+                row.addView(pillButton(Icon.UNLOCK, "Destravar todas as páginas") { canvasView.setAllPdfPagesLocked(false) })
+            }
             row.addView(pillButton(Icon.TRASH, "Excluir") { canvasView.deleteSelection() })
         } else if (txt != null) {
             row.addView(pillButton(Icon.EDIT, "Editar") {
@@ -847,7 +850,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             row.addView(pillButton(Icon.ROTATE, "Girar 90°") { canvasView.rotateSelection(90f) })
             row.addView(pillButton(Icon.TO_FRONT, "Frente") { canvasView.reorderSelection(true) })
             row.addView(pillButton(Icon.TO_BACK, "Trás") { canvasView.reorderSelection(false) })
-            if (items.any { it is ImageElement }) row.addView(pillButton(Icon.LOCK, "Travar imagens") { canvasView.setLocked(true) })
+            if (items.any { it is ImageElement }) row.addView(pillButton(Icon.LOCK, if (items.all { it is ImageElement && it.pdfPage > 0 }) "Travar páginas" else "Travar imagens") { canvasView.setLocked(true) })
         }
         selectionTrailing.addView(iconButton(Icon.CHECK, Ui.ACCENT, 40f) { canvasView.clearSelection() })
     }
@@ -961,6 +964,11 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             SheetItem(Icon.PDF, "Exportar como PDF") { exportPdf() },
         ) + (if (canvasView.pdfPages().isEmpty()) emptyList() else listOf(
             SheetItem(Icon.PDF, "Exportar PDF anotado (páginas originais)") { exportAnnotatedPdf() },
+        )) + (if (canvasView.pdfPageCount == 0) emptyList()
+        else if (canvasView.lockedPdfPageCount > 0) listOf(
+            SheetItem(Icon.UNLOCK, "Destravar todas as páginas do PDF") { canvasView.setAllPdfPagesLocked(false) },
+        ) else listOf(
+            SheetItem(Icon.LOCK, "Travar todas as páginas do PDF") { canvasView.setAllPdfPagesLocked(true) },
         )) + listOf(
             SheetItem(Icon.CENTER, "Centralizar conteúdo") { canvasView.recenter() },
             SheetItem(Icon.EDIT, "Renomear nota") { rename() },
