@@ -28,11 +28,17 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
 - Um toque na alça abre as posições prontas (topo, esquerda, direita).
 
 ### Página
-- Menu ⋮ → **Página**: **infinita** (padrão), **folhas verticais** (uma embaixo da outra)
-  ou **folhas horizontais** (lado a lado), em **retrato** ou **paisagem**.
+- Menu ⋮ → **Página**: **infinita** (padrão) ou **folhas**.
+- **Orientação da folha**: vertical (em pé) ou horizontal (deitada).
+- **Apresentação das folhas**: uma embaixo da outra ou lado a lado.
 - **Folhas infinitas**: uma folha nova aparece sozinha quando você escreve na última.
   Desligado, escolha o número de folhas.
 - O PDF exportado sai com uma página por folha.
+
+### Tema noturno
+- Botão de sol/lua na página inicial, ou menu ⋮ → **Tema**: igual ao celular, claro ou noturno.
+- No noturno, a nota de papel claro aparece escura e a tinta se inverte mantendo o tom de
+  cada cor (o vermelho continua vermelho). Miniaturas e exportações saem com as cores reais.
 
 ### Editor
 - **S Pen** escreve; segurando o **botão lateral**, apaga (dá para desligar).
@@ -45,8 +51,8 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
 - Cada pincel lembra sua **espessura**, **opacidade** e **cor**.
 - **Marca-texto** com ponta chanfrada: **tamanho**, **transparência**, **espessura da ponta**
   e **endireitar linhas** (o traço vira uma reta, perfeitamente horizontal quando quase).
-- Paleta de cores + **cor personalizada** (espectro, matiz e código hex); as cores
-  personalizadas ficam salvas.
+- Paleta de cores + **cor personalizada** (espectro, matiz, **tons da cor escolhida** do
+  mais claro ao mais escuro e código hex); as cores personalizadas ficam salvas.
 - **Formas automáticas**: linha reta, círculo/elipse, triângulo, retângulo, pentágono.
 - **Favoritos**: salve combinações de caneta e use pela barra (segure para remover).
 

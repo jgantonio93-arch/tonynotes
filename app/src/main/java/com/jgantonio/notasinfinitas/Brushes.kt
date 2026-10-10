@@ -212,6 +212,12 @@ object StrokeRenderer {
      */
     var zoom = 1f
 
+    /**
+     * Tema noturno com papel claro: a tinta é desenhada invertida (ver [Night]).
+     * O marca-texto fica como está: cor viva translúcida já funciona no escuro.
+     */
+    var night = false
+
     /** Grão do lápis: só alfa, quase sempre forte, com falhas finas como papel. */
     private val grain: IntArray by lazy {
         val rnd = Random(11)
@@ -343,6 +349,7 @@ object StrokeRenderer {
         paint.color = color or (0xFF shl 24)
         paint.shader = if (type == BrushType.PENCIL) pencilShader(color) else null
         paint.alpha = alpha
+        paint.colorFilter = if (night && type != BrushType.HIGHLIGHTER) Night.filter else null
         if (uniform) {
             linePaint.strokeWidth = uniformWidth
             linePaint.strokeCap = if (type == BrushType.HIGHLIGHTER) Paint.Cap.SQUARE else Paint.Cap.ROUND

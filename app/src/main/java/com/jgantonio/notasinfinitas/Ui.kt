@@ -32,17 +32,125 @@ import android.widget.TextView
  * raios variados, sombras tingidas e todos os pares de texto/fundo com contraste AA.
  */
 object Ui {
-    val BG = Color.parseColor("#F6F4EF")          // papel
-    val SURFACE = Color.WHITE
-    val INK = Color.parseColor("#1F1D1A")
-    val MUTED = Color.parseColor("#6A665E")       // 5,2:1 sobre o papel
-    val LINE = Color.parseColor("#E6E2DA")
-    val ACCENT = Color.parseColor("#3A55B8")      // tinta azul, 6,6:1 sobre branco
-    val ACCENT_SOFT = Color.parseColor("#E9EDF8")
-    val DANGER = Color.parseColor("#C4302B")
-    val FIELD = Color.parseColor("#EFECE6")
+    // Cores do tema atual (claro ou noturno). Mudam em applyTheme(); as telas são
+    // recriadas quando o tema muda, então quem lê estas cores ao montar a tela já
+    // pega as certas.
+    var BG = 0; private set            // papel
+    var SURFACE = 0; private set
+    var INK = 0; private set
+    var MUTED = 0; private set         // 5:1 ou mais sobre o fundo nos dois temas
+    var LINE = 0; private set
+    var ACCENT = 0; private set        // tinta azul
+    var ACCENT_SOFT = 0; private set
+    var ON_ACCENT = 0; private set     // texto e ícones sobre o acento
+    var DANGER = 0; private set
+    var DANGER_SOFT = 0; private set
+    var FIELD = 0; private set
     /** Cor das sombras: um marrom quente bem escuro (sombra "do papel", não cinza). */
-    val SHADOW = Color.parseColor("#3C301E")
+    var SHADOW = 0; private set
+    var TRACK = 0; private set         // trilho dos sliders e chaves desligadas
+    var HANDLE = 0; private set        // alça dos painéis
+    var THUMB_BG = 0; private set      // folha dentro do cartão de nota
+    var THUMB_LINE = 0; private set
+    var SEGMENT_ON = 0; private set    // opção marcada no controle segmentado
+
+    /** Tema noturno ativo. */
+    var isDark = false; private set
+    /** Muda a cada troca de tema (as telas comparam para saber se precisam se recriar). */
+    var themeVersion = 0; private set
+
+    init { applyTheme(false) }
+
+    fun applyTheme(dark: Boolean) {
+        if (dark == isDark && BG != 0) return
+        isDark = dark
+        themeVersion++
+        fun c(light: String, night: String) = Color.parseColor(if (dark) night else light)
+        BG = c("#F6F4EF", "#121110")
+        SURFACE = c("#FFFFFF", "#1D1C19")
+        INK = c("#1F1D1A", "#EDE8DD")
+        MUTED = c("#6A665E", "#A8A296")
+        LINE = c("#E6E2DA", "#34312B")
+        ACCENT = c("#3A55B8", "#93A6F2")
+        ACCENT_SOFT = c("#E9EDF8", "#262D47")
+        ON_ACCENT = c("#FFFFFF", "#10131E")
+        DANGER = c("#C4302B", "#F07A72")
+        DANGER_SOFT = c("#FDECEC", "#3A2220")
+        FIELD = c("#EFECE6", "#2A2824")
+        SHADOW = c("#3C301E", "#000000")
+        TRACK = c("#E4E1DA", "#3A3731")
+        HANDLE = c("#D8D3CA", "#4A463F")
+        THUMB_BG = c("#FBFAF7", "#171614")
+        THUMB_LINE = c("#EFEBE3", "#2E2B26")
+        SEGMENT_ON = c("#FFFFFF", "#3A3731")
+    }
+
+    /** Tema escolhido: "system" (segue o celular), "light" ou "dark". */
+    fun themeChoice(context: Context): String =
+        context.getSharedPreferences("canetas", Context.MODE_PRIVATE).getString("theme", "system") ?: "system"
+
+    fun setThemeChoice(context: Context, choice: String) {
+        context.getSharedPreferences("canetas", Context.MODE_PRIVATE).edit().putString("theme", choice).apply()
+        updateTheme(context)
+    }
+
+    private fun updateTheme(context: Context) {
+        val night = (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+        applyTheme(when (themeChoice(context)) {
+            "dark" -> true
+            "light" -> false
+            else -> night
+        })
+    }
+
+    /** Barras do sistema e fundo da janela no tom do tema. */
+    fun styleWindow(activity: android.app.Activity, barColor: Int) {
+        val w = activity.window
+        w.setBackgroundDrawable(ColorDrawable(BG))
+        @Suppress("DEPRECATION")
+        w.statusBarColor = barColor
+        @Suppress("DEPRECATION")
+        w.navigationBarColor = barColor
+        val light = !isDark
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            val flags = android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
+                android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+            w.insetsController?.setSystemBarsAppearance(if (light) flags else 0, flags)
+        } else {
+            @Suppress("DEPRECATION")
+            w.decorView.systemUiVisibility = if (light)
+                View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR else 0
+        }
+    }
+
+    /**
+     * Superfície flutuante (bandejas, barra, cartões): sombra no tema claro; no
+     * noturno, onde sombra quase não aparece, um fio de 1 px separa do fundo.
+     */
+    fun Context.floating(radiusDp: Float, fill: Int = SURFACE): GradientDrawable = GradientDrawable().apply {
+        shape = GradientDrawable.RECTANGLE
+        cornerRadius = dp(radiusDp)
+        setColor(fill)
+        if (isDark) setStroke(1, LINE)
+    }
+
+    /** Menu de tema: segue o celular, claro ou noturno. Recria a tela ao mudar. */
+    fun showThemeMenu(activity: android.app.Activity) {
+        val cur = themeChoice(activity)
+        fun mark(v: String) = if (cur == v) "  ✓" else ""
+        activity.actionSheet("Tema", listOf(
+            SheetItem(Icon.THEME_AUTO, "Igual ao celular" + mark("system")) { pick(activity, "system") },
+            SheetItem(Icon.SUN, "Claro" + mark("light")) { pick(activity, "light") },
+            SheetItem(Icon.MOON, "Noturno" + mark("dark")) { pick(activity, "dark") },
+        ))
+    }
+
+    private fun pick(activity: android.app.Activity, choice: String) {
+        val before = themeVersion
+        setThemeChoice(activity, choice)
+        if (themeVersion != before) activity.recreate()
+    }
 
     // Tipografia: carregada em init(); até lá, fontes do sistema.
     var REGULAR: Typeface = Typeface.create("sans-serif", Typeface.NORMAL); private set
@@ -64,6 +172,7 @@ object Ui {
 
     /** Carrega Onest (interface) e Fraunces (títulos). Chamar no onCreate das telas. */
     fun init(context: Context) {
+        updateTheme(context)
         if (fontsLoaded) return
         val c = context.applicationContext
         appContext = c
@@ -129,7 +238,7 @@ object Ui {
         val rnd = java.util.Random(11)
         val px = IntArray(size * size) {
             val v = rnd.nextInt(256)
-            Color.argb(if (v > 128) 10 else 0, 60, 48, 30)
+            if (isDark) Color.argb(if (v > 128) 7 else 0, 255, 240, 220) else Color.argb(if (v > 128) 10 else 0, 60, 48, 30)
         }
         val bmp = android.graphics.Bitmap.createBitmap(px, size, size, android.graphics.Bitmap.Config.ARGB_8888)
         val grain = android.graphics.drawable.BitmapDrawable(resources, bmp).apply {
@@ -159,7 +268,7 @@ object Ui {
     }
 
     /** Efeito de toque (ripple) por cima de um fundo. */
-    fun ripple(content: Drawable?, mask: Drawable?, color: Int = Color.parseColor("#1A000000")) =
+    fun ripple(content: Drawable?, mask: Drawable?, color: Int = if (isDark) Color.parseColor("#22FFFFFF") else Color.parseColor("#1A000000")) =
         RippleDrawable(ColorStateList.valueOf(color), content, mask)
 
     fun Context.card(radiusDp: Float = 20f, elevationDp: Float = 1.5f, view: View) {
@@ -231,7 +340,7 @@ object Ui {
         textSize = 15f
         typeface = MEDIUM
         gravity = Gravity.CENTER
-        setTextColor(Color.WHITE)
+        setTextColor(if (color == ACCENT) ON_ACCENT else Color.WHITE)
         minHeight = dpi(50f)
         setPadding(dpi(22f), 0, dpi(22f), 0)
         background = ripple(rounded(color, 14f), rounded(Color.WHITE, 14f), Color.parseColor("#33FFFFFF"))
@@ -300,7 +409,7 @@ object Ui {
         }
         val items = ArrayList<TextView>()
         fun style(sel: Int) = items.forEachIndexed { i, t ->
-            t.background = if (i == sel) pill(Color.WHITE, 0) else null
+            t.background = if (i == sel) pill(SEGMENT_ON, 0) else null
             t.elevation = if (i == sel) dp(1f) else 0f
             t.setTextColor(if (i == sel) INK else MUTED)
         }
@@ -335,7 +444,7 @@ object Ui {
             )
             trackTintList = ColorStateList(
                 arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                intArrayOf(ACCENT, Color.parseColor("#C9CED6")),
+                intArrayOf(ACCENT, TRACK),
             )
             setOnCheckedChangeListener { _, v -> onChange(v) }
         }
@@ -351,7 +460,7 @@ object Ui {
         val dialog = Dialog(this)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         val content = vertical().apply { setPadding(dpi(20f), dpi(10f), dpi(20f), dpi(20f)) }
-        content.addView(View(this).apply { background = pill(Color.parseColor("#D5D9E0"), 0) },
+        content.addView(View(this).apply { background = pill(HANDLE, 0) },
             LinearLayout.LayoutParams(dpi(36f), dpi(4f)).apply {
                 gravity = Gravity.CENTER_HORIZONTAL
                 bottomMargin = dpi(14f)

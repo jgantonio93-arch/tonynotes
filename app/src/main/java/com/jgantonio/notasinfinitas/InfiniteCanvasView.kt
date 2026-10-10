@@ -77,6 +77,15 @@ class InfiniteCanvasView(context: Context) : View(context) {
     var paperColor = Color.WHITE
         set(v) { field = v; dirty = true; invalidate() }
 
+    /** Desenhando para exportar/miniatura: sempre as cores de verdade. */
+    private var exporting = false
+
+    /** Tema noturno com papel claro: a nota aparece escura e a tinta invertida (ver [Night]). */
+    val nightInk get() = Ui.isDark && !exporting && Night.isLightPaper(paperColor)
+
+    /** Cor do papel como aparece na tela agora. */
+    private fun displayPaper() = if (nightInk) Night.paper(paperColor) else paperColor
+
     /** Tela infinita ou folhas (verticais/horizontais, fixas ou infinitas). */
     var pageLayout = PageLayout()
         private set
@@ -909,7 +918,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
         return l.indexAt(wx(width / 2f), wy(height / 2f)).coerceIn(0, max(0, pageCount - 1))
     }
 
-    private fun deskColor(): Int = if (isDarkPaper()) Color.parseColor("#121418") else Color.parseColor("#E7E3DB")
+    private fun deskColor(): Int = if (isDarkPaper()) Color.parseColor("#0C0B0A") else Color.parseColor("#E7E3DB")
 
     private val pagePaint = Paint()
     private val pageShadow = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -924,7 +933,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
         val last = min(n - 1, l.indexAt(visibleWorld.right, visibleWorld.bottom))
         if (first > last) return
         val dark = isDarkPaper()
-        pagePaint.color = paperColor
+        pagePaint.color = displayPaper()
         pageNumberPaint.color = if (dark) Color.parseColor("#8A8F98") else Ui.MUTED
         pageNumberPaint.textSize = 11f * density
         pageNumberPaint.typeface = Ui.MEDIUM
@@ -965,6 +974,15 @@ class InfiniteCanvasView(context: Context) : View(context) {
      * (sobre a cor do papel). Usado para exportar e para a miniatura.
      */
     fun renderToBitmap(maxW: Int, maxH: Int, maxScale: Float = 2f, thumbnail: Boolean = false): Bitmap? {
+        exporting = true
+        try {
+            return renderToBitmapInner(maxW, maxH, maxScale, thumbnail)
+        } finally {
+            exporting = false
+        }
+    }
+
+    private fun renderToBitmapInner(maxW: Int, maxH: Int, maxScale: Float, thumbnail: Boolean): Bitmap? {
         val content = contentBounds() ?: return null
         val pages = usedPageRects()
         val region = RectF(content)
@@ -994,10 +1012,16 @@ class InfiniteCanvasView(context: Context) : View(context) {
 
     /** Desenha os elementos num canvas já transformado para o mundo. */
     fun drawContent(canvas: Canvas, clip: RectF?, renderScale: Float = 1f) {
+        val wasExporting = exporting
+        val night = StrokeRenderer.night
+        exporting = true
+        StrokeRenderer.night = false
         for (e in elements) {
             if (clip != null && !RectF.intersects(e.bounds, clip)) continue
             drawElement(canvas, e, renderScale, sync = true)
         }
+        StrokeRenderer.night = night
+        exporting = wasExporting
     }
 
     // ---- Toque -------------------------------------------------------------
@@ -1132,7 +1156,10 @@ class InfiniteCanvasView(context: Context) : View(context) {
             val xs = FloatArray(n) { b.xs[start + it] * scale + offsetX }
             val ys = FloatArray(n) { b.ys[start + it] * scale + offsetY }
             val ws = FloatArray(n) { b.ws[start + it] * scale }
-            wet.draw(InkSegment(xs, ys, ws, n, b.pen.color))
+            // O pedaço vira o mesmo contorno do traço pronto (montado aqui, na thread
+            // principal): ao "secar", a tinta não muda de forma.
+            val outline = StrokeRenderer.buildPath(xs, ys, ws, n, uniform = false, into = Path())
+            wet.draw(InkSegment(outline, if (nightInk) Night.map(b.pen.color) else b.pen.color))
             wetSent = b.n
             return
         }
@@ -1169,6 +1196,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
         canvas.translate(offsetX, offsetY)
         canvas.scale(scale, scale)
         StrokeRenderer.zoom = scale
+        StrokeRenderer.night = nightInk
         StrokeRenderer.drawBuilder(canvas, b, predXs, predYs, predN)
         canvas.restore()
     }
@@ -1529,17 +1557,21 @@ class InfiniteCanvasView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (pendingWetClear) {
-            // O traço já está na nota: limpa a tinta molhada depois que este quadro aparecer.
+            // O traço já está na nota. Só apaga a tinta molhada depois que este quadro
+            // chegou de fato à tela (+2 quadros de folga): apagar antes fazia o traço
+            // sumir por um instante, o "pisca" ao escrever.
             pendingWetClear = false
-            postOnAnimation {
-                postOnAnimation { if (builder == null) wetInk?.clear() else pendingWetClear = true }
+            viewTreeObserver.registerFrameCommitCallback {
+                postOnAnimation {
+                    postOnAnimation { if (builder == null) wetInk?.clear() else pendingWetClear = true }
+                }
             }
         }
         visibleWorld.set(wx(0f), wy(0f), wx(width.toFloat()), wy(height.toFloat()))
         if (pageLayout.hasPages) {
             drawPages(canvas)
         } else {
-            canvas.drawColor(paperColor)
+            canvas.drawColor(displayPaper())
             drawPattern(canvas, 0f, 0f, null)
         }
 
@@ -1547,6 +1579,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
         canvas.translate(offsetX, offsetY)
         canvas.scale(scale, scale)
         StrokeRenderer.zoom = scale
+        StrokeRenderer.night = nightInk
         val moving = !selT.isIdentity
         val crop = cropTarget
         for (e in elements) {
@@ -1694,17 +1727,22 @@ class InfiniteCanvasView(context: Context) : View(context) {
         canvas.rotate(e.rotation)
         canvas.scale(if (e.flipH) -1f else 1f, if (e.flipV) -1f else 1f)
         canvas.translate(-e.boxWidth / 2f, -e.boxHeight / 2f)
+        val pad = e.pad
+        if (nightInk) canvas.saveLayer(-pad, -pad, e.boxWidth + pad, e.boxHeight + pad, nightTextPaint)
         if (e.bgColor != 0) {
             textBg.color = e.bgColor
             val p = e.pad
             canvas.drawRoundRect(RectF(-p, -p, e.boxWidth + p, e.boxHeight + p), p, p, textBg)
         }
         e.layout.draw(canvas)
+        if (nightInk) canvas.restore()
         canvas.restore()
     }
 
+    private val nightTextPaint = Paint().apply { colorFilter = Night.filter }
+
     private fun isDarkPaper(): Boolean {
-        val c = paperColor
+        val c = displayPaper()
         val lum = 0.299 * Color.red(c) + 0.587 * Color.green(c) + 0.114 * Color.blue(c)
         return lum < 128
     }

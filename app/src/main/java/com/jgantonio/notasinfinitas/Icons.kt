@@ -18,7 +18,8 @@ enum class Icon {
     TRASH, COPY, PALETTE, CHECK, CLOSE, EDIT, MOVE, STAR, TOUCH, EXPORT, PDF, PAGE, CENTER, SHAPES, CHEVRON_RIGHT,
     ROTATE, LOCK, UNLOCK, CROP, FLIP_H, FLIP_V, ADJUST, TO_FRONT, TO_BACK, DOWNLOAD, RESET, ZOOM, SELECT_ALL,
     SEARCH, MARKER, ALIGN_LEFT, ALIGN_CENTER, ALIGN_RIGHT, TEXT_BIGGER, TEXT_SMALLER,
-    RECT_SELECT, PARTIAL, STRAIGHT, GRIP, INFINITE, PAGES_V, PAGES_H, DOCK_TOP, DOCK_LEFT, DOCK_RIGHT
+    RECT_SELECT, PARTIAL, STRAIGHT, GRIP, INFINITE, PAGES_V, PAGES_H, DOCK_TOP, DOCK_LEFT, DOCK_RIGHT,
+    SUN, MOON, THEME_AUTO, PAGE_PORTRAIT, PAGE_LANDSCAPE
 }
 
 /** Rótulo em português para leitores de tela (botões só com ícone). */
@@ -38,7 +39,8 @@ val Icon.label: String
         Icon.RECT_SELECT -> "Seleção retangular"; Icon.PARTIAL -> "Seleção parcial"; Icon.STRAIGHT -> "Linhas retas"
         Icon.GRIP -> "Arrastar barra"; Icon.INFINITE -> "Infinito"; Icon.PAGES_V -> "Folhas verticais"
         Icon.PAGES_H -> "Folhas horizontais"; Icon.DOCK_TOP -> "Barra no topo"; Icon.DOCK_LEFT -> "Barra à esquerda"
-        Icon.DOCK_RIGHT -> "Barra à direita"
+        Icon.DOCK_RIGHT -> "Barra à direita"; Icon.SUN -> "Tema claro"; Icon.MOON -> "Tema noturno"
+        Icon.THEME_AUTO -> "Tema do celular"; Icon.PAGE_PORTRAIT -> "Folha vertical"; Icon.PAGE_LANDSCAPE -> "Folha horizontal"
         Icon.ALIGN_CENTER -> "Centralizar texto"; Icon.ALIGN_RIGHT -> "Alinhar à direita"
         Icon.TEXT_BIGGER -> "Aumentar"; Icon.TEXT_SMALLER -> "Diminuir"
     }
@@ -354,6 +356,29 @@ class IconDrawable(
                 c.drawPath(path { rrect(2.5f, 6.5f, 10.5f, 17.5f, 1.2f) }, stroke)
                 c.drawPath(path { rrect(13.5f, 6.5f, 21.5f, 17.5f, 1.2f) }, stroke)
             }
+            Icon.SUN -> {
+                c.drawCircle(12f, 12f, 4.2f, stroke)
+                val p = Path()
+                for (k in 0 until 8) {
+                    val a = Math.toRadians(k * 45.0)
+                    val cx = cos(a).toFloat()
+                    val cy = sin(a).toFloat()
+                    p.moveTo(12f + cx * 7.2f, 12f + cy * 7.2f); p.lineTo(12f + cx * 9.4f, 12f + cy * 9.4f)
+                }
+                c.drawPath(p, stroke)
+            }
+            Icon.MOON -> {
+                // Lua crescente: um círculo menos outro deslocado.
+                val moon = Path().apply { addCircle(11.5f, 12.5f, 8f, Path.Direction.CW) }
+                moon.op(Path().apply { addCircle(16.5f, 8f, 6.6f, Path.Direction.CW) }, Path.Op.DIFFERENCE)
+                c.drawPath(moon, stroke)
+            }
+            Icon.THEME_AUTO -> {
+                c.drawCircle(12f, 12f, 8f, stroke)
+                c.drawPath(path { moveTo(12f, 4f); arcTo(RectF(4f, 4f, 20f, 20f), -90f, 180f, false); close() }, fill)
+            }
+            Icon.PAGE_PORTRAIT -> c.drawPath(path { rrect(6.5f, 3.5f, 17.5f, 20.5f, 1.5f) }, stroke)
+            Icon.PAGE_LANDSCAPE -> c.drawPath(path { rrect(3.5f, 6.5f, 20.5f, 17.5f, 1.5f) }, stroke)
             Icon.DOCK_TOP, Icon.DOCK_LEFT, Icon.DOCK_RIGHT -> {
                 c.drawPath(path { rrect(3.5f, 3.5f, 20.5f, 20.5f, 3f) }, stroke)
                 when (icon) {

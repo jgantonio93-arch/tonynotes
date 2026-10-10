@@ -130,6 +130,21 @@ class ScreenshotTest {
         save(withDialog(folhas), "17-pagina")
         fc.setPageLayout(true, true, true, true, 1)
         save(snap(folhas), "18-folhas-horizontais")
+
+        // Tons da cor no seletor
+        ColorPicker.show(editor, Color.parseColor("#1F5FD1")) {}
+        save(withDialog(editor), "19-tons-da-cor")
+
+        // Tema noturno: início e editor (a nota aparece escura com a tinta invertida)
+        Ui.setThemeChoice(app, "dark")
+        val darkHome = Robolectric.buildActivity(FoldersActivity::class.java).setup().get()
+        save(snap(darkHome), "20-noturno-inicio")
+        val darkEditor = Robolectric.buildActivity(EditorActivity::class.java,
+            Intent(app, EditorActivity::class.java).putExtra(EditorActivity.EXTRA_NOTE, nota.id)).setup().get()
+        save(snap(darkEditor), "21-noturno-editor")
+        darkEditor.openPenTray()
+        save(snap(darkEditor), "22-noturno-bandeja")
+        Ui.setThemeChoice(app, "light")
     }
 
     // ---- Captura ---------------------------------------------------------------------

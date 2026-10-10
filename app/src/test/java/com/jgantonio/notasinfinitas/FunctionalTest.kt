@@ -509,4 +509,51 @@ class FunctionalTest {
         canvas.setPageLayout(false, false, false, true, 1)
         assertEquals(0, canvas.pageCount)
     }
+
+    // ---- Tons, tema noturno e página -------------------------------------------------------
+
+    @Test
+    fun tons_da_cor_mantem_o_matiz() {
+        val base = Color.parseColor("#1F5FD1")
+        val t = ColorPicker.tones(base)
+        assertEquals(9, t.size)
+        assertTrue("do claro ao escuro", Color.luminance(t.first()) > Color.luminance(t.last()))
+        val h0 = FloatArray(3).also { Color.colorToHSV(base, it) }
+        for (c in t.subList(1, 8)) {
+            val h = FloatArray(3).also { Color.colorToHSV(c, it) }
+            assertTrue("mesmo matiz: ${h[0]} vs ${h0[0]}", abs(h[0] - h0[0]) < 6f)
+        }
+        // Cinza vira escala de cinzas
+        for (c in ColorPicker.tones(Color.GRAY)) assertTrue(abs(Color.red(c) - Color.blue(c)) <= 1)
+    }
+
+    @Test
+    fun tema_noturno_inverte_tinta_e_exporta_cores_reais() {
+        assertEquals(Color.WHITE, Night.map(Color.BLACK))
+        val red = Night.map(Color.parseColor("#D7263D"))
+        assertTrue("vermelho continua avermelhado", Color.red(red) > Color.green(red) && Color.red(red) > Color.blue(red))
+        try {
+            Ui.setThemeChoice(app, "dark")
+            controller.pause().stop().destroy()
+            openEditor()
+            assertTrue(Ui.isDark)
+            assertTrue("papel branco aparece escuro", canvas.nightInk)
+            drag(line(200f, 700f, 900f, 700f))
+            val bmp = canvas.renderToBitmap(800, 800)!!
+            assertEquals("exportação com o papel de verdade", Color.WHITE, bmp.getPixel(2, 2))
+        } finally {
+            Ui.setThemeChoice(app, "light")
+        }
+        assertTrue(!Ui.isDark)
+    }
+
+    @Test
+    fun folha_horizontal_em_rolagem_vertical() {
+        // Orientação (folha deitada) e apresentação (uma embaixo da outra) são independentes.
+        canvas.setPageLayout(true, false, true, false, 3)
+        val l = canvas.pageLayout
+        assertTrue("folha deitada", l.w > l.h)
+        assertTrue("uma embaixo da outra", l.pageRect(1).top > l.pageRect(0).bottom)
+        assertEquals(l.pageRect(0).left, l.pageRect(1).left, 0.01f)
+    }
 }

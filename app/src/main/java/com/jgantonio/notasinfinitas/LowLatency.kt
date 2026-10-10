@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.PorterDuff
 import android.view.SurfaceView
@@ -12,22 +13,14 @@ import android.view.View
 import androidx.graphics.lowlatency.CanvasFrontBufferedRenderer
 
 /**
- * Pedaço de traço já em coordenadas da TELA, pronto para desenhar no front buffer.
- * Cada pedaço repete o último ponto do anterior, para a linha sair contínua.
+ * Pedaço de traço já em coordenadas da TELA, pronto para desenhar no front buffer:
+ * o contorno preenchido (o mesmo formato do traço pronto). Cada pedaço repete o
+ * último ponto do anterior, para a linha sair contínua.
  */
-class InkSegment(val xs: FloatArray, val ys: FloatArray, val ws: FloatArray, val n: Int, val color: Int) {
+class InkSegment(val outline: Path, val color: Int) {
     fun draw(c: Canvas, paint: Paint) {
         paint.color = color or (0xFF shl 24)
-        if (n == 1) {
-            paint.style = Paint.Style.FILL
-            c.drawCircle(xs[0], ys[0], ws[0] / 2f, paint)
-            paint.style = Paint.Style.STROKE
-            return
-        }
-        for (i in 1 until n) {
-            paint.strokeWidth = (ws[i - 1] + ws[i]) / 2f
-            c.drawLine(xs[i - 1], ys[i - 1], xs[i], ys[i], paint)
-        }
+        c.drawPath(outline, paint)
     }
 }
 
@@ -43,11 +36,7 @@ class InkSegment(val xs: FloatArray, val ys: FloatArray, val ws: FloatArray, val
 class WetInkLayer(context: Context) : SurfaceView(context) {
 
     private var renderer: CanvasFrontBufferedRenderer<InkSegment>? = null
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
 
     private val callback = object : CanvasFrontBufferedRenderer.Callback<InkSegment> {
         override fun onDrawFrontBufferedLayer(canvas: Canvas, bufferWidth: Int, bufferHeight: Int, param: InkSegment) {

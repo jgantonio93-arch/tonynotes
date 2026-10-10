@@ -35,6 +35,7 @@ import com.jgantonio.notasinfinitas.Ui.sheet
 import com.jgantonio.notasinfinitas.Ui.circle
 import com.jgantonio.notasinfinitas.Ui.dp
 import com.jgantonio.notasinfinitas.Ui.dpi
+import com.jgantonio.notasinfinitas.Ui.floating
 import com.jgantonio.notasinfinitas.Ui.horizontal
 import com.jgantonio.notasinfinitas.Ui.icon
 import com.jgantonio.notasinfinitas.Ui.iconButton
@@ -97,6 +98,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Ui.init(this)
+        Ui.styleWindow(this, Ui.SURFACE)
         Library.init(this)
         val n = Library.note(intent.getStringExtra(EXTRA_NOTE))
         if (n == null) {
@@ -151,7 +153,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             gravity = Gravity.CENTER
             minHeight = dpi(32f)
             setPadding(dpi(12f), 0, dpi(12f), 0)
-            background = ripple(pill(Color.parseColor("#F2FFFFFF")), pill(Color.WHITE, 0))
+            background = ripple(floating(100f), pill(Color.WHITE, 0))
             fontFeatureSettings = "tnum"
             Ui.run { softShadow(2f) }
             contentDescription = "Zoom"
@@ -165,8 +167,9 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             gravity = Gravity.CENTER_HORIZONTAL
             isClickable = false
             addView(ImageView(this@EditorActivity).apply {
-                setImageDrawable(PenGlyphDrawable(BrushType.FOUNTAIN, Ui.ACCENT, dpi(56f), dp(1.2f)))
-            }, LinearLayout.LayoutParams(dpi(56f), dpi(56f)))
+                setImageDrawable(LogoDrawable(dpi(52f)))
+                alpha = 0.92f
+            }, LinearLayout.LayoutParams(dpi(52f), dpi(52f)))
             hintTitle = label("", 17f, Ui.INK, bold = true).apply { setPadding(0, dpi(12f), 0, dpi(4f)) }
             hintBody = label("", 14f).apply {
                 gravity = Gravity.CENTER
@@ -329,12 +332,12 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     private fun buildDock(): LinearLayout {
         val bar = horizontal().apply {
             setPadding(dpi(4f), dpi(5f), dpi(6f), dpi(5f))
-            background = pill(Ui.SURFACE, Color.parseColor("#EEF0F3"))
+            background = floating(100f)
             Ui.run { softShadow(10f) }
             isClickable = true
         }
         dockGrip = ImageView(this).apply {
-            setImageDrawable(IconDrawable(Icon.GRIP, Color.parseColor("#A39E94"), dpi(20f), dp(1.6f)))
+            setImageDrawable(IconDrawable(Icon.GRIP, Ui.MUTED, dpi(20f), dp(1.6f)))
             scaleType = ImageView.ScaleType.CENTER
             contentDescription = "Arrastar barra (toque para mais opções)"
             setOnTouchListener(DockDrag())
@@ -375,7 +378,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         dock.orientation = if (vertical) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
         dock.gravity = Gravity.CENTER
         dock.setPadding(if (vertical) dpi(5f) else dpi(4f), if (vertical) dpi(4f) else dpi(5f), dpi(5f), if (vertical) dpi(8f) else dpi(5f))
-        dock.background = pill(Ui.SURFACE, Color.parseColor("#EEF0F3"), if (vertical) 30f else 100f)
+        dock.background = floating(if (vertical) 30f else 100f)
         dockGrip.layoutParams = if (vertical) LinearLayout.LayoutParams(dpi(46f), dpi(24f)) else LinearLayout.LayoutParams(dpi(24f), dpi(46f))
         val toolLp = { LinearLayout.LayoutParams(dpi(46f), dpi(46f)).apply {
             if (vertical) setMargins(0, dpi(1f), 0, dpi(1f)) else setMargins(dpi(1f), 0, dpi(1f), 0)
@@ -600,18 +603,21 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             "right" -> min(dock.left - gap - dpi(12f), dpi(440f))
             else -> min(sw - dpi(24f), dpi(440f))
         }
-        val lp = FrameLayout.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT)
-        lp.bottomMargin = dpi(12f)
-        lp.topMargin = dpi(12f)
+        // A bandeja tem uma folga em volta para a sombra (TRAY_SHADOW_DP): compensa aqui
+        // para o cartão ficar exatamente no lugar.
+        val room = dpi(TRAY_SHADOW_DP)
+        val lp = FrameLayout.LayoutParams(width + room * 2, ViewGroup.LayoutParams.WRAP_CONTENT)
+        lp.bottomMargin = dpi(12f) - room
+        lp.topMargin = dpi(12f) - room / 2
         var fromX = 0f
         var fromY = -dp(10f)
         when (prefs.dockMode) {
-            "left" -> { lp.gravity = Gravity.TOP or Gravity.START; lp.marginStart = dockRight + gap; fromX = -dp(10f); fromY = 0f }
-            "right" -> { lp.gravity = Gravity.TOP or Gravity.END; lp.marginEnd = sw - dock.left + gap; fromX = dp(10f); fromY = 0f }
+            "left" -> { lp.gravity = Gravity.TOP or Gravity.START; lp.marginStart = dockRight + gap - room; fromX = -dp(10f); fromY = 0f }
+            "right" -> { lp.gravity = Gravity.TOP or Gravity.END; lp.marginEnd = sw - dock.left + gap - room; fromX = dp(10f); fromY = 0f }
             else -> {
                 val below = dock.top + dock.height / 2 < sh / 2
-                if (below) { lp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL; lp.topMargin = dockBottom + gap }
-                else { lp.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL; lp.bottomMargin = sh - dock.top + gap; fromY = dp(10f) }
+                if (below) { lp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL; lp.topMargin = dockBottom + gap - room / 2 }
+                else { lp.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL; lp.bottomMargin = sh - dock.top + gap - room; fromY = dp(10f) }
             }
         }
 
@@ -668,7 +674,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         selectionTrailing = horizontal().apply { setPadding(0, 0, dpi(6f), 0) }
         selectionLabel = label("", 13f, Ui.ACCENT, bold = true)
         val outer = horizontal().apply {
-            background = pill(Ui.SURFACE, Color.parseColor("#EEF0F3"))
+            background = floating(100f)
             Ui.run { softShadow(12f) }
             isClickable = true
             setPadding(0, dpi(4f), 0, dpi(4f))
@@ -800,7 +806,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             textSize = 14f
             typeface = Ui.MEDIUM
             gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
+            setTextColor(Ui.ON_ACCENT)
             minHeight = dpi(38f)
             setPadding(dpi(16f), 0, dpi(16f), 0)
             background = ripple(pill(Ui.ACCENT, 0), pill(Color.WHITE, 0), Color.parseColor("#33FFFFFF"))
@@ -858,6 +864,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             SheetItem(Icon.PAGE, "Página (infinita ou folhas)") {
                 Panels.showPage(this, canvasView, prefs) { onStateChanged() }
             },
+            SheetItem(if (Ui.isDark) Icon.MOON else Icon.SUN, "Tema (claro ou noturno)") { Ui.showThemeMenu(this) },
             SheetItem(Icon.PDF, "Importar PDF") { pickPdf() },
             SheetItem(Icon.SELECT_ALL, "Selecionar tudo") { canvasView.selectAll(); refresh() },
             SheetItem(Icon.EXPORT, "Exportar como imagem") { exportPng() },

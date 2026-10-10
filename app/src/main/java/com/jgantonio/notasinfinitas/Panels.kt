@@ -32,12 +32,24 @@ import com.jgantonio.notasinfinitas.Ui.softShadow
 import com.jgantonio.notasinfinitas.Ui.wrapRow
 import kotlin.math.max
 
-/** Cartão flutuante usado pelas bandejas (caneta e borracha). */
+/** Cartão flutuante usado pelas bandejas (caneta, borracha e seleção). */
 private fun Context.trayCard(): LinearLayout = vertical().apply {
     setPadding(dpi(16f), dpi(14f), dpi(16f), dpi(16f))
-    background = rounded(Ui.SURFACE, 26f, Color.parseColor("#E9EBEF"))
+    background = Ui.run { floating(26f) }
     softShadow(14f)
     isClickable = true // não deixa o toque "vazar" para a tela de desenho
+}
+
+/**
+ * Folga em volta do cartão para a sombra aparecer inteira: sem ela, a sombra era
+ * cortada reta nas bordas da bandeja (o efeito de "borda bugada").
+ */
+const val TRAY_SHADOW_DP = 18f
+
+private fun LinearLayout.shadowRoom() {
+    val p = context.dpi(TRAY_SHADOW_DP)
+    setPadding(p, p / 2, p, p)
+    clipToPadding = false
 }
 
 /**
@@ -59,6 +71,7 @@ class PenTray(
 
     init {
         orientation = VERTICAL
+        shadowRoom()
         addView(card, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         render()
     }
@@ -249,6 +262,7 @@ class PenTray(
 class EraserTray(context: Context, prefs: PenPrefs, onChange: () -> Unit, onClearAll: () -> Unit) : LinearLayout(context) {
     init {
         orientation = VERTICAL
+        shadowRoom()
         val c = context
         val card = c.trayCard()
         addView(card, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
@@ -293,7 +307,7 @@ class EraserTray(context: Context, prefs: PenPrefs, onChange: () -> Unit, onClea
             setCompoundDrawablesRelativeWithIntrinsicBounds(c.icon(Icon.TRASH, Ui.DANGER, 20f), null, null, null)
             compoundDrawablePadding = c.dpi(8f)
             setPadding(c.dpi(16f), 0, c.dpi(18f), 0)
-            background = Ui.ripple(c.pill(Color.parseColor("#FDECEC"), 0), c.pill(Color.WHITE, 0))
+            background = Ui.ripple(c.pill(Ui.DANGER_SOFT, 0), c.pill(Color.WHITE, 0))
             setOnClickListener {
                 c.confirm("Apagar tudo?", "Todo o conteúdo desta nota será apagado. Dá para desfazer em seguida.", "Apagar") {
                     onClearAll()
@@ -311,6 +325,7 @@ class EraserTray(context: Context, prefs: PenPrefs, onChange: () -> Unit, onClea
 class SelectTray(context: Context, prefs: PenPrefs, onChange: () -> Unit) : LinearLayout(context) {
     init {
         orientation = VERTICAL
+        shadowRoom()
         val c = context
         val card = c.trayCard()
         addView(card, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
@@ -375,7 +390,7 @@ object Panels {
             }
 
             fun styleModes() {
-                val sel = if (!paged) 0 else if (horizontal) 2 else 1
+                val sel = if (!paged) 0 else 1
                 for ((i, tile) in modeTiles) {
                     val on = i == sel
                     val box2 = tile.getChildAt(0) as ImageView
@@ -390,7 +405,7 @@ object Panels {
 
             // Tipo de página
             val modes = context.horizontal()
-            listOf(Icon.INFINITE to "Infinita", Icon.PAGES_V to "Folhas verticais", Icon.PAGES_H to "Folhas horizontais")
+            listOf(Icon.INFINITE to "Infinita", Icon.PAGES_V to "Folhas")
                 .forEachIndexed { i, (icon, name) ->
                     val tile = context.vertical().apply {
                         gravity = Gravity.CENTER_HORIZONTAL
@@ -398,7 +413,6 @@ object Panels {
                         Ui.run { pressable(0.96f) }
                         setOnClickListener {
                             paged = i != 0
-                            if (paged) horizontal = i == 2
                             styleModes()
                             apply()
                         }
@@ -421,9 +435,16 @@ object Panels {
             box.addView(modes)
 
             // Opções das folhas
-            pageOptions.addView(context.sectionLabel("Formato da folha"))
-            pageOptions.addView(context.segmented(listOf("Retrato", "Paisagem"), if (landscape) 1 else 0) { i ->
+            // Orientação: a folha em pé (vertical) ou deitada (horizontal).
+            pageOptions.addView(context.sectionLabel("Orientação da folha"))
+            pageOptions.addView(context.segmented(listOf("Vertical", "Horizontal"), if (landscape) 1 else 0) { i ->
                 landscape = i == 1
+                apply()
+            })
+            // Apresentação: como as folhas se seguem na tela.
+            pageOptions.addView(context.sectionLabel("Apresentação das folhas"))
+            pageOptions.addView(context.segmented(listOf("Uma embaixo da outra", "Lado a lado"), if (horizontal) 1 else 0) { i ->
+                horizontal = i == 1
                 apply()
             })
             pageOptions.addView(context.switchRow(Icon.INFINITE, "Folhas infinitas", endless) { on ->

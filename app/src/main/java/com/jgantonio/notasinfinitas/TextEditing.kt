@@ -107,7 +107,9 @@ class InlineTextEditor(
 
         val e = EditText(ctx).apply {
             background = GradientDrawable().apply {
-                setColor(Color.argb(18, 47, 107, 255))
+                // Na nota noturna a tinta aparece invertida; enquanto digita, a caixa vira
+                // um pedaço de papel claro para o texto (com as cores reais) ficar legível.
+                setColor(if (canvas.nightInk) Color.parseColor("#F6F4EF") else Color.argb(18, 47, 107, 255))
                 cornerRadius = 6f * density
                 setStroke((1.5f * density).toInt(), Ui.ACCENT, 6f * density, 4f * density)
             }
@@ -413,7 +415,7 @@ class InlineTextEditor(
             textSize = 14f
             typeface = Ui.MEDIUM
             gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
+            setTextColor(Ui.ON_ACCENT)
             minHeight = c.dpi(38f)
             setPadding(c.dpi(14f), 0, c.dpi(14f), 0)
             background = ripple(c.pill(Ui.ACCENT, 0), c.pill(Color.WHITE, 0), Color.parseColor("#33FFFFFF"))

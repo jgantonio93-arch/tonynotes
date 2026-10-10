@@ -81,7 +81,7 @@ abstract class FancySlider(context: Context, val min: Float, val max: Float, val
     private val thumbRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = context.dp(1f)
-        color = Color.parseColor("#D0D5DD")
+        color = if (Ui.isDark) Color.parseColor("#5A564E") else Color.parseColor("#D0D5DD")
     }
 
     init {
@@ -140,7 +140,7 @@ class SizeSlider(context: Context, min: Float, max: Float, value: Float, onChang
     }
 
     override fun drawTrack(canvas: Canvas, cy: Float) {
-        paint.color = Color.parseColor("#E4E7EC")
+        paint.color = Ui.TRACK
         canvas.drawPath(wedge(left, right, cy), paint)
         paint.color = tint
         canvas.drawPath(wedge(left, thumbX, cy), paint)
@@ -175,7 +175,7 @@ class OpacitySlider(
             var y = r.top
             var row = 0
             while (y < r.bottom) {
-                paint.color = if ((col + row) % 2 == 0) Color.WHITE else Color.parseColor("#E1E4E8")
+                paint.color = if ((col + row) % 2 == 0) Ui.SURFACE else Ui.TRACK
                 canvas.drawRect(x, y, x + sq, y + sq, paint)
                 y += sq; row++
             }
@@ -218,10 +218,11 @@ class ColorDot(context: Context, color: Int, checked: Boolean, onClick: () -> Un
         paint.style = Paint.Style.FILL
         paint.color = color or (0xFF shl 24)
         canvas.drawCircle(cx, cy, inner, paint)
-        if (Color.luminance(color or (0xFF shl 24)) > 0.85f) {
+        val lum = Color.luminance(color or (0xFF shl 24))
+        if ((!Ui.isDark && lum > 0.85f) || (Ui.isDark && lum < 0.06f)) {
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = context.dp(1f)
-            paint.color = Ui.LINE
+            paint.color = if (Ui.isDark) Ui.HANDLE else Ui.LINE
             canvas.drawCircle(cx, cy, inner, paint)
         }
     }
@@ -245,7 +246,7 @@ class RainbowButton(context: Context, onClick: () -> Unit) : View(context) {
         ), null)
         canvas.drawCircle(cx, cy, r, paint)
         paint.shader = null
-        paint.color = Color.WHITE
+        paint.color = Ui.SURFACE
         canvas.drawCircle(cx, cy, r - context.dp(3.5f), paint)
         paint.color = Ui.INK
         paint.style = Paint.Style.STROKE
@@ -262,7 +263,7 @@ class RainbowButton(context: Context, onClick: () -> Unit) : View(context) {
 class PenPreview(context: Context, pen: PenSettings) : View(context) {
     var pen = pen
         set(v) { field = v; invalidate() }
-    private val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F4F5F8") }
+    private val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Ui.FIELD }
 
     override fun onDraw(canvas: Canvas) {
         val w = width.toFloat()
@@ -279,9 +280,13 @@ class PenPreview(context: Context, pen: PenSettings) : View(context) {
             b.add(x, y, p, 0.5f)
         }
         val z = StrokeRenderer.zoom
+        val night = StrokeRenderer.night
         StrokeRenderer.zoom = 1f
+        // No tema noturno a prévia mostra a tinta como ela aparece na nota escura.
+        StrokeRenderer.night = Ui.isDark
         StrokeRenderer.drawElement(canvas, b.build())
         StrokeRenderer.zoom = z
+        StrokeRenderer.night = night
     }
 }
 
@@ -343,7 +348,7 @@ class CenterSlider(context: Context, limit: Float, value: Float, onChange: (Floa
 
     override fun drawTrack(canvas: Canvas, cy: Float) {
         val h = context.dp(3f)
-        paint.color = Color.parseColor("#E4E7EC")
+        paint.color = Ui.TRACK
         canvas.drawRoundRect(RectF(left, cy - h, right, cy + h), h, h, paint)
         val mid = (left + right) / 2f
         paint.color = Ui.ACCENT

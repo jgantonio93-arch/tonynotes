@@ -52,9 +52,14 @@ class FoldersActivity : Activity() {
     private lateinit var content: LinearLayout
     private val ptBr = Locale("pt", "BR")
 
+    /** Tema com que a tela foi montada: se mudar (ex.: no editor), a tela se recria. */
+    private var builtTheme = 0
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Ui.init(this)
+        builtTheme = Ui.themeVersion
+        Ui.styleWindow(this, Ui.BG)
         Library.init(this)
         folderId = intent.getStringExtra(EXTRA_FOLDER)
         if (folderId != null && Library.folder(folderId) == null) {
@@ -100,10 +105,10 @@ class FoldersActivity : Activity() {
             text = if (folderId == null) "Nova pasta" else "Nova nota"
             textSize = 15f
             typeface = Ui.MEDIUM
-            setTextColor(Color.WHITE)
+            setTextColor(Ui.ON_ACCENT)
             gravity = Gravity.CENTER
             setPadding(dpi(18f), 0, dpi(22f), 0)
-            setCompoundDrawablesRelativeWithIntrinsicBounds(icon(Icon.PLUS, Color.WHITE, 22f, 2.2f), null, null, null)
+            setCompoundDrawablesRelativeWithIntrinsicBounds(icon(Icon.PLUS, Ui.ON_ACCENT, 22f, 2.2f), null, null, null)
             compoundDrawablePadding = dpi(8f)
             background = ripple(pill(Ui.ACCENT, 0), pill(Color.WHITE, 0), Color.parseColor("#33FFFFFF"))
             Ui.run { softShadow(8f); pressable(0.96f) }
@@ -118,6 +123,10 @@ class FoldersActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        if (Ui.themeVersion != builtTheme) {
+            recreate()
+            return
+        }
         if (folderId != null && Library.folder(folderId) == null) {
             finish()
             return
@@ -164,19 +173,22 @@ class FoldersActivity : Activity() {
     private fun renderHome() {
         if (homeHead == null) {
             val head = vertical().apply { setPadding(dpi(6f), dpi(44f), dpi(6f), dpi(8f)) }
-            head.addView(label("TonyNotes", 14f, Ui.ACCENT, bold = true).apply {
+            val brand = horizontal()
+            brand.addView(label("TonyNotes", 14f, Ui.ACCENT, bold = true).apply {
                 typeface = Ui.BOLD
                 gravity = Gravity.CENTER_VERTICAL
                 setCompoundDrawablesRelativeWithIntrinsicBounds(LogoDrawable(dpi(22f)), null, null, null)
                 compoundDrawablePadding = dpi(8f)
-            })
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            brand.addView(iconButton(if (Ui.isDark) Icon.MOON else Icon.SUN, Ui.MUTED, 40f, "Tema") { Ui.showThemeMenu(this) })
+            head.addView(brand)
             head.addView(title("Suas pastas", 40f).apply { setPadding(0, dpi(4f), 0, dpi(2f)) })
             homeCount = label("", 14f)
             head.addView(homeCount)
             val search = Ui.run { textField("", "Buscar notas e pastas") }.apply {
                 setCompoundDrawablesRelativeWithIntrinsicBounds(icon(Icon.SEARCH, Ui.MUTED, 20f), null, null, null)
                 compoundDrawablePadding = dpi(10f)
-                background = Ui.run { rounded(Color.WHITE, 16f, Ui.LINE) }
+                background = Ui.run { rounded(Ui.SURFACE, 16f, Ui.LINE) }
                 addTextChangedListener(object : android.text.TextWatcher {
                     override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
                     override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
@@ -290,7 +302,7 @@ class FoldersActivity : Activity() {
             setPadding(dpi(24f), dpi(70f), dpi(24f), 0)
         }
         box.addView(ImageView(this).apply {
-            setImageDrawable(FolderGlyphDrawable(Color.parseColor("#C5D3F5")))
+            setImageDrawable(FolderGlyphDrawable(if (Ui.isDark) Color.parseColor("#3A4A80") else Color.parseColor("#C5D3F5")))
         }, LinearLayout.LayoutParams(dpi(96f), dpi(78f)))
         box.addView(label(title, 18f, Ui.INK, bold = true).apply { setPadding(0, dpi(18f), 0, dpi(4f)) })
         box.addView(label(text, 14f).apply { gravity = Gravity.CENTER })
@@ -330,10 +342,13 @@ class FoldersActivity : Activity() {
         }
     }
 
+    /** Cor da pasta bem diluída no fundo dos cartões (branco no tema claro, escuro no noturno). */
     private fun tint(color: Int, amount: Float): Int {
-        val r = (Color.red(color) * amount + 255 * (1 - amount)).toInt()
-        val g = (Color.green(color) * amount + 255 * (1 - amount)).toInt()
-        val b = (Color.blue(color) * amount + 255 * (1 - amount)).toInt()
+        val base = Ui.SURFACE
+        val a = if (Ui.isDark) amount * 1.6f else amount
+        val r = (Color.red(color) * a + Color.red(base) * (1 - a)).toInt()
+        val g = (Color.green(color) * a + Color.green(base) * (1 - a)).toInt()
+        val b = (Color.blue(color) * a + Color.blue(base) * (1 - a)).toInt()
         return Color.rgb(r, g, b)
     }
 
@@ -373,7 +388,7 @@ class FoldersActivity : Activity() {
         // com cantos concêntricos (22dp fora, 15dp dentro).
         card.setPadding(dpi(7f), dpi(7f), dpi(7f), 0)
         val thumbBox = FrameLayout(this).apply {
-            background = rounded(Color.parseColor("#FBFAF7"), 15f, Color.parseColor("#EFEBE3"))
+            background = rounded(Ui.THUMB_BG, 15f, Ui.THUMB_LINE)
             clipToOutline = true
         }
         val f = Library.thumbFile(n.id)
@@ -387,7 +402,7 @@ class FoldersActivity : Activity() {
             }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         } else {
             thumbBox.addView(ImageView(this).apply {
-                setImageDrawable(icon(Icon.NOTE, Color.parseColor("#C9C3B8"), 34f, 1.6f))
+                setImageDrawable(icon(Icon.NOTE, Ui.HANDLE, 34f, 1.6f))
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             }, FrameLayout.LayoutParams(dpi(40f), dpi(40f), Gravity.CENTER))
         }
