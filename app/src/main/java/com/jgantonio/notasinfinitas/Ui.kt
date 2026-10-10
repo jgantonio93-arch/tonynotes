@@ -107,6 +107,9 @@ object Ui {
     /** Barras do sistema e fundo da janela no tom do tema. */
     fun styleWindow(activity: android.app.Activity, barColor: Int) {
         val w = activity.window
+        // Cria a DecorView já: antes do setContentView ela ainda não existe e o
+        // insetsController daria NullPointerException.
+        val decor = w.decorView
         w.setBackgroundDrawable(ColorDrawable(BG))
         @Suppress("DEPRECATION")
         w.statusBarColor = barColor
@@ -116,10 +119,10 @@ object Ui {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
             val flags = android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
                 android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
-            w.insetsController?.setSystemBarsAppearance(if (light) flags else 0, flags)
+            decor.windowInsetsController?.setSystemBarsAppearance(if (light) flags else 0, flags)
         } else {
             @Suppress("DEPRECATION")
-            w.decorView.systemUiVisibility = if (light)
+            decor.systemUiVisibility = if (light)
                 View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR else 0
         }
     }
