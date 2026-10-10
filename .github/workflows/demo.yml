@@ -9,6 +9,9 @@ on:
       - ".github/workflows/demo.yml"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   demo:
     runs-on: ubuntu-latest
@@ -24,8 +27,12 @@ jobs:
           chmod +x gradlew
           ./gradlew testDebugUnitTest --tests "*DemoRecordingTest*" -Ddemo.dir="$PWD/demo-frames" --stacktrace
           ls demo-frames | wc -l
-      - uses: actions/upload-artifact@v4
-        with:
-          name: demo-frames
-          path: demo-frames
-          retention-days: 3
+      # Os quadros vão como anexo de uma versão "demo-frames" (pré-lançamento, fora da lista
+      # de versões do app), substituída a cada gravação.
+      - name: Publicar quadros
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd demo-frames && zip -q -r ../demo-frames.zip . && cd ..
+          gh release view demo-frames >/dev/null 2>&1 || gh release create demo-frames --prerelease --title "Quadros do vídeo de demonstração" --notes "Gerado pelo workflow demo.yml." --target "$GITHUB_SHA"
+          gh release upload demo-frames demo-frames.zip --clobber
