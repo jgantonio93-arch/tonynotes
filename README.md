@@ -1,4 +1,4 @@
-# TonyNotes
+# RosaNotes
 
 App Android (Kotlin) de anotações à mão com **tela infinita na horizontal e na vertical**,
 pensado para a S Pen dos Galaxy.
@@ -131,8 +131,8 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
 - **Texto**: toque na tela para digitar; toque num texto existente para editar.
 - **Imagem**: insere uma foto da galeria (já vem selecionada para posicionar).
 - **Modelo da página**: em branco, pontilhado, pautado ou quadriculado, e cor do papel.
-- **Desfazer / Refazer**, **Exportar PNG** (Imagens/TonyNotes) e
-  **Exportar PDF** (Downloads/TonyNotes).
+- **Desfazer / Refazer**, **Exportar PNG** (Imagens/RosaNotes) e
+  **Exportar PDF** (Downloads/RosaNotes).
 - Tudo é salvo automaticamente ao sair da nota.
 
 ## Visual
@@ -145,7 +145,7 @@ Todos os pares de texto/fundo passam no contraste WCAG AA (auditado com o Playwr
 O repositório é privado: só quem tem acesso a ele consegue baixar o app.
 Cada versão que passa nos testes vira uma **Release**. Com o GitHub logado no celular, este
 link sempre baixa a mais recente:
-`https://github.com/jgantonio93-arch/tonynotes/releases/latest/download/TonyNotes.apk`
+`https://github.com/jgantonio93-arch/tonynotes/releases/latest/download/RosaNotes.apk`
 (o mesmo APK também fica no artefato `tonynotes-apk` de cada execução na aba **Actions**).
 Instale o `.apk` permitindo "instalar apps desconhecidos".
 

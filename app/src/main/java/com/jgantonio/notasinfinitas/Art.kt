@@ -224,23 +224,29 @@ class FolderGlyphDrawable(private val color: Int) : Drawable() {
 }
 
 /**
- * Logo do TonyNotes: quadrado arredondado azul com um "t" escrito à mão e uma faixa
- * de marca-texto atrás da barra (o mesmo desenho do ícone do app, em 108 x 108).
+ * Logo do RosaNotes: quadrado arredondado vermelho com um "R" branco cuja barriga é
+ * uma rosa (miolo em espiral) e a perna é o caule, com uma folha (o mesmo desenho do
+ * ícone do app, em 108 x 108).
  */
 class LogoDrawable(private val sizePx: Int) : Drawable() {
     private val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        shader = LinearGradient(0f, 0f, 108f, 108f, Color.parseColor("#4060CC"), Color.parseColor("#25389A"), Shader.TileMode.CLAMP)
+        shader = LinearGradient(0f, 0f, 108f, 108f, Color.parseColor("#E8404F"), Color.parseColor("#A3162B"), Shader.TileMode.CLAMP)
     }
-    private val band = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FFD84D") }
-    private val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val white = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+    private val leafPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FFC9D1") }
+    private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         style = Paint.Style.STROKE
-        strokeWidth = 10f
+        strokeWidth = 9f
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
     }
-    private val stem = Path().apply {
-        moveTo(53f, 41f); lineTo(53f, 60.5f); cubicTo(53f, 71.5f, 63.5f, 74.5f, 71f, 68f)
+    private val petal = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#B81D33")
+        style = Paint.Style.STROKE
+        strokeWidth = 2.4f
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
     }
 
     override fun getIntrinsicWidth() = sizePx
@@ -253,27 +259,52 @@ class LogoDrawable(private val sizePx: Int) : Drawable() {
         canvas.translate(b.left.toFloat(), b.top.toFloat())
         canvas.scale(s, s)
         canvas.drawRoundRect(0f, 0f, 108f, 108f, 30f, 30f, bg)
-        // O "t" ocupa mais espaço aqui do que no ícone adaptativo (que tem margem de recorte).
-        canvas.scale(1.25f, 1.25f, 54f, 54f)
-        canvas.translate(0f, -1f)
-        canvas.save()
-        canvas.rotate(-4f, 54f, 40f)
-        canvas.drawRoundRect(30f, 34f, 78f, 47f, 4f, 4f, band)
-        canvas.restore()
-        canvas.drawLine(34.5f, 41f, 73.5f, 41f, ink)
-        canvas.drawPath(stem, ink)
+        canvas.drawPath(LEAF, leafPaint)
+        canvas.drawPath(STEM, stroke)
+        canvas.drawPath(LEG, stroke)
+        canvas.drawPath(BLOOM, white)
+        canvas.drawPath(SPIRAL, petal)
+        canvas.drawPath(CUP, petal)
         canvas.restore()
     }
 
     override fun setAlpha(alpha: Int) {
-        bg.alpha = alpha; band.alpha = alpha; ink.alpha = alpha
+        bg.alpha = alpha; white.alpha = alpha; leafPaint.alpha = alpha; stroke.alpha = alpha; petal.alpha = alpha
     }
 
     override fun setColorFilter(colorFilter: ColorFilter?) {
-        bg.colorFilter = colorFilter; band.colorFilter = colorFilter; ink.colorFilter = colorFilter
+        bg.colorFilter = colorFilter; white.colorFilter = colorFilter; leafPaint.colorFilter = colorFilter
+        stroke.colorFilter = colorFilter; petal.colorFilter = colorFilter
     }
 
     @Deprecated("Deprecated in Java")
     override fun getOpacity() = PixelFormat.TRANSLUCENT
+
+    private companion object {
+        // Mesmos caminhos de res/drawable/ic_launcher_foreground.xml.
+        val LEAF = Path().apply {
+            moveTo(61f, 69f); cubicTo(60f, 61f, 67f, 56f, 75f, 57f); cubicTo(75f, 65f, 68f, 70f, 61f, 69f); close()
+        }
+        val STEM = Path().apply { moveTo(37f, 34f); lineTo(37f, 80f) }
+        val LEG = Path().apply { moveTo(50f, 56f); cubicTo(57f, 63f, 62f, 72f, 71f, 80f) }
+        val BLOOM = Path().apply {
+            moveTo(32.5f, 33f); cubicTo(32.5f, 27f, 37f, 25f, 41f, 26.5f)
+            cubicTo(44f, 22f, 51f, 21f, 54.5f, 25.5f)
+            cubicTo(59f, 21f, 67f, 22.5f, 69f, 29f)
+            cubicTo(73f, 32f, 74f, 37f, 73f, 42f)
+            cubicTo(71.5f, 52f, 63.5f, 59f, 52f, 59f)
+            lineTo(37f, 59f); cubicTo(34.5f, 59f, 32.5f, 57f, 32.5f, 54.5f); close()
+        }
+        val SPIRAL = Path().apply {
+            moveTo(54.5f, 37f); cubicTo(52.5f, 36f, 50.5f, 38f, 51.8f, 40.2f)
+            cubicTo(53.3f, 42.6f, 58f, 41.6f, 58f, 37.6f)
+            cubicTo(58f, 33.2f, 52.5f, 31.6f, 49.6f, 34.6f)
+            cubicTo(46.4f, 38f, 47.6f, 44.6f, 54f, 45.6f)
+            cubicTo(60.5f, 46.5f, 64.8f, 42f, 64.6f, 36f)
+        }
+        val CUP = Path().apply {
+            moveTo(42.5f, 40f); cubicTo(42.5f, 49.5f, 48.5f, 53.8f, 55f, 53.8f); cubicTo(62f, 53.8f, 67.5f, 49.5f, 68.5f, 42.5f)
+        }
+    }
 }
 

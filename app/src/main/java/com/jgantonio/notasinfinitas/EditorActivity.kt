@@ -909,12 +909,12 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             val bmp = try { canvasView.images.export(img) } catch (e: Exception) { null }
             val ok = bmp != null && try {
                 writeToMediaStore(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, fileName("png"), "image/png",
-                    Environment.DIRECTORY_PICTURES + "/TonyNotes") { out -> bmp.compress(Bitmap.CompressFormat.PNG, 100, out) }
+                    Environment.DIRECTORY_PICTURES + "/RosaNotes") { out -> bmp.compress(Bitmap.CompressFormat.PNG, 100, out) }
             } catch (e: Exception) {
                 false
             }
             bmp?.recycle()
-            main.post { toast(if (ok) "Imagem salva em Imagens/TonyNotes" else "Não foi possível salvar a imagem.") }
+            main.post { toast(if (ok) "Imagem salva em Imagens/RosaNotes" else "Não foi possível salvar a imagem.") }
         }
     }
 
@@ -1301,7 +1301,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     /** Pede para baixar o reconhecimento de escrita (uma vez, ~20 MB). */
     internal fun askHandwritingDownload(onReady: () -> Unit) {
         sheet("Reconhecer escrita à mão") { box, dialog ->
-            box.addView(label("Para transformar a escrita em texto e achar notas manuscritas na busca, o TonyNotes " +
+            box.addView(label("Para transformar a escrita em texto e achar notas manuscritas na busca, o RosaNotes " +
                 "baixa o reconhecimento de português (cerca de 20 MB, uma vez só). Depois funciona sem internet.", 15f, Ui.MUTED))
             box.addView(buttonRow(
                 secondaryButton("Agora não") { dialog.dismiss() },
@@ -1324,7 +1324,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         Library.io.execute {
             val ok = try {
                 writeToMediaStore(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, name, "image/png",
-                    Environment.DIRECTORY_PICTURES + "/TonyNotes") { out ->
+                    Environment.DIRECTORY_PICTURES + "/RosaNotes") { out ->
                     bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
                 }
             } catch (e: Exception) {
@@ -1332,7 +1332,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             } finally {
                 bitmap.recycle()
             }
-            main.post { toast(if (ok) "Imagem salva em Imagens/TonyNotes" else "Não foi possível salvar a imagem.") }
+            main.post { toast(if (ok) "Imagem salva em Imagens/RosaNotes" else "Não foi possível salvar a imagem.") }
         }
     }
 
@@ -1380,13 +1380,13 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         Library.io.execute {
             val ok = try {
                 writeToMediaStore(MediaStore.Downloads.EXTERNAL_CONTENT_URI, name, "application/pdf",
-                    Environment.DIRECTORY_DOWNLOADS + "/TonyNotes") { out -> doc.writeTo(out); true }
+                    Environment.DIRECTORY_DOWNLOADS + "/RosaNotes") { out -> doc.writeTo(out); true }
             } catch (e: Exception) {
                 false
             } finally {
                 doc.close()
             }
-            main.post { toast(if (ok) "PDF salvo em Downloads/TonyNotes" else "Não foi possível salvar o PDF.") }
+            main.post { toast(if (ok) "PDF salvo em Downloads/RosaNotes" else "Não foi possível salvar o PDF.") }
         }
     }
 
@@ -1414,13 +1414,13 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         Library.io.execute {
             val ok = try {
                 writeToMediaStore(MediaStore.Downloads.EXTERNAL_CONTENT_URI, name, "application/pdf",
-                    Environment.DIRECTORY_DOWNLOADS + "/TonyNotes") { out -> doc.writeTo(out); true }
+                    Environment.DIRECTORY_DOWNLOADS + "/RosaNotes") { out -> doc.writeTo(out); true }
             } catch (e: Exception) {
                 false
             } finally {
                 doc.close()
             }
-            main.post { toast(if (ok) "PDF anotado salvo em Downloads/TonyNotes" else "Não foi possível salvar o PDF.") }
+            main.post { toast(if (ok) "PDF anotado salvo em Downloads/RosaNotes" else "Não foi possível salvar o PDF.") }
         }
     }
 

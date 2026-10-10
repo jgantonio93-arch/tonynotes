@@ -175,7 +175,7 @@ class FoldersActivity : Activity() {
         if (homeHead == null) {
             val head = vertical().apply { setPadding(dpi(6f), dpi(44f), dpi(6f), dpi(8f)) }
             val brand = horizontal()
-            brand.addView(label("TonyNotes", 14f, Ui.ACCENT, bold = true).apply {
+            brand.addView(label("RosaNotes", 14f, Ui.ACCENT, bold = true).apply {
                 typeface = Ui.BOLD
                 gravity = Gravity.CENTER_VERTICAL
                 setCompoundDrawablesRelativeWithIntrinsicBounds(LogoDrawable(dpi(22f)), null, null, null)
@@ -720,7 +720,7 @@ class FoldersActivity : Activity() {
 
     private fun enableHandwritingSearch() {
         sheet("Buscar na escrita à mão") { box, dialog ->
-            box.addView(label("O TonyNotes baixa o reconhecimento de português (cerca de 20 MB, uma vez só) e lê a " +
+            box.addView(label("O RosaNotes baixa o reconhecimento de português (cerca de 20 MB, uma vez só) e lê a " +
                 "escrita das suas notas. Tudo fica no celular e funciona sem internet depois.", 15f, Ui.MUTED))
             box.addView(buttonRow(
                 secondaryButton("Agora não") { dialog.dismiss() },
@@ -822,7 +822,7 @@ class FoldersActivity : Activity() {
     /** Abre o seletor para criar o arquivo: na lateral dele, escolha "Drive" e a pasta. */
     private fun pickBackupFile(request: Int) {
         toast("Escolha o Google Drive no seletor e toque em Salvar")
-        val name = "TonyNotes-backup" + (if (request == REQ_BACKUP_NOW) "-" + SimpleDateFormat("yyyy-MM-dd", ptBr).format(Date()) else "") + ".zip"
+        val name = "RosaNotes-backup" + (if (request == REQ_BACKUP_NOW) "-" + SimpleDateFormat("yyyy-MM-dd", ptBr).format(Date()) else "") + ".zip"
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
             type = Backup.MIME
             addCategory(Intent.CATEGORY_OPENABLE)

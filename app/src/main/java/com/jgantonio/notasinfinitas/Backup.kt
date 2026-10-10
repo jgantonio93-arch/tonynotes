@@ -13,7 +13,7 @@ import java.util.zip.ZipOutputStream
  *
  * O arquivo é criado pelo seletor de arquivos do Android: cada pessoa escolhe a
  * própria conta do Google Drive (ou outro lugar) e o app guarda só a permissão
- * para aquele arquivo. Não há servidor nem chave do TonyNotes no meio: cada
+ * para aquele arquivo. Não há servidor nem chave do RosaNotes no meio: cada
  * cópia fica no Drive de quem usa o app.
  *
  * Com o backup automático ligado, o mesmo arquivo é regravado de tempos em tempos
@@ -22,7 +22,9 @@ import java.util.zip.ZipOutputStream
 object Backup {
 
     const val MIME = "application/zip"
-    private const val MARK = "tonynotes-backup.txt"
+    private const val MARK = "rosanotes-backup.txt"
+    /** Marca dos backups feitos quando o app ainda se chamava TonyNotes (continuam valendo). */
+    private const val OLD_MARK = "tonynotes-backup.txt"
     private val PARTS = listOf("library.json", "notes", "thumbs", "covers")
     /** Intervalo mínimo entre dois backups automáticos. */
     private const val AUTO_INTERVAL = 10 * 60 * 1000L
@@ -76,7 +78,7 @@ object Backup {
         val out = c.contentResolver.openOutputStream(uri, "wt") ?: error("Não foi possível abrir o arquivo")
         ZipOutputStream(out.buffered()).use { zip ->
             zip.putNextEntry(ZipEntry(MARK))
-            zip.write("TonyNotes 1\n".toByteArray())
+            zip.write("RosaNotes 1\n".toByteArray())
             zip.closeEntry()
             val root = c.filesDir
             for (part in PARTS) {
@@ -95,7 +97,7 @@ object Backup {
     /**
      * Restaura um backup: substitui as pastas e notas atuais pelas do arquivo.
      * Antes de apagar qualquer coisa, confere se o arquivo é mesmo um backup do
-     * TonyNotes e o extrai numa pasta temporária. Chamar fora da thread principal.
+     * RosaNotes (ou do antigo TonyNotes) e o extrai numa pasta temporária. Chamar fora da thread principal.
      */
     fun restore(c: Context, uri: Uri) {
         val root = c.filesDir
@@ -105,7 +107,7 @@ object Backup {
         ZipInputStream(input.buffered()).use { zip ->
             while (true) {
                 val e = zip.nextEntry ?: break
-                if (e.name == MARK) valid = true
+                if (e.name == MARK || e.name == OLD_MARK) valid = true
                 val dest = File(tmp, e.name)
                 // Não deixa o .zip escrever fora da pasta (nomes com "..").
                 if (!dest.canonicalPath.startsWith(tmp.canonicalPath + File.separator)) continue
@@ -117,7 +119,7 @@ object Backup {
         }
         if (!valid || !File(tmp, "library.json").exists()) {
             tmp.deleteRecursively()
-            error("Este arquivo não é um backup do TonyNotes")
+            error("Este arquivo não é um backup do RosaNotes")
         }
         for (part in PARTS) File(root, part).deleteRecursively()
         for (part in PARTS) {

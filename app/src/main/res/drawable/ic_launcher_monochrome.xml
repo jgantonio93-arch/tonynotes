@@ -1,19 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Versão de uma cor (ícones temáticos do Android 13+): só o "t". -->
+<!-- Versão de uma cor (ícones temáticos do Android 13+): o R com a rosa em traço. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:pathData="M34.5,41 H73.5"
-        android:strokeWidth="10"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeLineCap="round" />
-    <path
-        android:pathData="M53,41 V60.5 C53,71.5 63.5,74.5 71,68"
-        android:strokeWidth="10"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
+    <group android:pivotX="54" android:pivotY="54" android:scaleX="0.82" android:scaleY="0.82">
+        <path android:pathData="M37,34 V80" android:strokeWidth="9" android:strokeColor="#FFFFFFFF" android:strokeLineCap="round" />
+        <path android:pathData="M50,56 C57,63 62,72 71,80" android:strokeWidth="9" android:strokeColor="#FFFFFFFF" android:strokeLineCap="round" />
+        <path android:pathData="M32.5,33 C32.5,27 37,25 41,26.5 C44,22 51,21 54.5,25.5 C59,21 67,22.5 69,29 C73,32 74,37 73,42 C71.5,52 63.5,59 52,59 H37 C34.5,59 32.5,57 32.5,54.5 Z" android:strokeWidth="5" android:strokeColor="#FFFFFFFF" android:strokeLineJoin="round" />
+        <path android:pathData="M54.5,37 C52.5,36 50.5,38 51.8,40.2 C53.3,42.6 58,41.6 58,37.6 C58,33.2 52.5,31.6 49.6,34.6 C46.4,38 47.6,44.6 54,45.6 C60.5,46.5 64.8,42 64.6,36" android:strokeWidth="3.2" android:strokeColor="#FFFFFFFF" android:strokeLineCap="round" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M61,69 C60,61 67,56 75,57 C75,65 68,70 61,69 Z" />
+    </group>
 </vector>

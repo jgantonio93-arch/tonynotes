@@ -1,4 +1,4 @@
-name: TonyNotes (APK Android)
+name: RosaNotes (APK Android)
 
 on:
   push:
@@ -25,7 +25,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
-          gh release list --repo "$REPO" --limit 100 --json tagName --jq '.[].tagName | select(startswith("tonynotes-"))' \
+          gh release list --repo "$REPO" --limit 100 --json tagName --jq '.[].tagName | select(startswith("tonynotes-") or startswith("rosanotes-"))' \
             | xargs -r -n1 gh release delete --repo "$REPO" --cleanup-tag -y
           gh api "repos/$REPO/actions/artifacts" --paginate --jq '.artifacts[].id' \
             | xargs -r -I{} gh api -X DELETE "repos/$REPO/actions/artifacts/{}"
@@ -46,7 +46,7 @@ jobs:
         if: ${{ github.event.repository.private }}
         uses: actions/upload-artifact@v4
         with:
-          name: tonynotes-apk
+          name: rosanotes-apk
           path: app/build/outputs/apk/debug/*.apk
 
       - name: Testes de funcionamento
@@ -54,7 +54,7 @@ jobs:
 
       # Só versões que passaram nos testes viram "Release", e só com o repositório
       # privado (o download fica restrito a quem tem acesso). O link fixo
-      # https://github.com/<dono>/<repo>/releases/latest/download/TonyNotes.apk
+      # https://github.com/<dono>/<repo>/releases/latest/download/RosaNotes.apk
       # sempre baixa a mais recente (é o link do botão do site).
       - name: Publicar versão (link fixo de download)
         if: ${{ github.event.repository.private && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
@@ -62,16 +62,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
-          TAG="tonynotes-v${VERSION}-build${GITHUB_RUN_NUMBER}"
-          cp app/build/outputs/apk/debug/TonyNotes-debug.apk TonyNotes.apk
-          gh release create "$TAG" TonyNotes.apk \
+          TAG="rosanotes-v${VERSION}-build${GITHUB_RUN_NUMBER}"
+          cp app/build/outputs/apk/debug/RosaNotes-debug.apk RosaNotes.apk
+          gh release create "$TAG" RosaNotes.apk \
             --target "$GITHUB_SHA" \
-            --title "TonyNotes ${VERSION} (build ${GITHUB_RUN_NUMBER})" \
-            --notes "Versão gerada automaticamente a partir de ${GITHUB_SHA::7}. Baixe o TonyNotes.apk e instale por cima da versão anterior: suas notas continuam lá." \
+            --title "RosaNotes ${VERSION} (build ${GITHUB_RUN_NUMBER})" \
+            --notes "Versão gerada automaticamente a partir de ${GITHUB_SHA::7}. Baixe o RosaNotes.apk e instale por cima da versão anterior: suas notas continuam lá." \
             --latest
           # Guarda só as 10 versões mais novas.
           gh release list --limit 100 --json tagName,createdAt \
-            --jq 'sort_by(.createdAt) | reverse | .[].tagName | select(startswith("tonynotes-"))' \
+            --jq 'sort_by(.createdAt) | reverse | .[].tagName | select(startswith("tonynotes-") or startswith("rosanotes-"))' \
             | tail -n +11 | xargs -r -n1 gh release delete --cleanup-tag -y
 
       - name: Gerar capturas de tela

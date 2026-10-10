@@ -11,8 +11,8 @@ android {
         applicationId = "com.jgantonio.notasinfinitas"
         minSdk = 29
         targetSdk = 35
-        versionCode = 10
-        versionName = "0.10.0"
+        versionCode = 11
+        versionName = "0.11.0"
 
         // Só celulares ARM 64 bits (todos os Galaxy com S Pen e quase todo Android atual):
         // o reconhecimento de escrita traz um motor nativo por processador, e levar os
@@ -76,7 +76,7 @@ dependencies {
     testImplementation("androidx.test:core:1.6.1")
 }
 
-// O APK sai como TonyNotes-debug.apk (o id do pacote continua o mesmo: atualiza sem perder as notas).
+// O APK sai como RosaNotes-debug.apk (o id do pacote continua o mesmo: atualiza sem perder as notas).
 base {
-    archivesName.set("TonyNotes")
+    archivesName.set("RosaNotes")
 }
