@@ -52,6 +52,8 @@ object Library {
     fun noteFile(id: String) = File(dir, "notes/$id.ninf")
     fun assetsDir(id: String) = File(dir, "notes/$id")
     fun thumbFile(id: String) = File(dir, "thumbs/$id.png")
+    /** Imagem de capa de uma pasta (opcional). */
+    fun coverFile(folderId: String) = File(dir, "covers/$folderId.jpg")
 
     // ---- Consultas -----------------------------------------------------------
 
@@ -121,6 +123,7 @@ object Library {
         for (n in notes.filter { it.folder == id }) deleteNoteFiles(n.id)
         notes.removeAll { it.folder == id }
         folders.removeAll { it.id == id }
+        io.execute { coverFile(id).delete() }
         save()
     }
 

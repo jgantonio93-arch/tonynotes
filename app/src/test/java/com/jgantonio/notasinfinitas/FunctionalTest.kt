@@ -432,6 +432,70 @@ class FunctionalTest {
     }
 
     @Test
+    fun marca_texto_tem_botao_proprio() {
+        canvas.pen = PenSettings.default(BrushType.FOUNTAIN, Color.BLUE)
+        editor.prefsForTests.currentType = BrushType.FOUNTAIN
+        editor.highlighterButtonForTests.performClick()
+        ShadowLooper.idleMainLooper()
+        assertEquals(BrushType.HIGHLIGHTER, canvas.pen.type)
+        assertEquals(InfiniteCanvasView.Tool.PEN, canvas.tool)
+        // O botão da caneta volta para a última caneta usada (não para o marca-texto).
+        editor.penButtonForTests.performClick()
+        ShadowLooper.idleMainLooper()
+        assertEquals(BrushType.FOUNTAIN, canvas.pen.type)
+    }
+
+    @Test
+    fun marca_texto_acompanha_altura_da_escrita() {
+        // "Palavras" escritas à mão: zigue-zagues de ~90 px de altura na linha y = 700.
+        canvas.pen = PenSettings.default(BrushType.PEN, Color.BLACK)
+        for (k in 0 until 5) {
+            val x0 = 150f + k * 140f
+            drag((0..12).map { x0 + it * 8f to 700f + (if (it % 2 == 0) -45f else 45f) })
+        }
+        val letters = strokes().map { it.bounds.height() }.sorted()
+        val h = letters[letters.size / 2]
+        canvas.pen = PenSettings.default(BrushType.HIGHLIGHTER, Color.YELLOW).copy(size = 4f)
+        drag(line(120f, 700f, 900f, 700f))
+        val hl = strokes().last()
+        assertEquals(BrushType.HIGHLIGHTER, hl.type)
+        val w = hl.ws[hl.n / 2]
+        assertTrue("faixa ($w) cobre a escrita ($h)", w > h * 0.8f && w < h * 1.5f)
+
+        // Longe da escrita, vale o tamanho escolhido.
+        drag(line(120f, 1300f, 900f, 1300f))
+        assertEquals(4f * canvas.unit, strokes().last().ws[15], 0.5f)
+
+        // Desligado, também vale o tamanho escolhido.
+        canvas.highlighterFitsWriting = false
+        drag(line(120f, 700f, 900f, 700f))
+        assertEquals(4f * canvas.unit, strokes().last().ws[15], 0.5f)
+    }
+
+    @Test
+    fun backup_salva_e_restaura_pastas_notas_e_capas() {
+        val folder = Library.createFolder("Faculdade", Library.folderColors[2], null)
+        Library.coverFile(folder.id).apply { parentFile?.mkdirs(); writeBytes(byteArrayOf(1, 2, 3)) }
+        canvas.pen = PenSettings.default(BrushType.PEN, Color.BLACK)
+        drag(line(200f, 700f, 900f, 700f))
+        controller.pause()
+        Library.io.submit {}.get()
+        val zip = File(app.cacheDir, "teste-backup.zip")
+        Backup.write(app, android.net.Uri.fromFile(zip))
+        assertTrue(zip.length() > 0)
+
+        Library.deleteFolder(folder.id)
+        Library.io.submit {}.get()
+        assertNull(Library.folder(folder.id))
+
+        Backup.restore(app, android.net.Uri.fromFile(zip))
+        assertNotNull(Library.folder(folder.id))
+        assertNotNull(Library.note(note.id))
+        assertTrue(Library.noteFile(note.id).exists())
+        assertEquals(3, Library.coverFile(folder.id).readBytes().size)
+    }
+
+    @Test
     fun lapis_desenha_com_textura() {
         canvas.pen = PenSettings.default(BrushType.PENCIL, Color.BLACK).copy(size = 12f)
         drag(line(200f, 700f, 900f, 700f))

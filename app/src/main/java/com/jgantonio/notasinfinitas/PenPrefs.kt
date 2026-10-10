@@ -17,7 +17,20 @@ class PenPrefs(context: Context) {
 
     var currentType: BrushType
         get() = BrushType.byName(sp.getString("current", null)) ?: BrushType.PEN
-        set(v) = sp.edit().putString("current", v.name).apply()
+        set(v) {
+            val e = sp.edit().putString("current", v.name)
+            if (v != BrushType.HIGHLIGHTER) e.putString("last_ink", v.name)
+            e.apply()
+        }
+
+    /** Última caneta (sem ser o marca-texto), para o botão da caneta voltar a ela. */
+    val lastInkType: BrushType
+        get() = BrushType.byName(sp.getString("last_ink", null))?.takeIf { it != BrushType.HIGHLIGHTER } ?: BrushType.PEN
+
+    /** Marca-texto acompanha a altura da escrita que está embaixo dele. */
+    var highlighterFitsWriting: Boolean
+        get() = sp.getBoolean("hl_fit", true)
+        set(v) = sp.edit().putBoolean("hl_fit", v).apply()
 
     var favorites: List<PenSettings>
         get() = sp.getString("favorites", "")!!.split(';').mapNotNull { if (it.isBlank()) null else PenSettings.decode(it) }
@@ -97,6 +110,8 @@ class PenPrefs(context: Context) {
     companion object {
         const val MAX_FAVORITES = 10
         const val MAX_CUSTOM = 12
+
+        val INK_TYPES = BrushType.entries.filter { it != BrushType.HIGHLIGHTER }
 
         val INK_COLORS = listOf(
             "#1B1B1F", "#5F6368", "#FFFFFF", "#D7263D", "#F27405", "#F2C230",

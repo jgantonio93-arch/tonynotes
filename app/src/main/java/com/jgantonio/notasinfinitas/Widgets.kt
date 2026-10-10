@@ -16,11 +16,15 @@ import com.jgantonio.notasinfinitas.Ui.dp
 
 /** Fileira de canetas em pé; a selecionada fica "levantada". */
 @SuppressLint("ViewConstructor")
-class PenRackView(context: Context, private val colorOf: (BrushType) -> Int, private val onPick: (BrushType) -> Unit) : View(context) {
+class PenRackView(
+    context: Context,
+    private val colorOf: (BrushType) -> Int,
+    private val types: List<BrushType> = BrushType.entries,
+    private val onPick: (BrushType) -> Unit,
+) : View(context) {
     var selected: BrushType = BrushType.PEN
         set(v) { field = v; invalidate() }
 
-    private val types = BrushType.entries
     private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
         textSize = context.dp(11.5f)

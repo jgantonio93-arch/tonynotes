@@ -20,6 +20,17 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
 - Dentro de uma pasta, o **+** cria uma **nota** ou uma **subpasta**.
 - Segure uma pasta ou nota para **renomear, mudar a cor, mover, duplicar ou excluir**.
 - As notas aparecem com miniatura e data da última alteração.
+- **Capa da pasta**: segure a pasta → **Colocar imagem na capa** (galeria ou arquivos).
+  A imagem aparece no cartão e no topo da pasta; dá para trocar ou tirar.
+
+### Backup no Google Drive
+- Botão de **backup** no topo da página inicial.
+- **Fazer backup agora**: o seletor do Android abre, você escolhe **Drive** (a sua própria
+  conta) e salva um `.zip` com todas as pastas, notas, imagens e capas.
+- **Backup automático**: escolhe o arquivo uma vez; depois ele é regravado sozinho ao sair
+  de uma nota (no máximo a cada 10 minutos).
+- **Restaurar**: escolhe um backup e as pastas e notas voltam (útil ao trocar de celular).
+- Cada usuário usa o próprio Drive: o app não tem servidor nem conta própria no meio.
 
 ### Barra de ferramentas
 - Arraste pela **alça ⋮⋮** para levar a barra a qualquer lugar da tela.
@@ -47,7 +58,12 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
 
 ### Canetas (toque de novo na caneta, ou na bolinha de cor, para abrir a bandeja)
 - **Caneta-tinteiro**, **Caneta**, **Lápis** (grão de grafite do tamanho dos pixels da tela, em qualquer zoom), **Caligrafia** (bico chato
-  inclinado), **Pincel** (pressão forte e pontas afinadas) e **Marca-texto** (translúcido).
+  inclinado) e **Pincel** (pressão forte e pontas afinadas).
+- O **Marca-texto** tem **botão próprio** na barra, separado das canetas; o botão da caneta
+  volta sempre para a última caneta usada.
+- **Marca-texto acompanha a altura da escrita**: passando sobre letras escritas à mão, a
+  faixa fica da altura delas; longe da escrita, vale o tamanho escolhido (dá para desligar
+  na bandeja do marca-texto).
 - Cada pincel lembra sua **espessura**, **opacidade** e **cor**.
 - **Marca-texto** com ponta chanfrada: **tamanho**, **transparência**, **espessura da ponta**
   e **endireitar linhas** (o traço vira uma reta, perfeitamente horizontal quando quase).

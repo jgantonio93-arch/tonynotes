@@ -68,6 +68,8 @@ class InfiniteCanvasView(context: Context) : View(context) {
     var eraserArea = false
     var eraserSize = 14f
     var eraserHighlighterOnly = false
+    /** O marca-texto ganha a altura da escrita à mão que está embaixo dele. */
+    var highlighterFitsWriting = true
     /** Seleção por retângulo (em vez de laço livre). */
     var selectRect = false
     /** Inclui itens que só encostam no laço/retângulo. */
@@ -809,6 +811,27 @@ class InfiniteCanvasView(context: Context) : View(context) {
         listener?.onStateChanged()
     }
 
+    /**
+     * Altura típica da escrita à mão que passa pela altura [y] perto de [x] (unidades do
+     * mundo), ou null se não houver escrita ali. Usa a mediana das alturas dos traços:
+     * um traço solto mais alto (um "l", um "f") não estica o marca-texto.
+     */
+    internal fun writingHeightAt(x: Float, y: Float): Float? {
+        val reach = 160f * unit
+        val slack = 4f * unit
+        val hs = ArrayList<Float>()
+        for (e in elements) {
+            if (e !is StrokeElement || e.type == BrushType.HIGHLIGHTER) continue
+            val b = e.bounds
+            if (y < b.top - slack || y > b.bottom + slack || b.right < x - reach || b.left > x + reach) continue
+            val h = b.height()
+            if (h in 6f * unit..240f * unit) hs.add(h)
+        }
+        if (hs.isEmpty()) return null
+        hs.sort()
+        return hs[hs.size / 2]
+    }
+
     fun snapshot() = NoteData(ArrayList(elements), ViewState(offsetX, offsetY, scale), pageStyle, paperColor, pageLayout)
 
     fun markSaved() {
@@ -1104,7 +1127,10 @@ class InfiniteCanvasView(context: Context) : View(context) {
         }
         when (gesture) {
             Gesture.DRAW -> {
-                val p = pen()
+                var p = pen()
+                if (p.type == BrushType.HIGHLIGHTER && highlighterFitsWriting) {
+                    writingHeightAt(wx(x), wy(y))?.let { h -> p = p.copy(size = h * 1.15f / unit) }
+                }
                 // Front buffer só para tinta opaca (translúcida/textura ficaria diferente ao "secar").
                 wetActive = lowLatency && wetInk?.ready == true && p.alpha >= 255 &&
                     p.type != BrushType.PENCIL && p.type != BrushType.HIGHLIGHTER

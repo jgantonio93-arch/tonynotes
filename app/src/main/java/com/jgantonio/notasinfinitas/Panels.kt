@@ -88,9 +88,14 @@ class PenTray(
         val c = context
         card.removeAllViews()
 
-        card.addView(PenRackView(c, { t -> if (t == current.type) current.color else prefs.pen(t).color }) { t ->
-            apply(prefs.pen(t), rebuild = true)
-        }.apply { selected = current.type })
+        // O marca-texto tem botão próprio na barra: a fileira mostra só as canetas.
+        if (current.type != BrushType.HIGHLIGHTER) {
+            card.addView(PenRackView(c, { t -> if (t == current.type) current.color else prefs.pen(t).color }, PenPrefs.INK_TYPES) { t ->
+                apply(prefs.pen(t), rebuild = true)
+            }.apply { selected = current.type })
+        } else {
+            card.addView(c.label("Marca-texto", 16f, Ui.INK, bold = true))
+        }
 
         val preview = PenPreview(c, current)
         card.addView(preview, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, c.dpi(64f)).apply {
@@ -190,6 +195,10 @@ class PenTray(
 
         card.addView(c.switchRow(Icon.STRAIGHT, "Endireitar linhas", current.straight) { on ->
             update(current.copy(straight = on), preview)
+        })
+        card.addView(c.switchRow(Icon.MARKER, "Ajustar à altura da escrita", prefs.highlighterFitsWriting) { on ->
+            prefs.highlighterFitsWriting = on
+            onChange(current)
         })
     }
 

@@ -180,6 +180,7 @@ class FoldersActivity : Activity() {
                 setCompoundDrawablesRelativeWithIntrinsicBounds(LogoDrawable(dpi(22f)), null, null, null)
                 compoundDrawablePadding = dpi(8f)
             }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            brand.addView(iconButton(Icon.EXPORT, Ui.MUTED, 40f, "Backup no Google Drive") { backupMenu() })
             brand.addView(iconButton(if (Ui.isDark) Icon.MOON else Icon.SUN, Ui.MUTED, 40f, "Tema") { Ui.showThemeMenu(this) })
             head.addView(brand)
             head.addView(title("Suas pastas", 40f).apply { setPadding(0, dpi(4f), 0, dpi(2f)) })
@@ -273,8 +274,15 @@ class FoldersActivity : Activity() {
         content.addView(bar)
 
         val head = horizontal().apply { setPadding(dpi(6f), dpi(10f), dpi(6f), dpi(4f)) }
-        head.addView(ImageView(this).apply { setImageDrawable(FolderGlyphDrawable(folder.color)) },
-            LinearLayout.LayoutParams(dpi(54f), dpi(44f)).apply { marginEnd = dpi(14f) })
+        val cover = loadCover(folder.id)
+        head.addView(ImageView(this).apply {
+            if (cover != null) {
+                setImageBitmap(cover)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                background = rounded(folder.color, 14f)
+                clipToOutline = true
+            } else setImageDrawable(FolderGlyphDrawable(folder.color))
+        }, LinearLayout.LayoutParams(dpi(54f), dpi(if (cover != null) 54f else 44f)).apply { marginEnd = dpi(14f) })
         val titles = vertical()
         titles.addView(title(folder.name, 28f).apply { isSingleLine = true })
         val subs = Library.subfolders(folder.id)
@@ -362,19 +370,40 @@ class FoldersActivity : Activity() {
             }
             setOnLongClickListener { folderOptions(f); true }
         }
-        val top = horizontal().apply { gravity = Gravity.TOP }
-        top.addView(ImageView(this).apply { setImageDrawable(FolderGlyphDrawable(f.color)) },
-            LinearLayout.LayoutParams(dpi(50f), dpi(41f)).apply { topMargin = dpi(4f) })
-        top.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        top.addView(iconButton(Icon.MORE, Ui.MUTED, 36f) { folderOptions(f) })
-        card.addView(top)
-        card.addView(label(f.name, 17f, Ui.INK, bold = true).apply {
+        val cover = loadCover(f.id)
+        if (cover != null) {
+            // Com capa: a imagem ocupa o topo do cartão, com os cantos acompanhando o cartão.
+            card.setPadding(dpi(8f), dpi(8f), dpi(6f), dpi(18f))
+            card.addView(ImageView(this).apply {
+                setImageBitmap(cover)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                background = rounded(f.color, 17f)
+                clipToOutline = true
+                contentDescription = "Capa de ${f.name}"
+            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpi(96f)).apply { marginEnd = dpi(2f) })
+        }
+        val nameView = label(f.name, 17f, Ui.INK, bold = true).apply {
             typeface = Ui.BOLD
             isSingleLine = true
             ellipsize = android.text.TextUtils.TruncateAt.END
-            setPadding(0, dpi(14f), dpi(8f), dpi(2f))
+            setPadding(0, dpi(if (cover == null) 14f else 6f), dpi(8f), dpi(2f))
+        }
+        val top = horizontal().apply { gravity = Gravity.TOP }
+        if (cover == null) {
+            top.addView(ImageView(this).apply { setImageDrawable(FolderGlyphDrawable(f.color)) },
+                LinearLayout.LayoutParams(dpi(50f), dpi(41f)).apply { topMargin = dpi(4f) })
+            top.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+        } else {
+            // Com capa, o nome fica ao lado do botão de opções (o desenho da pasta sai).
+            top.setPadding(dpi(8f), 0, 0, 0)
+            top.addView(nameView, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        }
+        top.addView(iconButton(Icon.MORE, Ui.MUTED, 36f) { folderOptions(f) })
+        card.addView(top)
+        if (cover == null) card.addView(nameView)
+        card.addView(label(countText(Library.folders.count { it.parent == f.id }, Library.notes.count { it.folder == f.id }), 13f).apply {
+            if (cover != null) setPadding(dpi(8f), 0, 0, 0)
         })
-        card.addView(label(countText(Library.folders.count { it.parent == f.id }, Library.notes.count { it.folder == f.id }), 13f))
         return card
     }
 
@@ -446,9 +475,16 @@ class FoldersActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
-        val fid = folderId ?: return
-        if (requestCode != REQ_PDF || resultCode != RESULT_OK) return
+        if (resultCode != RESULT_OK) return
         val uri = data?.data ?: return
+        when (requestCode) {
+            REQ_COVER -> { coverFor?.let { setCover(it, uri) }; return }
+            REQ_BACKUP_NOW -> { runBackup(uri, auto = false); return }
+            REQ_BACKUP_AUTO -> { Backup.enableAuto(this, uri); runBackup(uri, auto = true); return }
+            REQ_RESTORE -> { confirmRestore(uri); return }
+        }
+        val fid = folderId ?: return
+        if (requestCode != REQ_PDF) return
         // Nota nova com o nome do arquivo; o editor importa as páginas ao abrir.
         val title = (PdfImporter.displayName(this, uri) ?: "PDF").removeSuffix(".pdf").removeSuffix(".PDF")
         val n = Library.createNote(fid, title)
@@ -504,6 +540,20 @@ class FoldersActivity : Activity() {
         val count = Library.itemCount(f.id)
         actionSheet(null, listOf(
             SheetItem(Icon.EDIT, "Renomear e mudar cor") { editFolder(f, f.parent) },
+            SheetItem(Icon.IMAGE, if (Library.coverFile(f.id).exists()) "Trocar imagem da capa" else "Colocar imagem na capa") {
+                coverFor = f.id
+                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                    type = "image/*"
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                }
+                @Suppress("DEPRECATION")
+                startActivityForResult(intent, REQ_COVER)
+            },
+        ) + (if (Library.coverFile(f.id).exists()) listOf(SheetItem(Icon.CLOSE, "Tirar imagem da capa") {
+            Library.coverFile(f.id).delete()
+            coverCache.remove(f.id)
+            render()
+        }) else emptyList()) + listOf(
             SheetItem(Icon.MOVE, "Mover") {
                 Pickers.folder(this, "Mover para", allowRoot = true, exclude = f.id, current = f.parent) { target ->
                     Library.updateFolder(f, parent = target)
@@ -548,8 +598,130 @@ class FoldersActivity : Activity() {
         ), header = Panels.headerRow(this, icon(Icon.NOTE, Ui.MUTED, 28f), n.title, formatDate(n.modified)))
     }
 
+    // ---- Capas das pastas ------------------------------------------------------------
+
+    /** Pasta que está escolhendo capa (o seletor de imagens volta por onActivityResult). */
+    private var coverFor: String?
+        get() = getSharedPreferences("ui", MODE_PRIVATE).getString("cover_for", null)
+        set(v) { getSharedPreferences("ui", MODE_PRIVATE).edit().putString("cover_for", v).apply() }
+
+    /** Capas já lidas do disco (chave: id da pasta; vale enquanto o arquivo não mudar). */
+    private val coverCache = HashMap<String, Pair<Long, android.graphics.Bitmap>>()
+
+    private fun loadCover(id: String): android.graphics.Bitmap? {
+        val f = Library.coverFile(id)
+        if (!f.exists()) { coverCache.remove(id); return null }
+        coverCache[id]?.let { (t, b) -> if (t == f.lastModified()) return b }
+        val b = BitmapFactory.decodeFile(f.path) ?: return null
+        coverCache[id] = f.lastModified() to b
+        return b
+    }
+
+    /** Lê a imagem escolhida, reduz para no máximo 900 px e guarda como capa. */
+    private fun setCover(folder: String, uri: android.net.Uri) {
+        Library.io.execute {
+            val ok = try {
+                val src = android.graphics.ImageDecoder.createSource(contentResolver, uri)
+                val bmp = android.graphics.ImageDecoder.decodeBitmap(src) { dec, info, _ ->
+                    val big = maxOf(info.size.width, info.size.height)
+                    if (big > COVER_MAX) {
+                        val k = COVER_MAX.toFloat() / big
+                        dec.setTargetSize((info.size.width * k).toInt().coerceAtLeast(1), (info.size.height * k).toInt().coerceAtLeast(1))
+                    }
+                    dec.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE
+                }
+                val f = Library.coverFile(folder)
+                f.parentFile?.mkdirs()
+                f.outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 88, it) }
+                true
+            } catch (e: Exception) {
+                false
+            }
+            runOnUiThread {
+                coverCache.remove(folder)
+                if (!ok) toast("Não foi possível usar essa imagem")
+                if (!isFinishing) render()
+            }
+        }
+    }
+
+    // ---- Backup no Google Drive --------------------------------------------------------
+
+    private fun backupMenu() {
+        val auto = Backup.autoUri(this)
+        val last = Backup.lastBackup(this)
+        val info = when {
+            last == 0L -> "Nenhum backup feito ainda"
+            else -> "Último backup: " + SimpleDateFormat("dd/MM/yyyy 'às' HH:mm", ptBr).format(Date(last))
+        }
+        actionSheet("Backup no Google Drive", listOfNotNull(
+            SheetItem(Icon.EXPORT, "Fazer backup agora") { pickBackupFile(REQ_BACKUP_NOW) },
+            if (auto == null) SheetItem(Icon.CHECK, "Ligar backup automático") { pickBackupFile(REQ_BACKUP_AUTO) }
+            else SheetItem(Icon.CLOSE, "Desligar backup automático") {
+                Backup.disableAuto(this)
+                toast("Backup automático desligado")
+            },
+            SheetItem(Icon.DOWNLOAD, "Restaurar de um backup") {
+                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                    type = "*/*"
+                    putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(Backup.MIME, "application/octet-stream"))
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                }
+                @Suppress("DEPRECATION")
+                startActivityForResult(intent, REQ_RESTORE)
+            },
+        ), header = Panels.headerRow(this, icon(Icon.EXPORT, Ui.MUTED, 28f),
+            if (auto != null) "Backup automático ligado" else "Suas notas no seu Drive", info))
+    }
+
+    /** Abre o seletor para criar o arquivo: na lateral dele, escolha "Drive" e a pasta. */
+    private fun pickBackupFile(request: Int) {
+        toast("Escolha o Google Drive no seletor e toque em Salvar")
+        val name = "TonyNotes-backup" + (if (request == REQ_BACKUP_NOW) "-" + SimpleDateFormat("yyyy-MM-dd", ptBr).format(Date()) else "") + ".zip"
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            type = Backup.MIME
+            addCategory(Intent.CATEGORY_OPENABLE)
+            putExtra(Intent.EXTRA_TITLE, name)
+        }
+        @Suppress("DEPRECATION")
+        startActivityForResult(intent, request)
+    }
+
+    private fun runBackup(uri: android.net.Uri, auto: Boolean) {
+        Library.io.execute {
+            val err = try { Backup.write(this, uri); null } catch (e: Exception) { e.message ?: "erro" }
+            runOnUiThread {
+                toast(when {
+                    err != null -> "Backup não concluído: $err"
+                    auto -> "Backup automático ligado: suas notas vão para o Drive"
+                    else -> "Backup salvo"
+                })
+            }
+        }
+    }
+
+    private fun confirmRestore(uri: android.net.Uri) {
+        confirm("Restaurar backup?", "As pastas e notas deste aparelho serão trocadas pelas do backup.", "Restaurar") {
+            Library.io.execute {
+                val err = try { Backup.restore(this, uri); null } catch (e: Exception) { e.message ?: "erro" }
+                runOnUiThread {
+                    coverCache.clear()
+                    toast(err?.let { "Não foi possível restaurar: $it" } ?: "Backup restaurado")
+                    if (!isFinishing) render()
+                }
+            }
+        }
+    }
+
+    private fun toast(msg: String) = android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_LONG).show()
+
     companion object {
         const val EXTRA_FOLDER = "folder"
         private const val REQ_PDF = 51
+        private const val REQ_COVER = 52
+        private const val REQ_BACKUP_NOW = 53
+        private const val REQ_BACKUP_AUTO = 54
+        private const val REQ_RESTORE = 55
+        private const val COVER_MAX = 900
     }
 }

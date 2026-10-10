@@ -84,6 +84,9 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
 
     private val toolButtons = LinkedHashMap<InfiniteCanvasView.Tool, ImageView>()
     private lateinit var penToolButton: ImageView
+    private lateinit var highlighterButton: ImageView
+    internal val highlighterButtonForTests get() = highlighterButton
+    internal val penButtonForTests get() = penToolButton
     private lateinit var colorDot: ColorDot
     private lateinit var favoritesBox: LinearLayout
     private lateinit var colorDivider: View
@@ -224,6 +227,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         super.onPause()
         if (::textEditor.isInitialized && textEditor.isActive) textEditor.finish()
         if (::canvasView.isInitialized) save()
+        Backup.autoBackupIfDue(this)
     }
 
     @Deprecated("Deprecated in Java")
@@ -243,6 +247,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         canvasView.eraserArea = prefs.eraserArea
         canvasView.eraserSize = prefs.eraserSize
         canvasView.eraserHighlighterOnly = prefs.eraserHighlighterOnly
+        canvasView.highlighterFitsWriting = prefs.highlighterFitsWriting
         canvasView.lowLatency = prefs.lowLatency
         canvasView.selectRect = prefs.selectRect
         canvasView.selectPartial = prefs.selectPartial
@@ -343,10 +348,17 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             setOnTouchListener(DockDrag())
         }
         bar.addView(dockGrip)
-        penToolButton = toolButton(PenGlyphDrawable(canvasView.pen.type, canvasView.pen.color, dpi(30f), dp(1f))) {
-            if (canvasView.tool == InfiniteCanvasView.Tool.PEN) toggleTray("pen") else setTool(InfiniteCanvasView.Tool.PEN)
+        penToolButton = toolButton(PenGlyphDrawable(canvasView.pen.type, canvasView.pen.color, dpi(30f), dp(1f)), "Caneta") {
+            if (penActive(highlighter = false)) toggleTray("pen")
+            else if (canvasView.pen.type == BrushType.HIGHLIGHTER) setPen(prefs.pen(prefs.lastInkType))
+            else setTool(InfiniteCanvasView.Tool.PEN)
         }
         toolButtons[InfiniteCanvasView.Tool.PEN] = penToolButton
+        // Marca-texto com botão próprio, separado das canetas.
+        val hl = prefs.pen(BrushType.HIGHLIGHTER)
+        highlighterButton = toolButton(PenGlyphDrawable(BrushType.HIGHLIGHTER, hl.color, dpi(30f), dp(1f)), "Marca-texto") {
+            if (penActive(highlighter = true)) toggleTray("pen") else setPen(prefs.pen(BrushType.HIGHLIGHTER))
+        }
         toolButtons[InfiniteCanvasView.Tool.ERASER] = toolButton(icon(Icon.ERASER), "Borracha") {
             if (canvasView.tool == InfiniteCanvasView.Tool.ERASER) toggleTray("eraser") else setTool(InfiniteCanvasView.Tool.ERASER)
         }
@@ -356,6 +368,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         toolButtons[InfiniteCanvasView.Tool.TEXT] = toolButton(icon(Icon.TEXT), "Texto") { setTool(InfiniteCanvasView.Tool.TEXT) }
         toolsInDock.clear()
         toolsInDock.addAll(toolButtons.values)
+        toolsInDock.add(1, highlighterButton)
         toolsInDock.add(toolButton(icon(Icon.IMAGE), "Inserir imagem ou PDF") { finishTyping(); closeTray(); showInsertMenu() })
         toolsInDock.forEach { bar.addView(it) }
         colorDivider = dockDivider()
@@ -527,12 +540,18 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         subtitleView.text = Library.pathOf(note.folder)
         val tool = canvasView.tool
         val pen = canvasView.pen
-        penToolButton.setImageDrawable(PenGlyphDrawable(pen.type, pen.color, dpi(30f), dp(1f)))
+        val ink = if (pen.type == BrushType.HIGHLIGHTER) prefs.pen(prefs.lastInkType) else pen
+        val hl = if (pen.type == BrushType.HIGHLIGHTER) pen else prefs.pen(BrushType.HIGHLIGHTER)
+        penToolButton.setImageDrawable(PenGlyphDrawable(ink.type, ink.color, dpi(30f), dp(1f)))
+        highlighterButton.setImageDrawable(PenGlyphDrawable(hl.type, hl.color, dpi(30f), dp(1f)))
         toolButtons[InfiniteCanvasView.Tool.SELECT]?.setImageDrawable(icon(if (prefs.selectRect) Icon.RECT_SELECT else Icon.LASSO))
         for ((t, b) in toolButtons) {
             val sel = t == tool
             b.background = if (sel) circle(Ui.ACCENT_SOFT, 0, 0f) else ripple(null, circle(Color.WHITE, 0, 0f))
             (b.drawable as? IconDrawable)?.color = if (sel) Ui.ACCENT else Ui.INK
+        }
+        for ((b, sel) in listOf(penToolButton to penActive(false), highlighterButton to penActive(true))) {
+            b.background = if (sel) circle(Ui.ACCENT_SOFT, 0, 0f) else ripple(null, circle(Color.WHITE, 0, 0f))
         }
         val vertical = dockVertical
         colorDot.visibility = if (tool == InfiniteCanvasView.Tool.PEN && !vertical) View.VISIBLE else View.GONE
@@ -554,6 +573,9 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         }
         onStateChanged()
     }
+
+    private fun penActive(highlighter: Boolean) =
+        canvasView.tool == InfiniteCanvasView.Tool.PEN && (canvasView.pen.type == BrushType.HIGHLIGHTER) == highlighter
 
     private fun setTool(tool: InfiniteCanvasView.Tool) {
         if (textEditor.isActive) textEditor.finish()
