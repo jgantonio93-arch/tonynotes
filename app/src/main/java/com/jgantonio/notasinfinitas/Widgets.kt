@@ -336,6 +336,7 @@ class PageStyleTile(context: Context, val style: PageStyle, var paper: Int, chec
                 }
             }
             PageStyle.BLANK -> Unit
+            else -> PageTemplates.draw(canvas, style, r, dark, context.dp(0.8f))
         }
         canvas.restore()
         paint.style = Paint.Style.STROKE

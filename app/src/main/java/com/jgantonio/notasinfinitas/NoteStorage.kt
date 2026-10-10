@@ -13,7 +13,11 @@ import java.io.FileOutputStream
 /** Posição da câmera sobre a tela infinita. */
 data class ViewState(val offsetX: Float, val offsetY: Float, val scale: Float)
 
-enum class PageStyle(val label: String) { BLANK("Em branco"), DOTS("Pontilhado"), LINES("Pautado"), GRID("Quadriculado") }
+enum class PageStyle(val label: String) {
+    BLANK("Em branco"), DOTS("Pontilhado"), LINES("Pautado"), GRID("Quadriculado"),
+    // Modelos de folha (desenhados em PageTemplates). Novos sempre no fim: o arquivo guarda a posição.
+    COLLEGE("Universitário"), CORNELL("Cornell"), MUSIC("Partitura"), PLANNER("Semanal"),
+}
 
 /**
  * Como a nota é organizada: tela infinita (padrão) ou folhas.

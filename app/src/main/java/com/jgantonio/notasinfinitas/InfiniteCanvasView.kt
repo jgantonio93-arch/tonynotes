@@ -977,7 +977,13 @@ class InfiniteCanvasView(context: Context) : View(context) {
             canvas.clipRect(sl, st, sr, sb)
             // Meio espaço de folga: as linhas não encostam na borda da folha.
             val spacing = l.w / 24f
-            drawPattern(canvas, r.left + spacing / 2f, r.top + spacing / 2f, spacing)
+            if (PageTemplates.isTemplate(pageStyle)) {
+                canvas.save()
+                canvas.translate(offsetX, offsetY)
+                canvas.scale(scale, scale)
+                PageTemplates.draw(canvas, pageStyle, r, dark, 1f / scale)
+                canvas.restore()
+            } else drawPattern(canvas, r.left + spacing / 2f, r.top + spacing / 2f, spacing)
             canvas.restore()
             if (n > 1 && sb - st > 180f * density) {
                 canvas.drawText("${i + 1}", (sl + sr) / 2f, sb - 10f * density, pageNumberPaint)
@@ -1779,6 +1785,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
      * como papel de verdade.
      */
     private fun drawPattern(canvas: Canvas, ax: Float, ay: Float, fixed: Float?) {
+        val pageStyle = PageTemplates.fallback(pageStyle)
         if (pageStyle == PageStyle.BLANK) return
         val dark = isDarkPaper()
         var spacing = fixed ?: GRID_SPACING
@@ -1825,9 +1832,16 @@ class InfiniteCanvasView(context: Context) : View(context) {
                     }
                 }
             }
-            PageStyle.BLANK -> Unit
+            else -> Unit
         }
     }
+
+    /** Modelo da folha no PDF exportado (os fundos simples continuam de fora, como antes). */
+    fun drawTemplateForExport(canvas: Canvas, page: RectF) {
+        if (PageTemplates.isTemplate(pageStyle)) PageTemplates.draw(canvas, pageStyle, page, isDarkPaperColor(paperColor), 0.6f)
+    }
+
+    private fun isDarkPaperColor(c: Int) = 0.299 * Color.red(c) + 0.587 * Color.green(c) + 0.114 * Color.blue(c) < 128
 
     companion object {
         private const val MIN_SCALE = 0.03f

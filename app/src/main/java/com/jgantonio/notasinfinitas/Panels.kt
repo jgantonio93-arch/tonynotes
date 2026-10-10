@@ -496,6 +496,9 @@ object Panels {
             box.addView(context.sectionLabel("Modelo"))
             val tiles = ArrayList<PageStyleTile>()
             val styles = context.horizontal()
+            if (!canvas.pageLayout.paged) box.addView(context.label("Universitário, Cornell, Partitura e Semanal aparecem completos com folhas.", 12f).apply {
+                setPadding(0, 0, 0, context.dpi(8f))
+            })
             for (st in PageStyle.entries) {
                 val col = context.vertical().apply { gravity = Gravity.CENTER_HORIZONTAL }
                 val tile = PageStyleTile(context, st, curPaper, st == curStyle) {
@@ -507,9 +510,12 @@ object Panels {
                 tiles.add(tile)
                 col.addView(tile, LinearLayout.LayoutParams(context.dpi(70f), context.dpi(90f)))
                 col.addView(context.label(st.label, 12f).apply { setPadding(0, context.dpi(6f), 0, 0) })
-                styles.addView(col, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                styles.addView(col, LinearLayout.LayoutParams(context.dpi(84f), ViewGroup.LayoutParams.WRAP_CONTENT))
             }
-            box.addView(styles)
+            box.addView(HorizontalScrollView(context).apply {
+                isHorizontalScrollBarEnabled = false
+                addView(styles)
+            })
 
             // Cor do papel
             box.addView(context.sectionLabel("Cor do papel"))

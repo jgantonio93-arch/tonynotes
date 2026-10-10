@@ -1175,6 +1175,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
                 c.scale(s, s)
                 c.translate(-r.left, -r.top)
                 c.clipRect(r)
+                canvasView.drawTemplateForExport(c, r)
                 canvasView.drawContent(c, r)
                 doc.finishPage(page)
             }
