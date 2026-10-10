@@ -13,6 +13,13 @@ android {
         targetSdk = 35
         versionCode = 10
         versionName = "0.10.0"
+
+        // Só celulares ARM 64 bits (todos os Galaxy com S Pen e quase todo Android atual):
+        // o reconhecimento de escrita traz um motor nativo por processador, e levar os
+        // quatro deixava o APK com 50 MB. Na Play Store (AAB) cada aparelho recebe só o seu.
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
     }
 
     signingConfigs {
