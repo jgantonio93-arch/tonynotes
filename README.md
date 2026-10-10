@@ -94,9 +94,12 @@ DESIGN.md do Notion (Awesome Design): papel quente, um único acento cor de tint
 Todos os pares de texto/fundo passam no contraste WCAG AA (auditado com o Playwright CLI).
 
 ## Como instalar
-O APK é gerado pelo GitHub Actions (workflow `TonyNotes (APK Android)`):
-abra a execução mais recente na aba **Actions**, baixe o artefato `tonynotes-apk`,
-descompacte e instale o `.apk` no celular (permita "instalar apps desconhecidos").
+O repositório é privado: só quem tem acesso a ele consegue baixar o app.
+Cada versão que passa nos testes vira uma **Release**. Com o GitHub logado no celular, este
+link sempre baixa a mais recente:
+`https://github.com/jgantonio93-arch/tonynotes/releases/latest/download/TonyNotes.apk`
+(o mesmo APK também fica no artefato `tonynotes-apk` de cada execução na aba **Actions**).
+Instale o `.apk` permitindo "instalar apps desconhecidos".
 
 O APK é assinado com uma chave de debug fixa (`app/debug.keystore`), então as versões
 novas instalam por cima das antigas sem perder as notas.
@@ -105,7 +108,6 @@ novas instalam por cima das antigas sem perder as notas.
 Requer JDK 17 e Android SDK (Android Studio):
 
 ```
-cd notas-infinitas
 ./gradlew assembleDebug
 ```
 
