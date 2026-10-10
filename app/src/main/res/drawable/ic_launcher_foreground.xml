@@ -1,21 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Logo do TonyNotes: um "t" escrito à mão (a haste termina numa curva, como na letra
+  cursiva) com uma faixa de marca-texto atrás da barra. Tudo dentro da área segura
+  de 66dp do ícone adaptativo.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- símbolo de infinito desenhado à mão -->
+    <group
+        android:pivotX="54"
+        android:pivotY="40"
+        android:rotation="-4">
+        <path
+            android:fillColor="#FFFFD84D"
+            android:pathData="M34,34 H74 A4,4 0 0 1 78,38 V43 A4,4 0 0 1 74,47 H34 A4,4 0 0 1 30,43 V38 A4,4 0 0 1 34,34 Z" />
+    </group>
     <path
-        android:pathData="M54,54 C46,42 30,40 30,54 C30,68 46,66 54,54 C62,42 78,40 78,54 C78,68 62,66 54,54 Z"
-        android:strokeWidth="6"
+        android:pathData="M34.5,41 H73.5"
+        android:strokeWidth="10"
         android:strokeColor="#FFFFFFFF"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
-    <!-- setas: rola para os lados e para baixo -->
+        android:strokeLineCap="round" />
     <path
-        android:pathData="M84,50 L90,54 L84,58 M24,50 L18,54 L24,58 M50,76 L54,82 L58,76"
-        android:strokeWidth="4"
-        android:strokeColor="#FFFFD166"
+        android:pathData="M53,41 V60.5 C53,71.5 63.5,74.5 71,68"
+        android:strokeWidth="10"
+        android:strokeColor="#FFFFFFFF"
         android:strokeLineCap="round"
         android:strokeLineJoin="round" />
 </vector>
