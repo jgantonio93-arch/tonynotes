@@ -521,6 +521,20 @@ class FunctionalTest {
     }
 
     @Test
+    fun etiquetas_favoritas_e_fixadas_ficam_salvas() {
+        Library.setTags(note, listOf(" #Prova", "anatomia", "prova", ""))
+        Library.setPinned(note, true)
+        Library.setFavorite(note, true)
+        Library.init(app, reload = true)
+        val n = Library.note(note.id)!!
+        assertEquals(listOf("Prova", "anatomia"), n.tags)
+        assertTrue(n.pinned && n.favorite)
+        val other = Library.createNote(n.folder, "Outra")
+        assertEquals("fixada vem primeiro", n.id, Library.notesIn(n.folder).first().id)
+        assertTrue(other.tags.isEmpty())
+    }
+
+    @Test
     fun lapis_desenha_com_textura() {
         canvas.pen = PenSettings.default(BrushType.PENCIL, Color.BLACK).copy(size = 12f)
         drag(line(200f, 700f, 900f, 700f))

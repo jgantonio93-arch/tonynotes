@@ -158,6 +158,7 @@ class FoldersActivity : Activity() {
     private var homeHead: LinearLayout? = null
     private var homeBody: LinearLayout? = null
     private var homeCount: TextView? = null
+    private var homeSearch: android.widget.EditText? = null
     private var query = ""
 
     private fun normalize(t: String) =
@@ -199,6 +200,7 @@ class FoldersActivity : Activity() {
                     }
                 })
             }
+            homeSearch = search
             head.addView(search, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                 topMargin = dpi(16f)
             })
@@ -221,8 +223,13 @@ class FoldersActivity : Activity() {
 
     private fun renderSearch() {
         val q = normalize(query)
-        val folders = Library.folders.filter { normalize(it.name).contains(q) }.sortedBy { it.name.lowercase() }
-        val notes = Library.notes.filter { normalize(it.title).contains(q) }.sortedByDescending { it.modified }
+        // "#etiqueta" mostra só as notas com aquela etiqueta.
+        val tag = if (q.startsWith("#")) q.removePrefix("#").trim() else null
+        val folders = if (tag != null) emptyList() else Library.folders.filter { normalize(it.name).contains(q) }.sortedBy { it.name.lowercase() }
+        val notes = Library.notes.filter { n ->
+            if (tag != null) n.tags.any { normalize(it) == tag }
+            else normalize(n.title).contains(q) || n.tags.any { normalize(it).contains(q) }
+        }.sortedByDescending { it.modified }
         if (folders.isEmpty() && notes.isEmpty()) {
             content.addView(label("Nada encontrado para “$query”.", 15f).apply {
                 gravity = Gravity.CENTER
@@ -240,7 +247,53 @@ class FoldersActivity : Activity() {
         }
     }
 
+    /** Fileira de cartões de nota que rola para o lado. */
+    private fun noteRow(title: String, notes: List<NoteInfo>) {
+        content.addView(sectionLabel(title).apply { setPadding(dpi(6f), dpi(18f), 0, dpi(8f)) })
+        val row = horizontal().apply { setPadding(dpi(2f), dpi(2f), dpi(2f), dpi(8f)) }
+        for (n in notes) {
+            row.addView(noteCard(n, showFolder = true), LinearLayout.LayoutParams(dpi(156f), ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                marginEnd = dpi(12f)
+            })
+        }
+        content.addView(HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            clipToPadding = false
+            addView(row)
+        })
+    }
+
+    /** Etiquetas como botões: um toque filtra as notas pela etiqueta. */
+    private fun tagChips() {
+        val tags = Library.allTags()
+        if (tags.isEmpty()) return
+        content.addView(sectionLabel("Etiquetas").apply { setPadding(dpi(6f), dpi(18f), 0, dpi(8f)) })
+        val row = horizontal().apply { setPadding(dpi(2f), 0, dpi(2f), 0) }
+        for (t in tags) {
+            row.addView(TextView(this).apply {
+                text = "#$t"
+                textSize = 14f
+                typeface = Ui.MEDIUM
+                setTextColor(Ui.INK)
+                gravity = Gravity.CENTER
+                minHeight = dpi(38f)
+                setPadding(dpi(14f), 0, dpi(14f), 0)
+                background = ripple(pill(Ui.FIELD, 0), pill(Color.WHITE, 0))
+                setOnClickListener { homeSearch?.setText("#$t") }
+            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { marginEnd = dpi(8f) })
+        }
+        content.addView(HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(row)
+        })
+    }
+
     private fun renderHomeBody() {
+        val pinned = Library.notes.filter { it.pinned }.sortedByDescending { it.modified }
+        if (pinned.isNotEmpty()) noteRow("Fixadas", pinned)
+        val favs = Library.notes.filter { it.favorite }.sortedByDescending { it.modified }
+        if (favs.isNotEmpty()) noteRow("Favoritas", favs)
+        tagChips()
         val recent = Library.notes.sortedByDescending { it.modified }.take(8)
         if (recent.isNotEmpty()) {
             content.addView(sectionLabel("Recentes").apply { setPadding(dpi(6f), dpi(18f), 0, dpi(8f)) })
@@ -443,7 +496,9 @@ class FoldersActivity : Activity() {
             isSingleLine = true
             ellipsize = android.text.TextUtils.TruncateAt.END
         })
-        val sub = if (showFolder) Library.folder(n.folder)?.name ?: "" else formatDate(n.modified)
+        val base = if (showFolder) Library.folder(n.folder)?.name ?: "" else formatDate(n.modified)
+        val marks = (if (n.pinned) "📌 " else "") + (if (n.favorite) "★ " else "")
+        val sub = marks + base + n.tags.joinToString("") { "  #$it" }
         texts.addView(label(sub, 12.5f).apply { isSingleLine = true; ellipsize = android.text.TextUtils.TruncateAt.END })
         info.addView(texts, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         info.addView(iconButton(Icon.MORE, Ui.MUTED, 34f) { noteOptions(n) })
@@ -579,6 +634,15 @@ class FoldersActivity : Activity() {
                     render()
                 }
             },
+            SheetItem(Icon.LOCK, if (n.pinned) "Desafixar do topo" else "Fixar no topo") {
+                Library.setPinned(n, !n.pinned)
+                render()
+            },
+            SheetItem(Icon.STAR, if (n.favorite) "Tirar dos favoritos" else "Favoritar") {
+                Library.setFavorite(n, !n.favorite)
+                render()
+            },
+            SheetItem(Icon.EDIT, "Etiquetas") { editTags(n) },
             SheetItem(Icon.MOVE, "Mover para outra pasta") {
                 Pickers.folder(this, "Mover para", allowRoot = false, exclude = null, current = n.folder) { target ->
                     if (target != null) Library.updateNote(n, folder = target)
@@ -596,6 +660,44 @@ class FoldersActivity : Activity() {
                 }
             },
         ), header = Panels.headerRow(this, icon(Icon.NOTE, Ui.MUTED, 28f), n.title, formatDate(n.modified)))
+    }
+
+    /** Etiquetas separadas por vírgula; as já usadas aparecem para tocar e incluir. */
+    private fun editTags(n: NoteInfo) {
+        sheet("Etiquetas") { box, dialog ->
+            val field = textField(n.tags.joinToString(", "), "Ex.: prova, anatomia, resumo")
+            box.addView(field)
+            val others = Library.allTags().filter { t -> n.tags.none { it.equals(t, true) } }
+            if (others.isNotEmpty()) {
+                box.addView(sectionLabel("Já usadas"))
+                val row = horizontal()
+                for (t in others) row.addView(TextView(this).apply {
+                    text = "#$t"
+                    textSize = 13f
+                    setTextColor(Ui.INK)
+                    gravity = Gravity.CENTER
+                    minHeight = dpi(36f)
+                    setPadding(dpi(12f), 0, dpi(12f), 0)
+                    background = ripple(pill(Ui.FIELD, 0), pill(Color.WHITE, 0))
+                    setOnClickListener {
+                        val cur = field.text.toString().trim().trimEnd(',')
+                        field.setText(if (cur.isEmpty()) t else "$cur, $t")
+                        field.setSelection(field.text.length)
+                        visibility = View.GONE
+                    }
+                }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { marginEnd = dpi(8f) })
+                box.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(row) })
+            }
+            box.addView(buttonRow(
+                secondaryButton("Cancelar") { dialog.dismiss() },
+                primaryButton("Salvar") {
+                    dialog.dismiss()
+                    Library.setTags(n, field.text.toString().split(','))
+                    render()
+                },
+            ))
+            field.requestFocus()
+        }
     }
 
     // ---- Capas das pastas ------------------------------------------------------------

@@ -10,7 +10,13 @@ import java.util.concurrent.Executors
 
 class Folder(val id: String, var name: String, var color: Int, var parent: String?, val created: Long)
 
-class NoteInfo(val id: String, var title: String, var folder: String, val created: Long, var modified: Long)
+class NoteInfo(
+    val id: String, var title: String, var folder: String, val created: Long, var modified: Long,
+    /** Fica no topo da página inicial e da pasta. */
+    var pinned: Boolean = false,
+    var favorite: Boolean = false,
+    var tags: List<String> = emptyList(),
+)
 
 /**
  * Biblioteca de pastas e notas. O índice fica em library.json; cada nota tem
@@ -64,7 +70,18 @@ object Library {
         folders.filter { it.parent == parent }.sortedBy { it.name.lowercase() }
 
     fun notesIn(folder: String) =
-        notes.filter { it.folder == folder }.sortedByDescending { it.modified }
+        notes.filter { it.folder == folder }.sortedWith(compareByDescending<NoteInfo> { it.pinned }.thenByDescending { it.modified })
+
+    /** Todas as etiquetas usadas, em ordem alfabética. */
+    fun allTags(): List<String> = notes.flatMap { it.tags }.distinct().sortedBy { it.lowercase() }
+
+    fun setTags(n: NoteInfo, tags: List<String>) {
+        n.tags = tags.map { it.trim().removePrefix("#").trim() }.filter { it.isNotEmpty() }.distinctBy { it.lowercase() }
+        save()
+    }
+
+    fun setPinned(n: NoteInfo, on: Boolean) { n.pinned = on; save() }
+    fun setFavorite(n: NoteInfo, on: Boolean) { n.favorite = on; save() }
 
     fun itemCount(folder: String) =
         folders.count { it.parent == folder } + notes.count { it.folder == folder }
@@ -189,9 +206,12 @@ object Library {
             val na = json.optJSONArray("notes") ?: JSONArray()
             for (i in 0 until na.length()) {
                 val o = na.getJSONObject(i)
+                val tags = o.optJSONArray("tags")
                 notes.add(NoteInfo(
                     o.getString("id"), o.getString("title"), o.getString("folder"),
                     o.optLong("created"), o.optLong("modified"),
+                    pinned = o.optBoolean("pinned"), favorite = o.optBoolean("favorite"),
+                    tags = if (tags == null) emptyList() else (0 until tags.length()).map { tags.getString(it) },
                 ))
             }
             // Notas cuja pasta sumiu vão para a primeira pasta existente.
@@ -219,6 +239,9 @@ object Library {
             for (n in notes) put(JSONObject().apply {
                 put("id", n.id); put("title", n.title); put("folder", n.folder)
                 put("created", n.created); put("modified", n.modified)
+                if (n.pinned) put("pinned", true)
+                if (n.favorite) put("favorite", true)
+                if (n.tags.isNotEmpty()) put("tags", JSONArray(n.tags))
             })
         })
         val tmp = File(dir, "library.json.tmp")
