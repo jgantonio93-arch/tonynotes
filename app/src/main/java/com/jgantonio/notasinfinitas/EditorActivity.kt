@@ -1252,11 +1252,11 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     private fun indexText(id: String, data: NoteData) {
         val typed = data.elements.filterIsInstance<TextElement>().joinToString("\n") { it.text }
         val strokes = data.elements.filterIsInstance<StrokeElement>()
-        val write = { hw: String? ->
-            Library.io.execute { Library.textFile(id).writeText(listOfNotNull(typed, hw).joinToString("\n")) }
-        }
+        val write = { hw: String? -> Library.textFile(id).writeText(listOfNotNull(typed, hw).joinToString("\n")) }
+        // Já estamos na fila de disco: o texto digitado é gravado na hora; o da escrita
+        // à mão volta depois do reconhecimento e entra de novo na fila.
         if (!Handwriting.enabled(this) || strokes.isEmpty() || strokes.size > MAX_INDEX_STROKES) write(null)
-        else main.post { Handwriting.recognize(strokes) { write(it) } }
+        else main.post { Handwriting.recognize(strokes) { hw -> Library.io.execute { write(hw) } } }
     }
 
     /** Converte a escrita selecionada em texto digitado (no mesmo lugar e cor). */
