@@ -181,6 +181,68 @@ class DemoKit(var act: Activity, private val out: File, private val scale: Float
         repeat(frames - frames / 2) { capture("tap", listOf(cx to cy), up = it == frames - frames / 2 - 1, on = v) }
     }
 
+    // ---- Ferramentas e barra ------------------------------------------------------------
+
+    /** Troca a ferramenta como o botão da barra faria (a barra se atualiza). */
+    fun useTool(tool: InfiniteCanvasView.Tool) {
+        canvas.tool = tool
+        editor.relayoutDockForTests()
+        ShadowLooper.idleMainLooper()
+    }
+
+    fun usePen(p: PenSettings) {
+        canvas.pen = p
+        canvas.tool = InfiniteCanvasView.Tool.PEN
+        editor.relayoutDockForTests()
+        ShadowLooper.idleMainLooper()
+    }
+
+    /** Laço de seleção (caneta) pelos pontos dados; o fecho volta ao primeiro ponto. */
+    fun lasso(pts: List<Pair<Float, Float>>, pxPerFrame: Float = 40f) {
+        useTool(InfiniteCanvasView.Tool.SELECT)
+        stroke(pts + listOf(pts.first()), pxPerFrame = pxPerFrame, kind = "pen")
+    }
+
+    /** Arrasta a seleção a partir de um ponto dentro dela. */
+    fun dragSelection(x: Float, y: Float, dx: Float, dy: Float, frames: Int) {
+        val down = time
+        val t = MotionEvent.TOOL_TYPE_STYLUS
+        canvas.dispatchTouchEvent(event(MotionEvent.ACTION_DOWN, listOf(x to y), t, down))
+        for (i in 1..frames) {
+            val k = i / frames.toFloat()
+            val e = k * k * (3 - 2 * k)
+            val p = x + dx * e to y + dy * e
+            canvas.dispatchTouchEvent(event(MotionEvent.ACTION_MOVE, listOf(p), t, down))
+            capture("pen", listOf(p), on = canvas)
+        }
+        canvas.dispatchTouchEvent(event(MotionEvent.ACTION_UP, listOf(x + dx to y + dy), t, down))
+        ShadowLooper.idleMainLooper()
+        capture("pen", listOf(x + dx to y + dy), up = true, on = canvas)
+    }
+
+    /** Arrasta a barra de ferramentas pela alça (perto da borda ela fica em pé). */
+    fun dragDock(dx: Float, dy: Float, frames: Int) {
+        val grip = editor.dockGripForTests
+        val down = time
+        val f = MotionEvent.TOOL_TYPE_FINGER
+        val x = grip.width / 2f
+        val y = grip.height / 2f
+        grip.dispatchTouchEvent(event(MotionEvent.ACTION_DOWN, listOf(x to y), f, down))
+        val (ox, oy) = origin(grip)
+        for (i in 1..frames) {
+            val k = i / frames.toFloat()
+            val e = k * k * (3 - 2 * k)
+            grip.dispatchTouchEvent(event(MotionEvent.ACTION_MOVE, listOf(x + dx * e to y + dy * e), f, down))
+            // o toque acompanha o dedo (a alça se move junto com a barra)
+            val p = listOf((ox + x + dx * e) to (oy + y + dy * e))
+            capture("finger", p)
+        }
+        grip.dispatchTouchEvent(event(MotionEvent.ACTION_UP, listOf(x + dx to y + dy), f, down))
+        ShadowLooper.idleMainLooper()
+        layout()
+        capture("finger", listOf((ox + x + dx) to (oy + y + dy)), up = true)
+    }
+
     // ---- Letra cursiva -----------------------------------------------------------------
 
     private class Glyph(val w: Float, val strokes: List<List<Pair<Float, Float>>>)
