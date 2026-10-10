@@ -23,6 +23,17 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
 - **Capa da pasta**: segure a pasta → **Colocar imagem na capa** (galeria ou arquivos).
   A imagem aparece no cartão e no topo da pasta; dá para trocar ou tirar.
 
+### Etiquetas, favoritas e fixadas
+- Segure uma nota → **Fixar no topo**, **Favoritar** ou **Etiquetas** (separadas por vírgula).
+- A página inicial mostra **Fixadas**, **Favoritas** e as **etiquetas**; tocar numa etiqueta
+  filtra as notas (ou busque `#etiqueta`). Dentro da pasta, as fixadas vêm primeiro.
+
+### Busca e escrita à mão
+- A busca acha o **texto digitado** dentro das notas.
+- **Procurar também na escrita à mão**: baixa uma vez o reconhecimento de português
+  (~20 MB, ML Kit) e a busca passa a achar o que foi escrito com a caneta. Funciona offline.
+- Selecione a escrita → **Em texto**: vira texto digitado no mesmo lugar e cor.
+
 ### Backup no Google Drive
 - Botão de **backup** no topo da página inicial.
 - **Fazer backup agora**: o seletor do Android abre, você escolhe **Drive** (a sua própria
@@ -40,6 +51,9 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
 
 ### Página
 - Menu ⋮ → **Página**: **infinita** (padrão) ou **folhas**.
+- **Modelos**: em branco, pontilhado, pautado, quadriculado, **universitário** (com margem),
+  **Cornell** (palavras-chave, notas e resumo), **partitura** e **planner semanal**. Os modelos
+  aparecem completos com folhas e saem no PDF exportado.
 - **Orientação da folha**: vertical (em pé) ou horizontal (deitada).
 - **Apresentação das folhas**: uma embaixo da outra ou lado a lado.
 - **Folhas infinitas**: uma folha nova aparece sozinha quando você escreve na última.
@@ -88,6 +102,16 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
 - Toque de novo num texto selecionado para editar. Com a seleção: girar (alça ou 90°),
   aumentar/diminuir, espelhar, virar, endireitar, cor, frente/trás, duplicar e excluir.
 
+### Áudio junto com a escrita
+- Menu ⋮ → **Gravar áudio com a escrita**. Cada traço feito durante a gravação guarda o
+  momento do áudio.
+- Selecione a escrita → **Ouvir daqui**: o áudio toca a partir de quando aquilo foi escrito.
+- Menu ⋮ → **Áudios da nota**: tocar ou apagar as gravações.
+
+### Apresentar
+- Menu ⋮ → **Ponteiro laser** (rastro vermelho que some na hora) ou **Tinta que some**
+  (fica alguns segundos e desaparece). Nada disso entra na nota.
+
 ### Imagens e PDF
 - Toque na imagem com a seleção: girar livre (com ímã nos ângulos retos), recortar
   (livre, 1:1, 16:9, círculo, à mão livre), ajustes (filtros, brilho, contraste,
@@ -95,6 +119,8 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
   salvar na galeria.
 - PDF: importa todas as páginas em coluna, lado a lado ou em grade, travadas como
   fundo. Destrave uma página para mover, girar, recortar ou separar.
+- **Exportar PDF anotado**: menu ⋮ gera um PDF com as mesmas páginas, no tamanho original,
+  com tudo o que foi escrito por cima.
 
 ### Outras ferramentas
 - **Borracha** (toque de novo para opções): **borracha de traço** ou **borracha de área**,
@@ -134,7 +160,7 @@ Requer JDK 17 e Android SDK (Android Studio):
 ```
 
 ## Próximos passos
-- Reconhecimento de escrita à mão (converter para texto)
-- Busca nas notas
-- Gravação de voz junto com a nota
-- Importar PDF para anotar por cima
+- Régua e transferidor
+- Lupa de escrita (zoom box)
+- Camadas
+- Plano Pro (Google Play Billing) e publicação na Play Store

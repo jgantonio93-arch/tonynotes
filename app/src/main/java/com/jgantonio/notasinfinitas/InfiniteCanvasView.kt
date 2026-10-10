@@ -53,6 +53,8 @@ class InfiniteCanvasView(context: Context) : View(context) {
     // ---- Configuração ------------------------------------------------------
 
     var listener: Listener? = null
+    /** Avisado a cada traço novo (o áudio usa para marcar o momento da escrita). */
+    var onStrokeAdded: ((StrokeElement) -> Unit)? = null
     var tool = Tool.PEN
         set(v) {
             field = v
@@ -1404,6 +1406,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
                     begin()
                     insertAt(elements.size, stroke)
                     commit()
+                    (stroke as? StrokeElement)?.let { onStrokeAdded?.invoke(it) }
                 }
             }
             Gesture.ERASE -> commit()

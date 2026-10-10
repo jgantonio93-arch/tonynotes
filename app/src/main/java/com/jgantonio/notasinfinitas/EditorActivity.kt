@@ -79,6 +79,15 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     private lateinit var selectionLabel: TextView
     private lateinit var zoomLabel: TextView
     private lateinit var ephemeralPill: TextView
+    private lateinit var audioPill: TextView
+    private var audioNotes: AudioNotes? = null
+    private val audio: AudioNotes get() = audioNotes ?: AudioNotes(Library.assetsDir(note.id)).also { audioNotes = it }
+    private val audioTicker = object : Runnable {
+        override fun run() {
+            updateAudioPill()
+            if (audioNotes?.isRecording == true || audioNotes?.isPlaying == true) main.postDelayed(this, 500)
+        }
+    }
 
     private lateinit var textEditor: InlineTextEditor
     private lateinit var stage: FrameLayout
@@ -202,6 +211,24 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             bottomMargin = dpi(18f)
         })
 
+        audioPill = TextView(this).apply {
+            textSize = 14f
+            typeface = Ui.MEDIUM
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            minHeight = dpi(40f)
+            setPadding(dpi(16f), 0, dpi(16f), 0)
+            fontFeatureSettings = "tnum"
+            background = ripple(pill(Color.parseColor("#D7263D"), 0), pill(Color.WHITE, 0))
+            Ui.run { softShadow(6f) }
+            visibility = View.GONE
+            setOnClickListener { audio.stop(); audio.stopPlayback(); updateAudioPill() }
+        }
+        stage.addView(audioPill, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.END).apply {
+            setMargins(0, 0, dpi(14f), dpi(14f))
+        })
+        canvasView.onStrokeAdded = { s -> audioNotes?.markStroke(s) }
+
         selectionBar = buildSelectionBar()
         selectionBar.visibility = View.GONE
         stage.addView(selectionBar, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
@@ -245,6 +272,8 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     override fun onPause() {
         super.onPause()
         if (::textEditor.isInitialized && textEditor.isActive) textEditor.finish()
+        // A gravação para quando a nota sai da tela (o áudio já fica salvo).
+        audioNotes?.let { if (it.isRecording) { it.stop(); updateAudioPill() } }
         if (::canvasView.isInitialized) save()
         Backup.autoBackupIfDue(this)
     }
@@ -819,6 +848,9 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             row.addView(pillButton(Icon.TRASH, "Excluir") { canvasView.deleteSelection() })
             row.addView(pillButton(Icon.COPY, "Duplicar") { canvasView.duplicateSelection() })
             if (items.any { it is StrokeElement }) row.addView(pillButton(Icon.TEXT, "Em texto") { convertSelectionToText() })
+            audio.markFor(items.filterIsInstance<StrokeElement>())?.let { (rec, t) ->
+                row.addView(pillButton(Icon.TOUCH, "Ouvir daqui") { playAudio(rec, t - 2000L) }, 1)
+            }
             row.addView(pillButton(Icon.PALETTE, "Cor") {
                 Panels.showColorChoice(this, prefs, canvasView.pen.color) { canvasView.recolorSelection(it) }
             })
@@ -926,6 +958,11 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
                 Panels.showPage(this, canvasView, prefs) { onStateChanged() }
             },
             SheetItem(if (Ui.isDark) Icon.MOON else Icon.SUN, "Tema (claro ou noturno)") { Ui.showThemeMenu(this) },
+            if (audio.isRecording) SheetItem(Icon.CLOSE, "Parar gravação") { audio.stop(); updateAudioPill() }
+            else SheetItem(Icon.TOUCH, "Gravar áudio com a escrita") { startRecording() },
+        ) + (if (audio.recordings.isEmpty()) emptyList() else listOf(
+            SheetItem(Icon.TOUCH, "Áudios da nota (${audio.recordings.size})") { showRecordings() },
+        )) + listOf(
             SheetItem(Icon.TOUCH, "Ponteiro laser (some na hora)") { setEphemeral(InfiniteCanvasView.Ephemeral.LASER) },
             SheetItem(Icon.EDIT, "Tinta que some (para explicar)") { setEphemeral(InfiniteCanvasView.Ephemeral.VANISH) },
             SheetItem(Icon.PDF, "Importar PDF") { pickPdf() },
@@ -1176,6 +1213,71 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         }
     }
 
+    // ---- Áudio ---------------------------------------------------------------------
+
+    private fun startRecording() {
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), REQ_MIC)
+            return
+        }
+        if (audio.start(this)) {
+            toast("Gravando: o que você escrever fica ligado ao áudio")
+            updateAudioPill()
+        } else toast("Não foi possível gravar.")
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQ_MIC) {
+            if (grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED) startRecording()
+            else toast("Sem acesso ao microfone, não dá para gravar.")
+        }
+    }
+
+    private fun playAudio(index: Int, fromMs: Long) {
+        if (!audio.play(index, fromMs) { updateAudioPill() }) toast("Não foi possível tocar o áudio.")
+        updateAudioPill()
+    }
+
+    private fun showRecordings() {
+        val df = SimpleDateFormat("dd/MM HH:mm", Locale("pt", "BR"))
+        actionSheet("Áudios da nota", audio.recordings.mapIndexed { i, r ->
+            SheetItem(Icon.TOUCH, "Gravação ${i + 1} · ${AudioNotes.format(r.durationMs)} · ${df.format(Date(r.created))}") {
+                actionSheet("Gravação ${i + 1}", listOf(
+                    SheetItem(Icon.TOUCH, "Tocar do começo") { playAudio(i, 0L) },
+                    SheetItem(Icon.TRASH, "Apagar gravação", danger = true) {
+                        confirmDelete("Apagar gravação?", "O áudio será apagado; a escrita continua na nota.") {
+                            audio.delete(i)
+                            updateAudioPill()
+                        }
+                    },
+                ))
+            }
+        })
+    }
+
+    private fun confirmDelete(title: String, msg: String, onOk: () -> Unit) = Ui.run { confirm(title, msg, "Apagar", onOk) }
+
+    private fun updateAudioPill() {
+        val a = audioNotes
+        val text = when {
+            a == null -> null
+            a.isRecording -> "●  Gravando ${AudioNotes.format(a.elapsedMs)}  ·  parar"
+            a.isPlaying -> "▶  ${AudioNotes.format(a.elapsedMs)}  ·  parar"
+            else -> null
+        }
+        audioPill.text = text ?: ""
+        audioPill.visibility = if (text != null) View.VISIBLE else View.GONE
+        main.removeCallbacks(audioTicker)
+        if (text != null) main.postDelayed(audioTicker, 500)
+    }
+
+    override fun onDestroy() {
+        audioNotes?.release()
+        main.removeCallbacks(audioTicker)
+        super.onDestroy()
+    }
+
     /** Guarda o texto da nota para a busca: o digitado e, se ligado, o da escrita à mão. */
     private fun indexText(id: String, data: NoteData) {
         val typed = data.elements.filterIsInstance<TextElement>().joinToString("\n") { it.text }
@@ -1374,5 +1476,6 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         private const val REQ_REPLACE = 42
         private const val REQ_PDF = 43
         private const val MAX_INDEX_STROKES = 4000
+        private const val REQ_MIC = 44
     }
 }
