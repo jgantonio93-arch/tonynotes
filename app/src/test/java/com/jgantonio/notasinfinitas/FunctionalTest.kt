@@ -594,7 +594,11 @@ class FunctionalTest {
         dragGrip(500f, 0f)
         assertEquals("free", editor.prefsForTests.dockMode)
         assertEquals(android.widget.LinearLayout.HORIZONTAL, editor.dockForTests.orientation)
-        assertEquals(View.GONE, editor.quickColorsForTests.visibility)
+        // Deitada também mostra as 3 cores, e a barra cabe na largura do celular.
+        val flat = (0 until editor.quickColorsForTests.childCount).map { editor.quickColorsForTests.getChildAt(it) }.filterIsInstance<ColorDot>()
+        assertEquals(3, flat.size)
+        assertEquals(View.VISIBLE, editor.quickColorsForTests.visibility)
+        assertTrue("barra cabe na tela: ${editor.dockForTests.width}", editor.dockForTests.width <= app.resources.displayMetrics.widthPixels)
     }
 
     // ---- Folhas ----------------------------------------------------------------------------

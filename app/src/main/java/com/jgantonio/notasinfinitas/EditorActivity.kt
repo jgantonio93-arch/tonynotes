@@ -422,13 +422,17 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         dock.setPadding(if (vertical) dpi(5f) else dpi(4f), if (vertical) dpi(4f) else dpi(5f), dpi(5f), if (vertical) dpi(8f) else dpi(5f))
         dock.background = floating(if (vertical) 30f else 100f)
         dockGrip.layoutParams = if (vertical) LinearLayout.LayoutParams(dpi(46f), dpi(24f)) else LinearLayout.LayoutParams(dpi(24f), dpi(46f))
-        val toolLp = { LinearLayout.LayoutParams(dpi(46f), dpi(46f)).apply {
+        // Deitada, a barra leva as 3 cores: em tela estreita (celular) os botões encolhem um pouco.
+        val narrow = !vertical && resources.displayMetrics.widthPixels / density < 480f
+        val tool = if (narrow) 40f else 46f
+        val toolLp = { LinearLayout.LayoutParams(dpi(tool), dpi(tool)).apply {
             if (vertical) setMargins(0, dpi(1f), 0, dpi(1f)) else setMargins(dpi(1f), 0, dpi(1f), 0)
         } }
         toolsInDock.forEach { it.layoutParams = toolLp() }
         orientDivider(colorDivider)
         favoritesBox.orientation = dock.orientation
-        quickColorsBox.visibility = if (vertical) View.VISIBLE else View.GONE
+        quickColorsBox.orientation = dock.orientation
+        quickColorsBox.gravity = Gravity.CENTER
 
         val lp = FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         val edge = dpi(8f)
@@ -543,7 +547,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     /** As 3 cores rápidas da barra em pé. */
     private fun fillQuickColors() {
         quickColorsBox.removeAllViews()
-        if (!dockVertical) return
+        val vertical = dockVertical
         quickColorsBox.addView(dockDivider().also { orientDivider(it) })
         val pen = canvasView.pen
         prefs.quickColors.forEachIndexed { i, col ->
@@ -560,7 +564,10 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
                 true
             }
             Ui.run { dot.pressable(0.9f) }
-            quickColorsBox.addView(dot, LinearLayout.LayoutParams(dpi(32f), dpi(32f)).apply { setMargins(0, dpi(4f), 0, dpi(4f)) })
+            val size = if (vertical) 32f else 28f
+            quickColorsBox.addView(dot, LinearLayout.LayoutParams(dpi(size), dpi(size)).apply {
+                if (vertical) setMargins(0, dpi(4f), 0, dpi(4f)) else setMargins(dpi(3f), 0, dpi(3f), 0)
+            })
         }
     }
 
@@ -583,14 +590,16 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             b.background = if (sel) circle(Ui.ACCENT_SOFT, 0, 0f) else ripple(null, circle(Color.WHITE, 0, 0f))
         }
         val vertical = dockVertical
-        colorDot.visibility = if (tool == InfiniteCanvasView.Tool.PEN && !vertical) View.VISIBLE else View.GONE
+        // As 3 cores rápidas ficam na barra em qualquer posição (a bolinha única saiu).
+        colorDot.visibility = View.GONE
         colorDivider.visibility = colorDot.visibility
         colorDot.color = pen.color
         fillQuickColors()
 
         favoritesBox.removeAllViews()
         // Em pé, os favoritos só aparecem se houver altura de sobra.
-        val roomForFavs = !vertical || stage.height == 0 || stage.height > dpi(600f)
+        val roomForFavs = if (vertical) stage.height == 0 || stage.height > dpi(600f)
+        else resources.displayMetrics.widthPixels / density >= 600f
         val favs = if (roomForFavs) prefs.favorites.asReversed().take(3) else emptyList()
         if (favs.isNotEmpty()) favoritesBox.addView(dockDivider().also { orientDivider(it) })
         for (f in favs) {
