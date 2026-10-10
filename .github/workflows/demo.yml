@@ -1,0 +1,31 @@
+name: Vídeo de demonstração (quadros do app)
+
+# Grava a demonstração do RosaNotes quadro a quadro (o app de verdade, no Robolectric)
+# e publica os quadros como artefato. Roda quando o roteiro muda ou quando pedido.
+on:
+  push:
+    paths:
+      - "app/src/test/java/com/jgantonio/notasinfinitas/DemoRecordingTest.kt"
+      - ".github/workflows/demo.yml"
+  workflow_dispatch:
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Gravar quadros
+        run: |
+          chmod +x gradlew
+          ./gradlew testDebugUnitTest --tests "*DemoRecordingTest*" -Ddemo.dir="$PWD/demo-frames" --stacktrace
+          ls demo-frames | wc -l
+      - uses: actions/upload-artifact@v4
+        with:
+          name: demo-frames
+          path: demo-frames
+          retention-days: 3

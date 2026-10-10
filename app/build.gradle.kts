@@ -57,6 +57,8 @@ android {
             isIncludeAndroidResources = true
             all {
                 it.systemProperty("shots.dir", rootProject.file("docs/screenshots").absolutePath)
+                // Vídeo de demonstração (só quando pedido: ./gradlew ... -Ddemo.dir=pasta)
+                System.getProperty("demo.dir")?.let { d -> it.systemProperty("demo.dir", d) }
                 it.testLogging {
                     events("passed", "failed")
                     exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
