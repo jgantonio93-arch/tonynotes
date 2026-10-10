@@ -100,9 +100,6 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     private lateinit var colorDot: ColorDot
     private lateinit var favoritesBox: LinearLayout
     private lateinit var colorDivider: View
-    private lateinit var emptyHint: View
-    private lateinit var hintTitle: TextView
-    private lateinit var hintBody: TextView
     private var openTray: String? = null
 
     private val main = Handler(Looper.getMainLooper())
@@ -176,22 +173,6 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             setMargins(dpi(14f), 0, 0, dpi(14f))
         })
 
-        emptyHint = vertical().apply {
-            gravity = Gravity.CENTER_HORIZONTAL
-            isClickable = false
-            addView(ImageView(this@EditorActivity).apply {
-                setImageDrawable(LogoDrawable(dpi(52f)))
-                alpha = 0.92f
-            }, LinearLayout.LayoutParams(dpi(52f), dpi(52f)))
-            hintTitle = label("", 17f, Ui.INK, bold = true).apply { setPadding(0, dpi(12f), 0, dpi(4f)) }
-            hintBody = label("", 14f).apply {
-                gravity = Gravity.CENTER
-                setLineSpacing(0f, 1.2f)
-            }
-            addView(hintTitle)
-            addView(hintBody)
-        }
-        stage.addView(emptyHint, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
 
         ephemeralPill = TextView(this).apply {
             textSize = 14f
@@ -1001,16 +982,6 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
 
     override fun onStateChanged() {
         if (::textEditor.isInitialized) textEditor.reposition()
-        if (::emptyHint.isInitialized) {
-            emptyHint.visibility = if (canvasView.isEmpty && !(::textEditor.isInitialized && textEditor.isActive)) View.VISIBLE else View.GONE
-            val l = canvasView.pageLayout
-            hintTitle.text = if (l.hasPages) "Escreva na folha" else "Escreva em qualquer direção"
-            hintBody.text = when {
-                !l.hasPages -> "A nota não tem fim: role para os lados e para baixo.\nUse dois dedos para mover e dar zoom."
-                l.endless -> "Uma folha nova aparece quando você escreve na última.\nUse dois dedos para mover e dar zoom."
-                else -> "Mude o número de folhas em ⋮ › Página.\nUse dois dedos para mover e dar zoom."
-            }
-        }
         undoButton.alpha = if (canvasView.canUndo) 1f else 0.3f
         redoButton.alpha = if (canvasView.canRedo) 1f else 0.3f
         zoomLabel.text = "${canvasView.zoomPercent}%"
@@ -1038,7 +1009,6 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     override fun onTextRequest(x: Float, y: Float, existing: TextElement?) {
         closeTray()
         canvasView.clearSelection()
-        emptyHint.visibility = View.GONE
         textEditor.start(existing, x, y)
     }
 
