@@ -512,6 +512,34 @@ class InfiniteCanvasView(context: Context) : View(context) {
         editImages { it.with(locked = locked) }
     }
 
+    // ---- Para testes e gravações de demonstração --------------------------------------
+
+    /** Câmera atual: deslocamento x, y e escala. */
+    internal val viewForTests get() = floatArrayOf(offsetX, offsetY, scale)
+
+    internal fun setViewForTests(ox: Float, oy: Float, s: Float) {
+        offsetX = ox; offsetY = oy; scale = s.coerceIn(MIN_SCALE, MAX_SCALE)
+        hasInitialPosition = true
+        invalidate()
+        listener?.onStateChanged()
+    }
+
+    /** Acrescenta elementos prontos (uma ação de desfazer). */
+    internal fun addForTests(list: List<Element>) {
+        begin()
+        for (e in list) insertAt(elements.size, e)
+        commit()
+    }
+
+    /** Aumenta/diminui a seleção em volta do centro dela (como arrastar a alça do canto). */
+    internal fun scaleSelectionForTests(k: Float) {
+        val f = selectionFrame() ?: return
+        val t = Transform(scale = k, ox = f.cx, oy = f.cy)
+        val pairs = selection.map { it to it.transformed(t) }
+        replaceAll(pairs)
+        setSelection(pairs.map { it.second })
+    }
+
     /** Quantas páginas de PDF a nota tem e quantas estão travadas. */
     val pdfPageCount get() = elements.count { it is ImageElement && it.pdfPage > 0 }
     val lockedPdfPageCount get() = elements.count { it is ImageElement && it.pdfPage > 0 && it.locked }
