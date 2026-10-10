@@ -58,6 +58,8 @@ object Library {
     fun noteFile(id: String) = File(dir, "notes/$id.ninf")
     fun assetsDir(id: String) = File(dir, "notes/$id")
     fun thumbFile(id: String) = File(dir, "thumbs/$id.png")
+    /** Texto da nota para a busca: o digitado e o reconhecido da escrita à mão. */
+    fun textFile(id: String) = File(dir, "notes/$id.txt")
     /** Imagem de capa de uma pasta (opcional). */
     fun coverFile(folderId: String) = File(dir, "covers/$folderId.jpg")
 
@@ -171,6 +173,7 @@ object Library {
             noteFile(src.id).takeIf { it.exists() }?.copyTo(noteFile(copy.id), overwrite = true)
             assetsDir(src.id).takeIf { it.exists() }?.copyRecursively(assetsDir(copy.id), overwrite = true)
             thumbFile(src.id).takeIf { it.exists() }?.copyTo(thumbFile(copy.id), overwrite = true)
+            textFile(src.id).takeIf { it.exists() }?.copyTo(textFile(copy.id), overwrite = true)
         }
         return copy
     }
@@ -180,6 +183,7 @@ object Library {
             noteFile(id).delete()
             assetsDir(id).deleteRecursively()
             thumbFile(id).delete()
+            textFile(id).delete()
         }
     }
 

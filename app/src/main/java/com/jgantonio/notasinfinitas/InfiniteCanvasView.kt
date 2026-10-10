@@ -435,6 +435,16 @@ class InfiniteCanvasView(context: Context) : View(context) {
         setSelection(elements.filter { !it.locked })
     }
 
+    /** Troca os itens selecionados por [e] (uma ação de desfazer). */
+    fun replaceSelection(e: Element) {
+        if (selection.isEmpty()) return
+        begin()
+        for (i in elements.indices.reversed()) if (elements[i] in selectionSet) removeAt(i)
+        insertAt(elements.size, e)
+        commit()
+        clearSelection()
+    }
+
     fun deleteSelection() {
         if (selection.isEmpty()) return
         begin()
@@ -1851,6 +1861,11 @@ class InfiniteCanvasView(context: Context) : View(context) {
             else -> Unit
         }
     }
+
+    /** Páginas de PDF importadas, na ordem de leitura (de cima para baixo, da esquerda para a direita). */
+    fun pdfPages(): List<ImageElement> =
+        elements.filterIsInstance<ImageElement>().filter { it.pdfPage > 0 && it.rotation == 0f }
+            .sortedWith(compareBy<ImageElement> { it.rect.top }.thenBy { it.rect.left })
 
     /** Traços do laser e da tinta que some, cada vez mais transparentes até sumir. */
     private fun drawFading(canvas: Canvas) {

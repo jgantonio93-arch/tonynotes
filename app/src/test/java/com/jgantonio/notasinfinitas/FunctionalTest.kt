@@ -535,6 +535,24 @@ class FunctionalTest {
     }
 
     @Test
+    fun escrita_separada_em_linhas_e_texto_vai_para_a_busca() {
+        canvas.pen = PenSettings.default(BrushType.PEN, Color.BLACK)
+        for (row in 0 until 2) for (k in 0 until 3) {
+            val x0 = 150f + k * 200f
+            val y0 = 700f + row * 200f
+            drag((0..10).map { x0 + it * 10f to y0 + (if (it % 2 == 0) -30f else 30f) })
+        }
+        val lines = Handwriting.lines(strokes())
+        assertEquals(2, lines.size)
+        assertTrue(lines.all { l -> l.size == 3 && l.zipWithNext().all { (a, b) -> a.bounds.left < b.bounds.left } })
+
+        canvas.addText(TextElement("Mitocôndria", 100f, 100f, 30f, Color.BLACK))
+        controller.pause()
+        Library.io.submit {}.get()
+        assertTrue(Library.textFile(note.id).readText().contains("Mitocôndria"))
+    }
+
+    @Test
     fun lapis_desenha_com_textura() {
         canvas.pen = PenSettings.default(BrushType.PENCIL, Color.BLACK).copy(size = 12f)
         drag(line(200f, 700f, 900f, 700f))

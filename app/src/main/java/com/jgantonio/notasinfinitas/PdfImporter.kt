@@ -26,7 +26,7 @@ object PdfImporter {
     class Page(val file: String, val widthPt: Int, val heightPt: Int)
 
     /** Pontos do PDF -> unidades do mundo (A4 fica com ~890 de largura). */
-    private const val WORLD_PER_PT = 1.5f
+    const val WORLD_PER_PT = 1.5f
     private const val GAP = 48f
 
     fun displayName(context: Context, uri: Uri): String? = try {

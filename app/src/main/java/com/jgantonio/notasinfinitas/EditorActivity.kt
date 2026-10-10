@@ -818,6 +818,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         } else {
             row.addView(pillButton(Icon.TRASH, "Excluir") { canvasView.deleteSelection() })
             row.addView(pillButton(Icon.COPY, "Duplicar") { canvasView.duplicateSelection() })
+            if (items.any { it is StrokeElement }) row.addView(pillButton(Icon.TEXT, "Em texto") { convertSelectionToText() })
             row.addView(pillButton(Icon.PALETTE, "Cor") {
                 Panels.showColorChoice(this, prefs, canvasView.pen.color) { canvasView.recolorSelection(it) }
             })
@@ -931,6 +932,9 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             SheetItem(Icon.SELECT_ALL, "Selecionar tudo") { canvasView.selectAll(); refresh() },
             SheetItem(Icon.EXPORT, "Exportar como imagem") { exportPng() },
             SheetItem(Icon.PDF, "Exportar como PDF") { exportPdf() },
+        ) + (if (canvasView.pdfPages().isEmpty()) emptyList() else listOf(
+            SheetItem(Icon.PDF, "Exportar PDF anotado (páginas originais)") { exportAnnotatedPdf() },
+        )) + listOf(
             SheetItem(Icon.CENTER, "Centralizar conteúdo") { canvasView.recenter() },
             SheetItem(Icon.EDIT, "Renomear nota") { rename() },
             SheetItem(Icon.MOVE, "Mover para outra pasta") { moveToFolder() },
@@ -1157,6 +1161,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         Library.io.execute {
             try {
                 NoteStorage.save(Library.noteFile(id), data)
+                if (wasDirty) indexText(id, data)
                 if (wasDirty) {
                     val tf = Library.thumbFile(id)
                     if (thumb == null) tf.delete() else {
@@ -1168,6 +1173,55 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             } catch (e: Exception) {
                 main.post { toast("Erro ao salvar a nota.") }
             }
+        }
+    }
+
+    /** Guarda o texto da nota para a busca: o digitado e, se ligado, o da escrita à mão. */
+    private fun indexText(id: String, data: NoteData) {
+        val typed = data.elements.filterIsInstance<TextElement>().joinToString("\n") { it.text }
+        val strokes = data.elements.filterIsInstance<StrokeElement>()
+        val write = { hw: String? ->
+            Library.io.execute { Library.textFile(id).writeText(listOfNotNull(typed, hw).joinToString("\n")) }
+        }
+        if (!Handwriting.enabled(this) || strokes.isEmpty() || strokes.size > MAX_INDEX_STROKES) write(null)
+        else main.post { Handwriting.recognize(strokes) { write(it) } }
+    }
+
+    /** Converte a escrita selecionada em texto digitado (no mesmo lugar e cor). */
+    private fun convertSelectionToText() {
+        val strokes = canvasView.selectedItems.filterIsInstance<StrokeElement>()
+        if (strokes.isEmpty()) return
+        val run = {
+            toast("Reconhecendo a escrita…")
+            Handwriting.recognize(strokes) { text ->
+                if (text.isNullOrBlank()) toast("Não deu para reconhecer essa escrita.")
+                else {
+                    val lines = Handwriting.lines(strokes)
+                    val h = lines.map { l -> l.maxOf { it.bounds.bottom } - l.minOf { it.bounds.top } }.sorted()
+                    val size = (h[h.size / 2] * 0.62f).coerceAtLeast(8f)
+                    val left = strokes.minOf { it.bounds.left }
+                    val top = strokes.minOf { it.bounds.top }
+                    canvasView.replaceSelection(TextElement(text, left, top, size, strokes.first().color))
+                    refresh()
+                }
+            }
+        }
+        if (Handwriting.enabled(this)) run() else askHandwritingDownload { run() }
+    }
+
+    /** Pede para baixar o reconhecimento de escrita (uma vez, ~20 MB). */
+    internal fun askHandwritingDownload(onReady: () -> Unit) {
+        sheet("Reconhecer escrita à mão") { box, dialog ->
+            box.addView(label("Para transformar a escrita em texto e achar notas manuscritas na busca, o TonyNotes " +
+                "baixa o reconhecimento de português (cerca de 20 MB, uma vez só). Depois funciona sem internet.", 15f, Ui.MUTED))
+            box.addView(buttonRow(
+                secondaryButton("Agora não") { dialog.dismiss() },
+                primaryButton("Baixar") {
+                    dialog.dismiss()
+                    toast("Baixando o reconhecimento de escrita…")
+                    Handwriting.prepare(this) { ok -> if (ok) onReady() else toast("Não foi possível baixar. Confira a internet.") }
+                },
+            ))
         }
     }
 
@@ -1247,6 +1301,40 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         }
     }
 
+    /**
+     * PDF com as mesmas páginas do PDF importado, no tamanho original, e tudo o que foi
+     * escrito por cima de cada uma (a escrita continua vetorial).
+     */
+    private fun exportAnnotatedPdf() {
+        val pages = canvasView.pdfPages()
+        if (pages.isEmpty()) return
+        val doc = PdfDocument()
+        pages.forEachIndexed { i, img ->
+            val r = img.rect
+            val s = 1f / PdfImporter.WORLD_PER_PT
+            val page = doc.startPage(PdfDocument.PageInfo.Builder(max(1, (r.width() * s).toInt()), max(1, (r.height() * s).toInt()), i + 1).create())
+            val c = page.canvas
+            c.drawColor(Color.WHITE)
+            c.scale(s, s)
+            c.translate(-r.left, -r.top)
+            c.clipRect(r)
+            canvasView.drawContent(c, r)
+            doc.finishPage(page)
+        }
+        val name = fileName("pdf").replace(".pdf", "_anotado.pdf")
+        Library.io.execute {
+            val ok = try {
+                writeToMediaStore(MediaStore.Downloads.EXTERNAL_CONTENT_URI, name, "application/pdf",
+                    Environment.DIRECTORY_DOWNLOADS + "/TonyNotes") { out -> doc.writeTo(out); true }
+            } catch (e: Exception) {
+                false
+            } finally {
+                doc.close()
+            }
+            main.post { toast(if (ok) "PDF anotado salvo em Downloads/TonyNotes" else "Não foi possível salvar o PDF.") }
+        }
+    }
+
     private fun fileName(ext: String): String {
         val safe = note.title.replace(Regex("[^\\p{L}\\p{N} _-]"), "").trim().ifBlank { "nota" }
         return safe + "_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + "." + ext
@@ -1285,5 +1373,6 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         private const val REQ_IMAGE = 41
         private const val REQ_REPLACE = 42
         private const val REQ_PDF = 43
+        private const val MAX_INDEX_STROKES = 4000
     }
 }
