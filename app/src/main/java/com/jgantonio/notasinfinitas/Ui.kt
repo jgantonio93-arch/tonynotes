@@ -40,7 +40,7 @@ object Ui {
     var INK = 0; private set
     var MUTED = 0; private set         // 5:1 ou mais sobre o fundo nos dois temas
     var LINE = 0; private set
-    var ACCENT = 0; private set        // tinta azul
+    var ACCENT = 0; private set        // vermelho rosa (o da logo)
     var ACCENT_SOFT = 0; private set
     var ON_ACCENT = 0; private set     // texto e ícones sobre o acento
     var DANGER = 0; private set
@@ -71,9 +71,9 @@ object Ui {
         INK = c("#1F1D1A", "#EDE8DD")
         MUTED = c("#6A665E", "#A8A296")
         LINE = c("#E6E2DA", "#34312B")
-        ACCENT = c("#3A55B8", "#93A6F2")
-        ACCENT_SOFT = c("#E9EDF8", "#262D47")
-        ON_ACCENT = c("#FFFFFF", "#10131E")
+        ACCENT = c("#C2253B", "#F28A97")
+        ACCENT_SOFT = c("#FBE8EB", "#45232A")
+        ON_ACCENT = c("#FFFFFF", "#1E0E11")
         DANGER = c("#C4302B", "#F07A72")
         DANGER_SOFT = c("#FDECEC", "#3A2220")
         FIELD = c("#EFECE6", "#2A2824")
