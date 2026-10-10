@@ -6,6 +6,8 @@ on:
   push:
     paths:
       - "app/src/test/java/com/jgantonio/notasinfinitas/DemoRecordingTest.kt"
+      - "app/src/test/java/com/jgantonio/notasinfinitas/DemoKit.kt"
+      - "app/src/test/resources/demo/**"
       - ".github/workflows/demo.yml"
   workflow_dispatch:
 
@@ -26,7 +28,7 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew testDebugUnitTest --tests "*DemoRecordingTest*" -Ddemo.dir="$PWD/demo-frames" --stacktrace
-          ls demo-frames | wc -l
+          find demo-frames -name "*.jpg" | wc -l
       # Os quadros vão como anexo de uma versão "demo-frames" (pré-lançamento, fora da lista
       # de versões do app), substituída a cada gravação.
       - name: Publicar quadros
