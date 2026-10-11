@@ -676,10 +676,12 @@
       const view = viewAt(ff);
       const k = pl.s * st.S;                                     // px da gravação -> px do vídeo
       const O = [st.P[0] + st.S * (14 + pl.tx + view[0] * pl.s - PH_C[0]), st.P[1] + st.S * (14 + pl.ty + view[1] * pl.s - PH_C[1])];
+      // o passo mínimo cai de 23 para 10 px junto com o zoom-out (grade "46 → 10 px" do roteiro)
+      const Lb = lerp(23, 10, inOut(seg(t, 8.0, 8.8)));
       let D = 40 * view[2] * k;
-      while (D < 23) D *= 2; while (D >= 46) D /= 2;
+      while (D < Lb) D *= 2; while (D >= 2 * Lb) D /= 2;
       const d1 = q(root, "#a5d1"), d2 = q(root, "#a5d2");
-      [[d1, D, (D - 23) / 23], [d2, 2 * D, 1]].forEach(([el, sz, op]) => {
+      [[d1, D, (D - Lb) / Lb], [d2, 2 * D, 1]].forEach(([el, sz, op]) => {
         el.style.backgroundSize = `${sz}px ${sz}px`;
         el.style.backgroundPosition = `${O[0] - sz / 2}px ${O[1] - sz / 2}px`;
         el.style.opacity = op;
