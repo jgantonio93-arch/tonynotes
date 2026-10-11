@@ -119,6 +119,8 @@ class FoldersActivity : Activity() {
         })
 
         setContentView(root)
+        // Na tela inicial, confere se há versão nova no GitHub (só avisa se houver).
+        if (folderId == null) Updates.check(this)
     }
 
     override fun onResume() {

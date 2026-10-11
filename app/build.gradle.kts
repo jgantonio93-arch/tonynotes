@@ -1,3 +1,8 @@
+// Número da execução do CI (0 em builds locais). Entra no versionCode, para cada APK
+// novo instalar por cima do anterior, e no BuildConfig, para o app comparar com a
+// tag "buildN" da última versão publicada no GitHub e avisar quando houver uma nova.
+val ciBuild = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -11,8 +16,9 @@ android {
         applicationId = "com.jgantonio.notasinfinitas"
         minSdk = 29
         targetSdk = 35
-        versionCode = 11
+        versionCode = if (ciBuild > 0) 1000 + ciBuild else 11
         versionName = "0.11.0"
+        buildConfigField("int", "BUILD_NUMBER", ciBuild.toString())
 
         // Só celulares ARM 64 bits (todos os Galaxy com S Pen e quase todo Android atual):
         // o reconhecimento de escrita traz um motor nativo por processador, e levar os
@@ -41,6 +47,10 @@ android {
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("debug")
         }
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {

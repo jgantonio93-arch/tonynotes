@@ -142,15 +142,19 @@ DESIGN.md do Notion (Awesome Design): papel quente, um único acento cor de tint
 Todos os pares de texto/fundo passam no contraste WCAG AA (auditado com o Playwright CLI).
 
 ## Como instalar
-O repositório é privado: só quem tem acesso a ele consegue baixar o app.
-Cada versão que passa nos testes vira uma **Release**. Com o GitHub logado no celular, este
-link sempre baixa a mais recente:
+O repositório é público. Cada versão do `main` que passa nos testes vira uma **Release**
+(tag `rosanotes-v<versão>-build<N>`), e este link sempre baixa a mais recente (é o botão do site):
 `https://github.com/jgantonio93-arch/tonynotes/releases/latest/download/RosaNotes.apk`
-(o mesmo APK também fica no artefato `tonynotes-apk` de cada execução na aba **Actions**).
+(o APK de cada execução também fica no artefato `rosanotes-apk` da aba **Actions**).
 Instale o `.apk` permitindo "instalar apps desconhecidos".
 
 O APK é assinado com uma chave de debug fixa (`app/debug.keystore`), então as versões
 novas instalam por cima das antigas sem perder as notas.
+
+**Aviso de atualização:** ao abrir, o app consulta a última Release no GitHub e compara o
+`buildN` da tag com o próprio `BuildConfig.BUILD_NUMBER` (o número da execução do CI que o
+gerou). Se houver versão mais nova, aparece um painel com o botão **Atualizar**; se estiver em
+dia ou sem internet, nada aparece. Builds locais (número 0) não consultam (`Updates.kt`).
 
 ## Compilar localmente
 Requer JDK 17 e Android SDK (Android Studio):

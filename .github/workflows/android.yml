@@ -18,19 +18,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # O app é particular: enquanto o repositório estiver público, nada fica
-      # disponível para download (apaga versões publicadas e arquivos de builds).
-      - name: Proteger downloads (repositório público)
-        if: ${{ !github.event.repository.private }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-        run: |
-          gh release list --repo "$REPO" --limit 100 --json tagName --jq '.[].tagName | select(startswith("tonynotes-") or startswith("rosanotes-"))' \
-            | xargs -r -n1 gh release delete --repo "$REPO" --cleanup-tag -y
-          gh api "repos/$REPO/actions/artifacts" --paginate --jq '.artifacts[].id' \
-            | xargs -r -I{} gh api -X DELETE "repos/$REPO/actions/artifacts/{}"
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -44,7 +31,6 @@ jobs:
           ./gradlew assembleDebug --stacktrace
 
       - name: Publicar APK
-        if: ${{ github.event.repository.private }}
         uses: actions/upload-artifact@v4
         with:
           name: rosanotes-apk
@@ -53,12 +39,13 @@ jobs:
       - name: Testes de funcionamento
         run: ./gradlew testDebugUnitTest --tests "*FunctionalTest*"
 
-      # Só versões que passaram nos testes viram "Release", e só com o repositório
-      # privado (o download fica restrito a quem tem acesso). O link fixo
+      # Só versões do main que passaram nos testes viram "Release" (o repositório é
+      # público: qualquer pessoa baixa). O link fixo
       # https://github.com/<dono>/<repo>/releases/latest/download/RosaNotes.apk
-      # sempre baixa a mais recente (é o link do botão do site).
+      # sempre baixa a mais recente (é o link do botão do site). O app compara o
+      # "buildN" da tag com o BUILD_NUMBER dele para avisar que há versão nova.
       - name: Publicar versão (link fixo de download)
-        if: ${{ github.event.repository.private && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+        if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

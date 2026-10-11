@@ -696,4 +696,16 @@ class FunctionalTest {
         assertTrue("uma embaixo da outra", l.pageRect(1).top > l.pageRect(0).bottom)
         assertEquals(l.pageRect(0).left, l.pageRect(1).left, 0.01f)
     }
+
+    @Test
+    fun aviso_de_versao_nova_compara_o_build_da_tag() {
+        assertEquals(123, Updates.buildOf("rosanotes-v0.11.0-build123"))
+        assertNull(Updates.buildOf("demo-frames"))
+        assertNull(Updates.buildOf(null))
+        assertTrue(Updates.isNewer(124, 123))
+        assertTrue(!Updates.isNewer(123, 123))
+        assertTrue("mais antiga não avisa", !Updates.isNewer(100, 123))
+        assertTrue("build local nunca avisa", !Updates.isNewer(124, 0))
+        assertTrue("sem resposta não avisa", !Updates.isNewer(null, 123))
+    }
 }
