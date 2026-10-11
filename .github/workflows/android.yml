@@ -5,6 +5,7 @@ on:
     paths-ignore:
       - "docs/**"
       - "README.md"
+      - "video/**"
   workflow_dispatch:
 
 permissions:
