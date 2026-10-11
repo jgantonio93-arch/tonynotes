@@ -1,0 +1,422 @@
+{
+ "title": "RosaNotes: Escreva fora da margem (lançamento, 150 BPM)",
+ "logline": "Todo estudante já ouviu \"não escreva fora da margem\" e já espremeu o fim da palavra na borda da folha. Em 40 s, num funk 150 com acabamento de lançamento premium, o RosaNotes risca o \"NÃO\". No app real, um toque tira a borda, a escrita passa de onde a folha acabava e a nota se revela infinita, para o lado e para baixo. Na sequência, cada recurso cai numa batida. No fim, a espiral desenhada com a S Pen vira o miolo da rosa da logo.",
+ "hook": "0,00 s: o vídeo já abre em movimento, sem fade. O app REAL aparece em macro de 2,2x na borda direita de uma folha Universitário, com a S Pen escrevendo \"ener-gia\" em azul. Sobre ele, quatro slams nas colcheias: NÃO (0,0, já no meio do slam no quadro 0), ESCREVA (0,2), FORA DA (0,4) e MARGEM. (0,6). É a frase que todo aluno brasileiro já ouviu.\n\nDe 0,6 a 1,0 s, no app, \"da célula\" sai espremido em escadinha, colado à borda da folha: o gesto que todo estudante já fez.\n\n1,0 s: uma S Pen rabisca o NÃO de vermelho.\n1,2 s: BOOM. O NÃO despenca girando, a imagem congela, um círculo vermelho se desenha em volta da letra espremida e aparece \"socorro\" em Caveat. Sobra a ordem rebelde ESCREVA FORA DA MARGEM.\n\nPor que prende:\n- Junta duas identificações imediatas: a frase do professor e a letra espremida.\n- Tem humor.\n- Mostra o produto real desde o quadro 0.\n- Tem impacto sonoro antes de 1,5 s.\n- Deixa no ar a pergunta \"e agora?\", respondida no drop aos 3,2 s.",
+ "duration_s": 40,
+ "bpm": 150,
+ "music": "Trilha original sintetizada em numpy no estilo \"funk 150 elegante\": groove de funk brasileiro com produção limpa de future house. É energético e reconhecível para o público BR, sem cara de meme.\n\nGRADE\n- 150 BPM exatos: 1 tempo = 0,4 s = 12 quadros; 1 colcheia = 6 quadros; 1 compasso = 1,6 s = 48 quadros.\n- 25 compassos = 40,0 s. Todo corte cai em quadro inteiro.\n- Tom de Fá menor, que só resolve em Láb maior na logo.\n\nTIMBRES\n- Kick/808: seno 140→45 Hz em 60 ms, cauda de 0,3 s, saturação tanh leve (drive 2,5), com harmônicos para o alto-falante do celular.\n- Palma: 3 rajadas de ruído passa-banda em 1,2 kHz.\n- Chimbal: passa-alta em 8 kHz.\n- Perc: tom sintético em 180/240 Hz.\n- Lead pluck/marimba (serra + seno, decaimento de 180 ms), que é o gancho melódico.\n- Cowbell 808 afinado e discreto: só no drop 1b e no drop 2, a −8 dB do lead, para dar sabor de funk sem dominar.\n- Supersaw de 7 vozes (±8/±16/±25 cents) mais uma oitava abaixo.\n- Pad quente, sub de 40–55 Hz, risers (ruído com passa-banda subindo e serra 200→2000 Hz), whooshes, pops afinados e prato reverso.\n\nPADRÕES (16 semicolcheias)\n- Kick/808: x..x..x.x..x..x. (3+3+2, o balanço do funk).\n- Palma: ....x.......x...\n- Chimbal: x.x.x.x.x.x.x.x.\n- Perc: ..x..x...x..x.x.\n- Gancho do lead, 2 compassos: Dó5 Dó5 Láb4 Sib4 Dó5 Mib5 Dó5 | Láb4 Láb4 Fá4 Sol4 Láb4 Dó5 Sib4, nos passos 1, 4, 7, 9, 11, 13 e 15.\n- Harmonia: Fm | Réb–Mib (808 nas fundamentais, glide de 30 ms).\n\nSEÇÕES\n- 0,0–1,6 GANCHO\n  - Groove completo, mas abafado (passa-baixa em 800 Hz) e com chiado de caneta em primeiro plano.\n  - Stomps (kick + palma + tapa de papel + stab de serra em Fm) em 0,0, 0,2, 0,4 e 0,6; o 4º é o mais forte.\n  - 1,0: arranhado agressivo de caneta.\n  - 1,2: BOOM (seno 55→38 Hz, 0,6 s, saturado, mais estalo).\n  - 1,4–1,6: tape-stop (cai uma oitava e para).\n- 1,6–3,2 BUILD\n  - 1,6–2,0: rebobinar de fita (chirp + \"tec\" de VHS).\n  - 2,0–3,0: riser + rufada acelerando (colcheias → semicolcheias → fusas).\n  - 2,4: clique de toque + brilho Fá5-Láb5-Dó6.\n  - 3,0–3,2: SILÊNCIO total, só um prato reverso de 0,2 s.\n- 3,2–9,6 DROP 1 (4 compassos)\n  - Tudo aberto: 808, palma, chimbal, perc e o gancho do lead.\n  - Crashes em 3,2 e 6,4.\n  - Whooshes horizontais em 4,0 e 4,8; whoosh vertical em 6,4.\n  - 8,0–8,8: whoosh de zoom-out com o pitch descendo.\n  - 8,8: impacto + crash.\n- 9,6–20,8 DROP 1b (7 compassos)\n  - Entram o cowbell discreto dobrando o gancho e as notas-fantasma de perc.\n  - O arpejo pluck em semicolcheias (Fá-Láb-Dó-Mib / Réb-Fá-Láb-Dó / Mib-Sol-Sib-Réb) entra em 12,8.\n  - Crashes em 9,6, 12,8, 15,2 e 17,6.\n  - 13,6: CLACK de madeira quando a barra fica em pé.\n  - 15,6–16,6: 6 pops afinados nas colcheias (Dó5 Ré5 Mib5 Fá5 Sol5 Láb5).\n  - 20,0: \"poof\" da borracha.\n  - 20,4–20,8: downlifter.\n- 20,8–24,0 BREAK (2 compassos)\n  - A bateria sai e fica um pad de Fm com passa-baixa.\n  - Tique-taque de woodblock em cada tempo, com flip mecânico dos dígitos.\n  - Kick só na cabeça do compasso, como batimento.\n  - Zumbido de \"luz forte\" de 120 Hz bem baixo.\n  - Riser de 22,4 a 23,6.\n  - 23,2: clique de toque.\n  - 23,6–24,0: SILÊNCIO, só com dois batimentos cardíacos (sub de 55 Hz + clique) em 23,65 e 23,85.\n- 24,0–30,4 DROP 2 (4 compassos)\n  - Tudo do drop 1b, mais stabs de supersaw nos passos 1 e 7 com o acorde do compasso. O lead dobra uma oitava acima.\n  - 24,0: IMPACTO (sub + crash + stab de \"luz acendendo\").\n  - De 24,8 a 26,8, um \"card flip\" de papel a cada tempo, subindo meio tom a cada troca de modelo.\n  - 27,2: crash.\n  - 27,2–27,8: whooshes 3D das pastas.\n  - 28,0: pop de adesivo.\n  - 28,8: crash curto + rabisco.\n- 30,4–32,8 LISTA\n  - Groove sem o lead, com o filtro levemente fechado (6 kHz).\n  - Em cada tempo, um stamp (pop grave + clique) e um chiado curto de marca-texto de 60 ms.\n- 32,8–34,4 HERÓI\n  - Meio-tempo: kick só no 1 e no 3, acorde de Réb maior aberto em supersaw.\n  - Som de caneta em primeiro plano, modulado pela velocidade real da espiral.\n  - Swell reverso de 34,0 a 34,4.\n- 34,4–36,8 LOGO\n  - 34,4: IMPACTO máximo e primeira resolução em maior (Láb add9 cheio, sub de 40 Hz, crash, sino).\n  - 35,0: pop agudo da folha (seno 1200→600 Hz).\n  - 35,6: um \"tic\" por letra de RosaNotes.\n  - 36,0: squeak de marca-texto e retorno do kick em meio-tempo.\n- 36,8–40,0 CTA/OUTRO\n  - Groove leve (kick, palma, cowbell discreto) com o passa-baixa abrindo de 1,2 para 8 kHz.\n  - 37,2: pop do balão.\n  - 38,0–38,8: caneta do sublinhado com pan da direita para a esquerda até sair.\n  - 39,2–40,0: prato reverso + chiado de caneta crescendo.\n  - 40,0: corte seco no downbeat, que casa com o quadro 0 (loop).\n\nIMPACTOS/CORTES DUROS\n0,0 · 0,2 · 0,4 · 0,6 · 1,2 · 3,2 · 4,0 · 4,8 · 6,4 · 8,8 · 9,6 · 12,8 · 13,6 · 15,2 · 16,8 · 17,6 · 20,0 · 20,8 · 24,0 · 27,2 · 28,8 · 30,4 · 32,8 · 34,4 · 36,8 · 40,0.\n\nSONS DE CANETA E MARCA-TEXTO\n- Gerados a partir do touches.json, com amplitude proporcional à velocidade real da ponta, e só com a ponta encostada.\n- Ruído rosa em passa-faixa:\n  - caneta: 2–5 kHz;\n  - tinteiro: mais grave e liso;\n  - lápis: granulado;\n  - pincel: úmido;\n  - marca-texto: 0,8–2,5 kHz, com chiado de feltro.\n- Dentro dos drops, a −10 dB da música.\n\nMASTER\n-14 LUFS integrado, pico real de -1 dBTP, compatível com mono.",
+ "visual_style": "CONCEITO: \"a folha que não acaba\", com acabamento de lançamento premium e ritmo de Reels.\n\nDOIS MUNDOS, alternados para dar ritmo:\n- MUNDO PAPEL (0–20,8 s e cartão final):\n  - fundo #F6F4EF com grão de papel a 3–4% em multiply;\n  - a MESMA grade de pontos do app (3 px a cada 46 px, #1B1B1F a 14%), PRESA AO MUNDO: sempre que o celular aparece, ela anda e escala junto com o pan e o zoom reais do canvas (view.json por quadro). A tela infinita continua fora do aparelho.\n- MUNDO NOITE (20,8–34,4 s):\n  - fundo #0F0C0D → vinho #3A0A14, pontos #F6F4EF a 7%;\n  - luz #C2253B a 35% vindo de baixo, pulsando +6% a cada kick;\n  - grão de 5%.\n- Nada de bokeh parado (era o defeito da versão anterior).\n\nPALETA\n- Tinta #1B1B1F.\n- Vermelho-rosa #C2253B (claro) / #F28A97 (noturno).\n- Gradiente da logo #E8404F→#A3162B.\n- Pétala/folha #FFC9D1.\n- Marca-texto #FFE45C (no escuro, oliva #7A6A12, como no app).\n- Azul de caneta #1F5FD1.\n\nTIPOGRAFIA\n- Fraunces 900 (opsz 144, tracking -3%) nos textos que batem, de 110 a 280 px; a palavra de ênfase em itálico #C2253B/#F28A97.\n- Onest 700–800 em CAIXA ALTA, tracking 0,08–0,12em, para rótulos, contadores (algarismos tabulares, efeito odômetro) e pílulas.\n- Caveat 700 só para anotações de estudante (\"socorro\", \"kkkk\", \"botão próprio\", setas, círculos, colchetes), sempre desenhadas traço a traço (stroke-dashoffset) em 4–6 quadros.\n- Regra: no máximo UM texto principal novo por tempo (0,4 s) e no máximo 5 palavras grandes na tela.\n\nVOCABULÁRIO DE MOVIMENTO (sempre na batida)\n- SLAM: escala 1,4→1 e desfoque 14→0 em 3–4 quadros (ease-out-back), com fantasma rosa #E8404F deslocado 8 px por 2 quadros.\n- RISE: a linha sobe de dentro de uma máscara em 6 quadros, 2 quadros entre palavras.\n- STAMP: escala 1,15→1 com giro de -2°→0.\n- ADESIVO: faixa de papel #F6F4EF com sombra dura de 6 px a 25% e rotação de ±3° atrás do texto que fica sobre o app. No clap seguinte, uma faixa de marca-texto passa atrás da palavra-chave.\n- WHIP: saída de 1200 px em 5 quadros, com desfoque só no eixo do movimento (até 40 px), acompanhando os arrastos REAIS do app.\n- Texto sai por corte seco ou empurrado pelo próximo. Nunca fade lento.\n\nCÂMERA\n- Cerca de 70% do tempo o app ocupa a TELA CHEIA em recorte macro de 1,3–2,4x, seguindo a ponta da S Pen com mola (k=140, olhando 120 px à frente).\n- Celular 3D genérico (sem marca, aro preto de 14 px, cantos de 64 px, reflexo de vidro que corre ao girar, perspectiva de 2000 px) só nas revelações: zoom-out, madrugada, pastas e CTA.\n- Beat bounce de +2,5% em cada kick, decaindo em 6 quadros.\n- Nos drops (3,2 / 24,0 / 34,4): bump de 6%, aberração cromática de 3 quadros e tremor de 10 px.\n- Nada fica parado mais de 0,4 s.\n\nCURSORES (desenhados sobre a gravação a partir do touches.json)\n- S Pen genérica: corpo grafite #2B2B30, ponta clara, botão lateral, inclinada 32° vindo de baixo pela direita, com sombra que encosta ao escrever e brilho #FFC9D1 na ponta quando há tinta. SEM rastro de cometa, que pareceria atraso.\n- Dedo: círculo branco de 64 px a 55%, com anel que se expande no toque.\n\nTRANSIÇÕES-ASSINATURA\n1. A linha vermelha da margem, que abre e fecha o vídeo.\n2. O ∞ que nasce do botão real \"Infinita\" e vira portal.\n3. Varredura gigante de marca-texto amarelo.\n4. Revelação circular do noturno a partir do botão real.\n5. Ladrilhos que se juntam numa tela só.\n6. Match cut da espiral para o miolo da rosa.\n\nPétalas #FFC9D1/#E8404F só em 3 impactos (8,8 / 24,0 / 34,4).\n\nZONAS SEGURAS (Reels/TikTok)\n- Textos entre y 250 e y 1480, x 80–960.\n- Nada de texto em x>960 entre y 900 e y 1700.\n\nPRODUÇÃO\n- Chromium em 1080x1920, 30 fps, 1200 quadros, grade de 12 quadros por tempo.\n- Time-remap por markers: cada trecho entre dois markers é reamostrado para a duração exata da cena, a 0,8–3x (escrita a 2–3x, gestos-chave a 1x).\n- H.264 CRF 16, AAC 320 kbps.\n- Fraunces e Onest vêm de app/src/main/assets/fonts; a Caveat (OFL) vem do Google Fonts.\n- Último quadro limpo, que emenda no quadro 0 (loop).",
+ "scenes": [
+  {
+   "id": "S01-gancho-margem",
+   "start_s": 0,
+   "dur_s": 1.6,
+   "kind": "mixed",
+   "on_screen_text": [
+    "NÃO",
+    "ESCREVA",
+    "FORA DA",
+    "MARGEM.",
+    "socorro"
+   ],
+   "visuals": "BASE: R1 em TELA CHEIA, macro de 2,2x na borda direita de uma folha Universitário (modo Folhas). A borda da folha e o cinza além dela ficam em x≈820–1080 do quadro. A câmera segue a ponta da S Pen com push-in de 2,2→2,5x.\n- 0,0–0,6: a caneta termina 'gia' (de 'energia') em azul.\n- 0,6–1,0: 'da célula' sai espremido em escadinha, descendo colado à borda (cerca de 2x).\n\nTEXTO no terço superior (y 260–860), sobre um ADESIVO de papel a 92%, em Fraunces 900 CAIXA ALTA alinhado à esquerda em x=120:\n- 0,0 'NÃO' (260 px, começa 2 quadros antes, então já está no meio do slam no quadro 0)\n- 0,2 'ESCREVA' (150 px)\n- 0,4 'FORA DA' (150 px)\n- 0,6 'MARGEM.' (150 px)\nCada slam vem com tremor de câmera de 6 px.\n\n- 1,0–1,2: uma S Pen (overlay) rabisca 3 zigue-zagues vermelhos #C2253B (SVG de 30 px, largura variando como pressão) sobre o 'NÃO'.\n- 1,2 IMPACTO:\n  - O 'NÃO' despenca (translateY +900, rotate 18°) com separação RGB, e 'ESCREVA FORA DA MARGEM.' sobe 260 px com mola.\n  - A gravação congela (freeze de 4 quadros) com punch-in instantâneo de +18% centrado na escadinha.\n  - Um círculo vermelho de 10 px se desenha em 4 quadros em volta da escadinha.\n  - Aparece 'socorro' (Caveat 700, 110 px, #C2253B, -8°), com jitter de 2 px.\n- 1,4–1,6: tape-stop visual. A imagem cai 40 px com blur vertical e dessatura 60%.",
+   "app_actions": "R1, markers 'gancho' → 'socorro'.\n- A S Pen escreve 'gia' (Caneta azul) completando 'a usina de energia' na 6ª pauta.\n- Depois escreve ' da célula' letra a letra, cada vez menor e mais baixa, colada à borda direita da folha (escadinha).\n- Hold de 12 quadros.",
+   "sfx": "- 0,0: chiado de caneta em primeiro plano + groove abafado.\n- 0,0 / 0,2 / 0,4 / 0,6: stomps.\n- 0,6–1,0: o arranhado fica mais agudo (o aperto).\n- 1,0: arranhado agressivo do rabisco.\n- 1,2: BOOM + estalo de papel.\n- 1,25: rabisco do círculo.\n- 1,4–1,6: tape-stop."
+  },
+  {
+   "id": "S02-um-toque-infinita",
+   "start_s": 1.6,
+   "dur_s": 1.6,
+   "kind": "mixed",
+   "on_screen_text": [
+    "◀◀ REBOBINA",
+    "Um toque…",
+    "e a borda some."
+   ],
+   "visuals": "- 1,6–2,0 REBOBINAR:\n  - Os quadros de R1 da escadinha tocam ao contrário a 6x e 'da célula' se desescreve.\n  - Efeitos de VHS: scanlines de 4 px a 20%, deslocamento RGB de 8 px e tremor.\n  - Rótulo '◀◀ REBOBINA' (Onest 800, branco com contorno) no canto superior esquerdo.\n- 2,0: corte seco. R1 em tela cheia a 1,2x, enquadrando a metade de baixo da tela do app: a bandeja 'Página' REAL sobe (se o Robolectric não animar, a subida é animada no HTML a partir do quadro aberto, em 8 quadros ease-out-expo).\n  - 'Um toque…' (Fraunces 900, 110 px, branco) aparece sobre o escurecido do próprio app, em y≈420.\n- 2,4: o dedo toca 'Infinita', com anel e o botão piscando rosa. Do botão nasce um ∞ em SVG (traço de 60 px #C2253B com brilho #FF8C99), desenhado em 8 quadros, que cresce até 3x a largura da tela girando -8°.\n- 2,8: 'e a borda some.' (Fraunces 900 itálico #C2253B).\n- 3,0–3,2: a câmera mergulha no laço esquerdo do ∞ (escala 1→6, blur radial); dentro dele, por máscara, já aparece R1 'drop'.\n- 3,2: flash branco de 1 quadro.",
+   "app_actions": "R1, markers 'pagina' → 'infinita'.\n- Toque no ⋮.\n- Toque em 'Página': a bandeja abre.\n- Toque em 'Infinita' (o modo vira tela infinita).\n- Fechar a bandeja.",
+   "sfx": "- 1,6–2,0: rebobinar de fita.\n- 2,0: whoosh curto da bandeja.\n- 2,0–3,0: riser + rufada acelerando.\n- 2,4: clique + brilho Fá5-Láb5-Dó6 enquanto o ∞ se desenha.\n- 3,0–3,2: silêncio, só prato reverso."
+  },
+  {
+   "id": "S03-drop-escreve-arrasta",
+   "start_s": 3.2,
+   "dur_s": 3.2,
+   "kind": "app_recording",
+   "on_screen_text": [
+    "Escreva",
+    "fora da margem.",
+    "21 cm",
+    "Arrasta.",
+    "1 m",
+    "E continua.",
+    "10 m",
+    "∞"
+   ],
+   "visuals": "3,2 DROP.\n- R1 em tela cheia, recorte de 1,5x na linha de 'energia', com a câmera presa à ponta.\n- No impacto, uma linha vermelha tracejada (o fantasma da antiga borda, na mesma posição de antes) estoura em partículas.\n- A caneta escreve ' da célula' em tamanho normal ATRAVESSANDO o lugar onde era a borda; o pontilhado continua.\n\nRitmo escreve–arrasta (time-remap):\n- 3,2–4,0: escreve ' da célula' (2,5x).\n- 4,0–4,4: arrasto real a 1x, com whip horizontal e blur de até 40 px.\n- 4,4–4,8: escreve ' produz ATP' (3x).\n- 4,8–5,2: arrasto.\n- 5,2–6,0: toque no vermelho e ' cai na prova!' (3x).\n- 6,0–6,4: push-in de 8% no 'prova!'.\n\nTEXTO em ADESIVOS no terço superior, Fraunces 900:\n- 3,2 'Escreva' (130 px, tinta).\n- 3,6 'fora da margem.' (itálico 150 px #C2253B, shake de 8 px na palma).\n- 4,4 'Arrasta.' (empurra o anterior para fora).\n- 5,2 'E continua.' ('continua.' em itálico vermelho).\n\nCONTADOR: selo-odômetro preto pequeno no canto inferior esquerdo (Onest 800, 64 px, em y≈1400). Troca por rolagem de 4 quadros com pop de 115%:\n- 3,2 '21 cm'\n- 4,4 '1 m'\n- 5,2 '10 m'\n- 6,0 '∞'\n\nSem fita métrica e sem esteira de setas, para não sobrecarregar.",
+   "app_actions": "R1, markers 'drop' → 'arrasta1' → 'atp' → 'arrasta2' → 'vermelho'.",
+   "sfx": "- 3,2: crash + kick + 808 + palma (DROP) + estalo de partículas.\n- Chiado de caneta em cada escrita.\n- 4,0 e 4,8: whoosh horizontal (passa-banda varrendo 300→3000 Hz, pan L→R).\n- 4,4 / 5,2 / 6,0: 'tic-tic' de catraca do odômetro; em 6,0, 'ding' metálico."
+  },
+  {
+   "id": "S04-pra-baixo",
+   "start_s": 6.4,
+   "dur_s": 1.6,
+   "kind": "app_recording",
+   "on_screen_text": [
+    "Pra baixo",
+    "também."
+   ],
+   "visuals": "- 6,4: whip VERTICAL. O arrasto real sobe a nota e revela, embaixo, o diagrama do ciclo pré-desenhado (círculo com setas, 'citrato', 'NADH', 'FADH2', 'oxaloacetato').\n- 6,4: 'Pra baixo' (Fraunces 900, 130 px) entra letra por letra caindo do topo nas semicolcheias, com 2 quiques.\n- 6,8–7,8: toque no azul e 'Krebs' é escrito em azul no centro do ciclo (2,5x), com recorte de 1,6x seguindo a ponta.\n- 7,2: 'também.' (itálico #1F5FD1, a mesma cor da tinta), com uma seta Caveat azul para baixo que quica em cada kick.",
+   "app_actions": "R1, markers 'desce' → 'krebs'.",
+   "sfx": "- 6,4: crash + whoosh vertical descendente.\n- 6,4–6,8: 'plic' de cada letra caindo, em escala descendente.\n- 6,8–7,8: caneta mais leve."
+  },
+  {
+   "id": "S05-aula-inteira",
+   "start_s": 8,
+   "dur_s": 1.6,
+   "kind": "mixed",
+   "on_screen_text": [
+    "140%",
+    "22%",
+    "A aula",
+    "INTEIRA",
+    "numa tela só."
+   ],
+   "visuals": "ZOOM-OUT DUPLO.\n- 8,0: dois círculos de dedo fazem a pinça REAL no app (140% → cerca de 22%).\n- Ao mesmo tempo, a montagem encolhe a gravação da tela cheia para dentro do celular 3D (escala 1→0,62, rotateY -16°, rotateX 10°) sobre o MUNDO PAPEL. A grade de pontos do fundo encolhe junto (46→10 px), presa ao zoom real.\n- Uma cópia da gravação sem máscara, a 35%, vaza para fora da moldura: a nota continua além do aparelho.\n- Aparece o mapa da aula: Biologia celular, Membrana, Glicólise, o ciclo, ATP sintase, 'Cai na prova!', Resumo, 'sem fim'.\n- Odômetro grande no canto superior esquerdo (Onest 800 tabular, 90 px) rola de '140%' a '22%', sincronizado com o view.json.\n\nTEXTOS:\n- 8,4 'A aula' (Fraunces 900, 110 px, tinta).\n- 8,8 IMPACTO: pétalas explodem atrás do celular. 'INTEIRA' (Fraunces 900 itálico, 240 px, #C2253B) entra em SANDUÍCHE: metade das letras atrás do celular, metade na frente. O celular dá um tranco de 4° e volta com mola.\n- 9,2 'numa tela só.' (90 px).\n- 9,4–9,6: varredura amarela começa pela esquerda.",
+   "app_actions": "R1, markers 'zoom' → 'fim': pinça de 140% até cerca de 22%, depois hold.",
+   "sfx": "- 8,0–8,8: zoom-out com pitch descendo e reverb abrindo, mais um tique granular a cada número do odômetro.\n- 8,8: impacto + crash + sininhos das pétalas.\n- 9,2: thump."
+  },
+  {
+   "id": "S06-marca-texto",
+   "start_s": 9.6,
+   "dur_s": 3.2,
+   "kind": "app_recording",
+   "on_screen_text": [
+    "Marca-texto",
+    "botão próprio",
+    "letra pequena",
+    "letra grande",
+    "Ele se ajusta à letra."
+   ],
+   "visuals": "- 9,6 TRANSIÇÃO: uma faixa de marca-texto gigante (#FFE45C a 80%, em multiply, -8°, 700 px de altura, ponta chanfrada) varre a tela da esquerda para a direita em 6 quadros e revela R2 em tela cheia.\n- 9,6: 'Marca-texto' em slam (Fraunces 900, 130 px, y 260–400).\n- 9,8–10,2: recorte de 1,8x na barra. O dedo toca o botão do marca-texto (anel, o ícone pula). Uma anotação Caveat vermelha circula o botão e escreve 'botão próprio' (64 px, -6°) com seta.\n- 10,4–11,2: whip para baixo. O marca-texto passa sobre a linha PEQUENA 'gera NADH e FADH' a 1,5x e a faixa sai FINA.\n  - Ao terminar, um colchete-régua vermelho (2 px, com tiques) aparece à direita medindo a altura da faixa, com o selo 'letra pequena' (Onest 800 caixa alta, 48 px, pílula preta).\n- 11,2–12,0: a câmera sobe até o título GRANDE 'Mitocôndria'. A faixa sai ALTA, e o MESMO colchete cresce com mola (overshoot de 12%) até a nova altura, com o selo 'letra grande'.\n- 12,0–12,8: congela e recua até mostrar as duas faixas. 'Ele se ajusta à letra.' em RISE, com 'à letra.' em itálico #C2253B e faixa amarela passando atrás no clap. Punch-in de 6% em 12,4.",
+   "app_actions": "R2, markers 'mt' → 'fina' → 'alta'.\n- Toque no botão do marca-texto.\n- Faixa sobre a linha pequena.\n- Faixa sobre o título grande.",
+   "sfx": "- 9,6: squeak gigante de marca-texto + crash.\n- 9,9: clique do botão.\n- 10,0: rabisco de marcador da anotação.\n- 10,4–11,0 e 11,2–11,9: som de feltro seguindo a velocidade.\n- 11,0 e 11,9: 'tic-tic' de régua no colchete.\n- 12,0: pop."
+  },
+  {
+   "id": "S07-barra-em-pe",
+   "start_s": 12.8,
+   "dur_s": 2.4,
+   "kind": "app_recording",
+   "on_screen_text": [
+    "Barra no caminho?",
+    "Arrasta pra borda.",
+    "Ela fica em pé.",
+    "3 cores",
+    "a um toque."
+   ],
+   "visuals": "- 12,8: whip diagonal. Recorte de 1,3x no topo do app.\n- 12,8–13,6: o dedo agarra a alça ⋮⋮ e leva a barra até a borda esquerda, com a câmera acompanhando.\n- Textos (Fraunces 900, 110 px):\n  - 12,8 'Barra no caminho?'\n  - 13,2 'Arrasta pra borda.'\n- 13,6 IMPACTO: a barra encaixa EM PÉ (real). Shake de 12 px e contorno rosa piscando 3 quadros em volta dela. 'Ela fica em pé.' entra com 'em pé' escrito NA VERTICAL ao lado da barra (piada tipográfica).\n- 14,0–15,2: enquadramento de 1,2x com a barra e a área de escrita, trocando de cor NA BATIDA:\n  - 14,0: preto, escreve 'ATP'.\n  - 14,4: vermelho, circula.\n  - 14,8: azul, sublinha ondulado.\n  A cada toque: anel no dedo, a borda interna do vídeo brilha na cor por 4 quadros e o fundo muda levemente de matiz.\n- 14,4: '3 cores' (o '3' troca de cor a cada batida).\n- 14,8: 'a um toque.' (itálico).",
+   "app_actions": "R2, markers 'barra' → 'empe' → 'cores'.",
+   "sfx": "- 12,8: whoosh + deslize com fricção.\n- 13,6: CLACK de madeira + grave.\n- 14,0 / 14,4 / 14,8: cliques de cor afinados em Fá5, Láb5 e Dó6, com caneta entre eles."
+  },
+  {
+   "id": "S08-seis-pinceis",
+   "start_s": 15.2,
+   "dur_s": 2.4,
+   "kind": "mixed",
+   "on_screen_text": [
+    "6 pincéis.",
+    "TINTEIRO",
+    "CANETA",
+    "LÁPIS",
+    "CALIGRAFIA",
+    "PINCEL",
+    "MARCA-TEXTO",
+    "Letra bonita (ou não)."
+   ],
+   "visuals": "- 15,2: crash + flash. A bandeja de canetas REAL (R2 'bandeja') bate na tela a 1,4x. '6 pincéis.' em slam (Fraunces 900, 150 px, o '6' em #C2253B).\n- 15,6–16,6: a bandeja dá lugar a uma GRADE 2x3 de ladrilhos sobre o papel:\n  - cada ladrilho tem 493x420 px, vãos de 24 px, cantos de 28 px e sombra;\n  - cada um é o recorte da região de R2 onde aquele pincel escreveu;\n  - entram em POP (escala 0,6→1, rotateY 30°→0) a cada COLCHETA: 15,6 / 15,8 / 16,0 / 16,2 / 16,4 / 16,6;\n  - cada um toca seu trecho (b1…b6) comprimido em cerca de 0,5 s;\n  - rótulo no canto do ladrilho em Onest 800, 30 px, na cor da tinta;\n  - os ladrilhos ficam todos na tela, então a leitura é cumulativa.\n- 16,8: os vãos fecham e os cantos zeram; a grade vira A PRÓPRIA tela do app (era uma nota só), e a câmera recua em 4 quadros.\n- 17,2: 'Letra bonita (ou não).' em Fraunces 900, com '(ou não)' em Caveat vermelho rabiscado.",
+   "app_actions": "R2, markers 'bandeja', depois 'b1'…'b6'.\n- Toque abre a bandeja.\n- Os 6 pincéis escrevem um em cada célula da grade.",
+   "sfx": "- 15,2: crash + bandeja abrindo (clique + ar).\n- 15,6–16,6: um pop afinado por ladrilho (Dó5 Ré5 Mib5 Fá5 Sol5 Láb5), por cima da textura de cada pincel.\n- 16,8: click-lock dos ladrilhos.\n- 17,2: thump."
+  },
+  {
+   "id": "S09-laco-borracha",
+   "start_s": 17.6,
+   "dur_s": 3.2,
+   "kind": "app_recording",
+   "on_screen_text": [
+    "Circula.",
+    "Move.",
+    "Gira.",
+    "Aumenta.",
+    "mitocondira?",
+    "Errou?",
+    "kkkk",
+    "Apaga."
+   ],
+   "visuals": "- 17,6: corte duro. R2 a 1,4x: a S Pen faz o laço tracejado em volta da mitocôndria vermelha. 'Circula.'\n- 18,0 'Move.': a seleção é arrastada com rastro fantasma de 2 cópias recortadas pela caixa (25/10%), e a câmera segue.\n- 18,4 'Gira.': gira -20°, e a montagem desenha um arco tracejado Caveat.\n- 18,8 'Aumenta.': a seleção cresce 1,3x e a câmera recua 6% junto.\n- Os verbos são Fraunces 900, 140 px, branco com sombra dura #C2253B deslocada 8 px, alternando o canto superior esquerdo e o direito.\n- 19,2: whip para baixo até 'mitocondira', escrito errado de propósito. Uma seta Caveat aponta 'mitocondira?'. Entram 'Errou?' (19,2, Fraunces 120 px) e 'kkkk' (19,4, Caveat vermelho, 12°).\n- 19,6–20,0: a borracha real passa em zigue-zague e a palavra some. Poeira de tinta (partículas pretas) sobe do lugar.\n- 20,0: 'Apaga.' com punch-in.\n- 20,4–20,8: a imagem dessatura e escurece até 70% (entrada da madrugada).",
+   "app_actions": "R2, markers 'laco' → 'move' → 'gira' → 'aumenta' → 'borracha'.",
+   "sfx": "- 17,6: zip pontilhado do laço.\n- 18,0: swish.\n- 18,4: catraca 'reco-reco'.\n- 18,8: 'boing' curto subindo.\n- 19,4: ba-dum-tss leve.\n- 19,6–20,0: borracha esfregando.\n- 20,0: 'poof' (ruído com pitch subindo).\n- 20,4–20,8: downlifter."
+  },
+  {
+   "id": "S10-break-madrugada",
+   "start_s": 20.8,
+   "dur_s": 3.2,
+   "kind": "mixed",
+   "on_screen_text": [
+    "01:12",
+    "01:58",
+    "02:41",
+    "Virando a noite",
+    "03:12",
+    "estudando?",
+    "03:58",
+    "socorro, meus olhos",
+    "04:31",
+    "Um toque e…",
+    "04:52",
+    "Respira."
+   ],
+   "visuals": "- 20,8: a batida cai e o vídeo entra no MUNDO NOITE.\n- Celular 3D DEITADO na mesa, visto de cima (rotateX 35°, rotateZ -6°), com a tela inicial CLARA de R3 (pastas com capa e 'Suas pastas').\n- Bloom exagerado: o branco vaza 60 px, e há um reflexo azulado na mesa.\n- Relógio gigante acima do celular (Onest 800 tabular, 200 px, #F28A97 a 75%), com flip mecânico de 3 quadros A CADA TEMPO:\n  - 20,8 '01:12'\n  - 21,2 '01:58'\n  - 21,6 '02:41'\n  - 22,0 '03:12'\n  - 22,4 '03:58'\n  - 22,8 '04:31'\n  - 23,2 '04:52'\n- Embaixo, Fraunces 900 branco, 100 px:\n  - 21,2 'Virando a noite'\n  - 22,0 'estudando?'\n- 22,4: 'socorro, meus olhos' (Caveat 700, 90 px, #F28A97, seta até a tela), retomando o gancho. O brilho da tela pulsa +30% a cada batimento.\n- 22,8: 'Um toque e…'. A câmera mergulha no celular (rotateX 35°→0°, escala 1→2,2) até o botão de sol.\n- 23,2: o dedo toca o sol (anel).\n- 23,4–23,6: o sol ocupa a tela e gira 45°.\n- 23,6–24,0: preto absoluto, com a lua apagada a 20% e 'Respira.' pequeno no centro (Fraunces itálico, 64 px, #F6F4EF a 80%), pulsando com os dois batimentos (escala 1→1,04).",
+   "app_actions": "R3, markers 'claro' → 'sol'.\n- Tela inicial clara parada.\n- Toque no botão de tema (sol).",
+   "sfx": "- 20,8: corte da batida; fica o pad de Fm.\n- Tique-taque + flip dos dígitos em cada tempo.\n- Zumbido de luz forte.\n- Kick de batimento na cabeça do compasso.\n- 22,4–23,6: riser.\n- 23,2: clique.\n- 23,6–24,0: silêncio, só com os batimentos em 23,65 e 23,85."
+  },
+  {
+   "id": "S11-drop2-noturno-modelos",
+   "start_s": 24,
+   "dur_s": 3.2,
+   "kind": "app_recording",
+   "on_screen_text": [
+    "Modo noturno.",
+    "pra virar a noite.",
+    "Prefere folhas?",
+    "PAUTADO",
+    "QUADRICULADO",
+    "UNIVERSITÁRIO",
+    "CORNELL",
+    "PARTITURA",
+    "SEMANAL"
+   ],
+   "visuals": "- 24,0 DROP 2:\n  - A lua vetorial que ocupa a tela encolhe (escala 30→1 em 7 quadros, easeOutExpo) até virar o botão de lua REAL da tela inicial noturna (R3 'escuro').\n  - Revelação circular a partir desse ponto, com pétalas explodindo e o celular girando de rotateY 20°→-8°.\n  - 'Modo noturno.' em slam letra a letra nas semicolcheias (Fraunces 900, 120 px, #F6F4EF, 'noturno' em itálico #F28A97).\n- 24,4: 'pra virar a noite.' (Onest 600, 48 px, #F28A97).\n- 24,8: corte para R4 em TELA CHEIA a 1,2x: uma folha no tema escuro com a anotação da aula ('Mitocôndria', 'a usina de energia da célula', 'cai na prova!' circulado). Cabeçalho fixo 'Prefere folhas?' no topo (Fraunces 900, 90 px).\n- A CADA TEMPO, corte seco para o próximo modelo; a escrita fica parada e só o papel muda (efeito hipnótico):\n  - 24,8 Pautado\n  - 25,2 Quadriculado\n  - 25,6 Universitário\n  - 26,0 Cornell\n  - 26,4 Partitura\n  - 26,8 Semanal\n- O rótulo fica numa pílula escura na base (Onest 800, 60 px, #F28A97, y≈1380).\n- Cada corte alterna rotação de ±2° e escala de 1,00/1,04, com flash rosa de 1 quadro a 15%.",
+   "app_actions": "R3 marker 'escuro' (24,0–24,8).\nR4, markers 'lines' … 'planner': o mesmo quadro com 6 modelos de folha.",
+   "sfx": "- 24,0: IMPACTO + crash + whoosh da lua.\n- 24,0–24,4: tiques das letras.\n- 24,8–26,8: card flip a cada tempo, subindo meio tom."
+  },
+  {
+   "id": "S12-pastas-etiquetas",
+   "start_s": 27.2,
+   "dur_s": 1.6,
+   "kind": "mixed",
+   "on_screen_text": [
+    "Uma pasta",
+    "pra cada matéria.",
+    "#prova",
+    "achou na hora."
+   ],
+   "visuals": "- 27,2: celular 3D noturno inclinado (rotateY 20°, rotateX 8°), com a tela inicial rolando de verdade (R3 'rola'): Fixadas, etiquetas, pastas com capa.\n- Os cartões das pastas (recortados do quadro de R3 como sprites) saltam da tela em direção à câmera (translateZ 0→500 px) e pousam em leque na frente do celular, um por COLCHETA, com giro leve e sombra:\n  - 27,2 Biologia\n  - 27,4 Química\n  - 27,6 Física\n  - 27,8 Redação\n- Textos (Fraunces 900, 110 px, branco):\n  - 27,2 'Uma pasta'\n  - 27,6 'pra cada matéria.' ('matéria.' em itálico #F28A97)\n- 28,0: whip-zoom de 6 quadros até a fileira de etiquetas. O dedo toca o chip 'prova' (real) e a lista filtra de verdade. O adesivo '#prova' cola por cima (escala 0→1,15→1, -6°).\n- 28,4: 'achou na hora.' (itálico #F28A97), com um tique Caveat.",
+   "app_actions": "R3, markers 'rola' → 'prova'.\n- Rolagem da tela inicial.\n- Toque no chip de etiqueta 'prova' (filtra a lista).",
+   "sfx": "- 27,2: crash.\n- 27,2–27,8: um whoosh 3D por pasta (pan alternado L/R) + 'thud' macio ao pousar.\n- 28,0: pop do toque + pop de adesivo.\n- 28,4: 'ding' em Dó6."
+  },
+  {
+   "id": "S13-pdf-do-slide",
+   "start_s": 28.8,
+   "dur_s": 1.6,
+   "kind": "app_recording",
+   "on_screen_text": [
+    "PDF do slide?",
+    "Escreve por cima."
+   ],
+   "visuals": "- 28,8: TRAÇO-TRANSIÇÃO. Um traço de pincel vermelho de 240 px cruza a tela na diagonal em 6 quadros e revela R4 'pdf' em tela cheia a 1,3x (tema escuro): uma página de slide 'Ciclo de Krebs — 48/112' dentro da nota.\n- 'PDF do slide?' (Fraunces 900, 120 px, branco, sobre adesivo escuro).\n- 29,0–30,0: a S Pen escreve 'cai na prova!' em vermelho por cima do slide (2,5x), circula um tópico e desenha uma seta. A câmera segue a ponta em macro de 1,6x.\n- 29,6: 'Escreve por cima.' (itálico #F28A97), com faixa de marca-texto oliva atrás no clap.\n- 30,0–30,4: recuo rápido de 8% e whip para cima.",
+   "app_actions": "R4, markers 'pdf' → 'fim'.\n- Página de slide (PDF) na nota.\n- Toque no vermelho.\n- Escrever e circular por cima.",
+   "sfx": "- 28,8: crash curto + traço de pincel largo.\n- 29,0–30,0: caneta.\n- 29,6: thump.\n- 30,0: whoosh para cima."
+  },
+  {
+   "id": "S14-e-ainda",
+   "start_s": 30.4,
+   "dur_s": 2.4,
+   "kind": "kinetic",
+   "on_screen_text": [
+    "E ainda:",
+    "Áudio junto da escrita",
+    "Busca até na letra à mão",
+    "Letra vira texto",
+    "Ponteiro laser",
+    "Backup no seu Drive"
+   ],
+   "visuals": "MUNDO NOITE.\n\nFUNDO: capturas reais do app (docs/screenshots 8-imagem-selecionada, 11-texto-editando, 21-noturno) como cartões inclinados (rotateX 50°, rotateZ -20°) deslizando na diagonal, a 18% de opacidade e com 6 px de desfoque.\n\n- 30,4: 'E ainda:' entra em whip (Fraunces 900 itálico, 120 px, #F28A97, y 260–390).\n\nLISTA cumulativa alinhada em x=96 (Onest 700, 60 px, #F6F4EF, 130 px entre linhas, de y 470 a y 990). Um item por TEMPO (0,4 s):\n- 30,8 'Áudio junto da escrita'\n- 31,2 'Busca até na letra à mão'\n- 31,6 'Letra vira texto'\n- 32,0 'Ponteiro laser'\n- 32,4 'Backup no seu Drive'\n\nCada item entra em STAMP, revelado por uma faixa de marca-texto oliva #7A6A12 que varre na altura das letras em 5 quadros (eco do recurso). O item anterior cai para 55% de opacidade.\n\nÍcone animado de 72 px à esquerda de cada item (traço de 5 px #F6F4EF, detalhe em #F28A97):\n1. forma de onda pulsando no tempo;\n2. lupa varrendo um 'rosa' cursivo;\n3. 'aula' cursivo virando 'aula' digitado;\n4. ponto laser com rastro que some;\n5. nuvem com seta subindo.\n\nA lista sobe 3% e faz zoom 1,00→1,04 ao longo dos 2,4 s. São ilustrações próprias, sem imitar telas do app nem logos de terceiros.",
+   "app_actions": "",
+   "sfx": "- 30,4: whoosh.\n- Em cada tempo: stamp + chiado curto de marca-texto + micro-som do ícone:\n  - bip de onda;\n  - ping da lupa;\n  - glitch digital de 80 ms;\n  - 'piu' de laser;\n  - whoosh para cima."
+  },
+  {
+   "id": "S15-tinta-na-ponta",
+   "start_s": 32.8,
+   "dur_s": 1.6,
+   "kind": "app_recording",
+   "on_screen_text": [
+    "Tinta colada",
+    "na ponta.",
+    "latência mínima · até 120 Hz"
+   ],
+   "visuals": "- 32,8: corte seco para o macro de R5 em tela cheia: região de 540x960 da gravação em volta da espiral, ampliada cerca de 2x. A imagem gira devagar (-4°→+2°) e aproxima (1,00→1,12).\n- A S Pen desenha a espiral vermelha e depois o arco embaixo (time-remap para terminar em 34,0). A ponta tem brilho quente (radial de 24 px, branco a 35%) e linhas de velocidade radiais finas a 15%. SEM rastro atrasado, para não sugerir latência.\n- Textos:\n  - 32,8 'Tinta colada' (Fraunces 900, 120 px, #F6F4EF, y 260–400)\n  - 33,2 'na ponta.' (itálico #F28A97)\n  - 33,6 legenda em Onest 600, 40 px, a 75%: 'latência mínima · até 120 Hz', com o número rolando de 60 a 120 em 6 quadros\n- 34,0–34,4: o texto sai em whip para cima, e a câmera mergulha no centro da espiral (escala ×1,6, ease-in, blur radial).\n- 34,3: a imagem é trocada pelo SVG do miolo da logo exatamente na mesma posição (crossfade de 3 quadros), graças ao mapeamento logo→tela.",
+   "app_actions": "R5, markers 'espiral' → 'arco' → 'fim'.",
+   "sfx": "- 32,8: meio-tempo + acorde de Réb aberto.\n- Caneta em primeiro plano, modulada pela velocidade real (mais aguda na espiral, mais grave no arco).\n- 32,8 / 33,2: golpes curtos.\n- 33,6: blips do contador.\n- 34,0–34,4: swell reverso com sucção."
+  },
+  {
+   "id": "S16-logo",
+   "start_s": 34.4,
+   "dur_s": 2.4,
+   "kind": "logo",
+   "on_screen_text": [
+    "RosaNotes",
+    "Escreva fora da margem."
+   ],
+   "visuals": "- 34,4 IMPACTO, MATCH CUT: num corte seco, o fundo escuro vira o branco da rosa da logo, e a espiral #B81D33 continua no mesmo lugar.\n- 34,4–35,4: a câmera recua (escala 14→1, easeOutExpo) e revela:\n  - a silhueta branca da rosa (path real de logo.svg);\n  - o quadrado arredondado com gradiente #E8404F→#A3162B (rx 30), que bate por trás com mola (1→1,08→1);\n  - em volta, o papel #F6F4EF com a grade de pontos voltando.\n- Onda de choque circular, 40 pétalas #FFC9D1/#E8404F explodindo radialmente e raios de luz girando atrás, sumindo em 0,8 s.\n- 34,6–35,0: a haste (M37,34 V80) e a perna (M50,56 C57,63 62,72 71,80) se desenham em branco por stroke-dashoffset.\n- 35,0: a folha #FFC9D1 brota (escala 0→1,15→1, rotação -20°→0).\n- 35,4: o ícone pousa com 340 px em (540, 640), com sombra 0 30px 60px rgba(163,22,43,.28). Um reflexo especular cruza o ícone.\n- 35,6: 'RosaNotes' sobe letra a letra nas semicolcheias (Fraunces 900, 150 px, #1B1B1F, y 860–1020).\n- 36,0: 'Escreva fora da margem.' (Fraunces 600 itálico, 64 px, 'fora da margem.' em #C2253B), com faixa de marca-texto amarela passando atrás de 'fora da margem.' no clap.",
+   "app_actions": "",
+   "sfx": "- 34,4: IMPACTO máximo e primeira resolução em maior (Láb add9, sub de 40 Hz, crash, sino, cintilar de pétalas).\n- 34,6–35,0: swish dos traços.\n- 35,0: pop agudo da folha.\n- 35,4: thock.\n- 35,6: um tic por letra.\n- 36,0: squeak de marca-texto + kick em meio-tempo."
+  },
+  {
+   "id": "S17-cta-loop",
+   "start_s": 36.8,
+   "dur_s": 3.2,
+   "kind": "mixed",
+   "on_screen_text": [
+    "Comenta ROSA",
+    "que eu te mando o link",
+    "Para Galaxy com S Pen"
+   ],
+   "visuals": "MUNDO PAPEL com grade.\n- 36,8: o ícone, o nome e o slogan sobem e diminuem até o topo (ícone de 180 px em y≈330, nome de 90 px, slogan de 40 px), com mola.\n- 36,8: a linha vermelha da margem (#E8404F, 4 px) se desenha de cima para baixo em x=110, como no gancho.\n- No centro:\n  - 36,8 'Comenta ROSA' (Fraunces 900, 130 px, tinta), com 'ROSA' em itálico #C2253B e faixa amarela varrendo por trás em 4 quadros.\n  - 37,2 'que eu te mando o link' (Onest 600, 48 px, tinta a 80%).\n  - 37,6 pílula 'Para Galaxy com S Pen' em STAMP (Onest 700, 40 px, branco sobre #C2253B), com brilho atravessando.\n- Um ícone de balão de comentário em SVG pulsa a cada tempo.\n- 38,0–38,8: a S Pen entra pela direita e passa um sublinhado Caveat vermelho sob 'Comenta ROSA'. O traço não para: faz a curva, CRUZA a linha da margem para a esquerda e sai da tela levando a caneta junto. É o último traço do vídeo, literalmente fora da margem.\n- 38,8–39,2: dolly lento de 1→1,03.\n- 39,2–40,0 LOOP: whip para a direita ao longo da grade de pontos (blur direcional de 40 px). A câmera pousa no enquadramento macro EXATO do quadro 0 de R1 (borda da folha Universitário, caneta antes do 'gia'). O vídeo recomeça sem emenda.",
+   "app_actions": "Sem gravação nova. Nos últimos 3 quadros, o quadro 0 de R1 com o mesmo recorte do gancho, para o loop.",
+   "sfx": "- 36,8: o groove volta leve, com o filtro abrindo.\n- 36,8: zíper da margem.\n- 37,2: pop do balão (pulsa em cada tempo).\n- 37,6: pop da pílula.\n- 38,0–38,8: caneta com pan da direita para a esquerda até sair.\n- 39,2–40,0: prato reverso + chiado de caneta crescendo.\n- 40,0: corte seco."
+  }
+ ],
+ "cta": "Na tela: 'Comenta ROSA' + 'que eu te mando o link' + a pílula 'Para Galaxy com S Pen', com a logo, 'RosaNotes' e o slogan 'Escreva fora da margem.' no topo. O último traço da S Pen cruza a margem e sai da tela, e o vídeo volta sem emenda ao quadro 0.\n\nPedir uma palavra nos comentários gera engajamento e combina com a distribuição atual (APK na Release, ainda fora da Play Store).\n\nVariações sem mexer no tempo:\n- Status do WhatsApp: 'Me responde ROSA que eu te mando o app'.\n- Perfil com link: 'Link na bio'.\n- Depois da Play Store: 'Baixe na Play Store'.",
+ "why_it_works": "1. **Gancho duplo de identificação em 1,2 s.** A frase cultural 'NÃO ESCREVA FORA DA MARGEM.' aparece sobre o APP REAL, em macro desde o quadro 0, com a letra espremida na borda da folha. Riscar o NÃO e o 'socorro' trazem rebeldia e humor. Isso corrige a crítica de que o gancho tipográfico não mostrava o produto.\n\n2. **Problema e solução no próprio app em 3,2 s.** Página → Infinita, e no drop a escrita atravessa o lugar onde era a borda. A pessoa entende o produto antes dos 4 s.\n\n3. **Bem mais animado, sem virar bagunça.** A 150 BPM, cada tempo tem 12 quadros inteiros, sem jitter de sincronia, e algo muda a cada 0,2–0,4 s. A regra de 1 texto principal por tempo, as listas cumulativas (pincéis, recursos) e nenhum estrobo de 0,2 s mantêm tudo legível.\n\n4. **Corrige a versão anterior.** Lá eram celular pequeno, fades, fundo estático e rabiscos ilegíveis. Aqui são:\n   - cerca de 70% de app em tela cheia seguindo a S Pen;\n   - letra cursiva legível de verdade;\n   - fundo que é a própria tela infinita, andando com o pan e o zoom reais;\n   - transições-assinatura (margem, ∞, marca-texto, revelação noturna, match cut da espiral).\n\n5. **App real em cerca de 75% do tempo, cada recurso como um momento satisfatório na batida:**\n   - a borda some;\n   - o odômetro vai a ∞;\n   - o zoom-out mostra a aula INTEIRA;\n   - o colchete-régua cresce com a letra;\n   - a barra fica em pé;\n   - 3 cores em 3 tempos;\n   - 6 pincéis que viram uma tela só;\n   - laço e borracha com 'kkkk';\n   - 6 modelos em 6 tempos no noturno;\n   - #prova filtrando;\n   - escrever no PDF do slide.\n\n6. **Arco emocional de estudante.** Aula → madrugada ('Virando a noite estudando?', 'socorro, meus olhos', 'Respira.' com batimento) → drop 2 noturno. Conteúdo de biologia e medicina fácil de reconhecer ('a usina de energia da célula', 'cai na prova!').\n\n7. **Marca forte e memorável.** O slogan próprio 'Escreva fora da margem.' abre e fecha o vídeo. A espiral desenhada no app vira o miolo da rosa por match cut com os paths reais de logo.svg. A música só resolve em maior na logo.\n\n8. **Honesto e executável.** São só 5 gravações, todas na API real do DemoKit, com os poucos helpers novos listados. O que não se grava (áudio, ML Kit, Drive, laser) aparece como lista ilustrada, sem fingir tela. O CTA combina com a distribuição real, e o loop sem emenda aumenta o tempo assistido.",
+ "recordings": [
+  {
+   "id": "R1-margem-infinita-mundo",
+   "setup": "PRÉ-REQUISITOS NO DEMOKIT (valem para todas as gravações; só ESTES helpers são novos):\n- (a) quiet{ }: executa ações sem capturar quadros.\n- (b) setView(offX, offY, zoom) e world(x, y) → coordenadas de tela (e o inverso).\n- (c) Gravar view.json por quadro (offsetX, offsetY, scale do canvas; hoje privados: expor viewForTests), para a grade de pontos do HTML ficar presa ao mundo.\n- (d) anchor(nome, view) → anchors.json com o retângulo da view.\n- (e) rotateSelection(graus, quadros): usa canvas.rotateSelection(passo) a cada quadro, com capture.\n- (f) scaleSelection(fator, quadros): novo, com Transform de escala em torno do centro da seleção.\n- (g) tapAt(view encontrada por texto ou contentDescription).\n\nO que já existe e deve ser usado: write() já faz á é í ó ú â ê ô ã õ ç (não desenhar acentos à parte); tap(ed.quickColorsForTests.getChildAt(i)); highlighterButtonForTests; penButtonForTests; closeTrayForTests; dragDock; lasso; dragSelection; pan; pinch; mark.\n\nUnidades: w = 1233, h = 2673 (px da view). Cores: tinta #1B1B1F, vermelho #D7263D, azul #1F5FD1.\n\nSCALE 2,0 (o gancho é recortado a 2,2x; quadros JPG q92). Tema CLARO.\n\nfreshEditor('Biologia celular') dentro da pasta 'Biologia'. Em quiet:\n- canvas.setPageLayout(paged=true, horizontal=false, landscape=false, endless=true, count=1); canvas.pageStyle = COLLEGE (Universitário); papel branco.\n- setView com zoom de 140%, deixando a borda direita da folha em x≈0,80w e a 6ª pauta em y≈0,42h.\n- usePen(FOUNTAIN #1B1B1F 5f): write('Mitocôndria', 0,08w, 0,30h, cap 64).\n- usePen(PEN #1F5FD1 4f): x1 = write('a usina de ener', 0,08w, 0,42h, cap 44). Ajustar o cap para x1 ≈ 0,64w.",
+   "steps": [
+    "1. mark('gancho'); x2 = write('gia', x1, 0,42h, cap 44, pxPerFrame 30). Termina em ≈0,72w. Cerca de 18 quadros.",
+    "2. mark('aperta'). Escadinha letra a letra de 'da célula' (pular o espaço): para cada letra i, write(letra, xi, 0,42h + i·16 px, cap 22, pxPerFrame 24), com xi começando em x2 + 6 px e avançando 0,55·textWidth(letra, 22). Limitar a ≤0,80w (borda da folha). Contar os traços feitos. Cerca de 30 quadros.",
+    "3. mark('socorro'); hold(12).",
+    "4. quiet{ canvas.undo() uma vez por traço do passo 2 }. A linha volta a terminar em 'energia'.",
+    "5. mark('pagina'); tap no botão ⋮ (achar por contentDescription; se faltar, expor menuButtonForTests), 4 quadros; tap no item 'Página' (por texto), 4 quadros; hold(6) com a bandeja aberta.",
+    "6. mark('infinita'); tap na opção 'Infinita' (por texto), 6 quadros. Fallback: canvas.setPageLayout(paged=false, …) no mesmo quadro. hold(4); fechar a bandeja (voltar/dismiss), hold(4).",
+    "7. quiet: pré-povoar o mundo em coordenadas de mundo (a vista de 140% cobre mundo x 0–880, y 0–1910); escrever fora da tela com setView/world e voltar EXATAMENTE à vista do passo 6.\n  - B1 (0; -700): CALLIGRAPHY vermelho, cap 110, 'Biologia celular'; PEN tinta, cap 46, 'módulo 1' em y -580.\n  - B2 (2400; 300): FOUNTAIN, cap 90, 'Membrana'; PEN tinta, cap 40, 'externa lisa', 'interna com cristas' e 'matriz com DNA próprio' em y 440/540/640; marca-texto em 'interna com cristas'.\n  - B3 ciclo: círculo PEN tinta 6f com centro (1500; 1700) e r 300, com 4 pontas de seta; rótulos 'citrato' azul (1450; 1330), 'NADH' vermelho (1830; 1720), 'FADH2' vermelho (1450; 2090), 'oxaloacetato' azul (1000; 1760), cap 40. Deixar o centro vazio.\n  - B4 (-1000; 400): FOUNTAIN, cap 80, 'Glicólise'; PEN azul, cap 40, 'glicose', 'piruvato', 'saldo: 2 ATP'.\n  - B5 (2400; 1500): PEN vermelho, ATP sintase (faixa de 600x90 + cogumelo) e 'ATP sintase'.\n  - B6 (100; 2500): BRUSH vermelho, cap 110, 'Cai na prova!', com elipse em volta.\n  - B7 (2400; 2500): FOUNTAIN, cap 80, 'Resumo'; PEN tinta, cap 40, 'tem DNA próprio', 'herança materna', 'produz ATP'.\n  - B8 (900; 3300): CALLIGRAPHY vermelho, cap 100, 'sem fim'.",
+    "8. mark('drop'); usePen(PEN azul 4f); write(' da célula', fim de 'energia', 0,42h, cap 44, pxPerFrame 40). Atravessa x 0,80w (a antiga borda) e termina em ≈0,96w; ajustar o cap se passar disso.",
+    "9. mark('arrasta1'); pan(0,85w, 0,62h, -0,60w, 0, 12). São 12 quadros = 0,4 s, e roda a 1x.",
+    "10. mark('atp'); write(' produz ATP', ≈0,37w, 0,42h, cap 44, pxPerFrame 45).",
+    "11. mark('arrasta2'); pan(0,85w, 0,62h, -0,60w, 0, 12).",
+    "12. mark('vermelho'); tap(ed.quickColorsForTests.getChildAt(1), 4); write(' cai na prova!', ≈0,37w, 0,42h, cap 44, pxPerFrame 45). hold(4).",
+    "13. mark('desce'); pan(0,50w, 0,80h, 0, -0,45h, 12). O ciclo B3 entra na vista.",
+    "14. mark('krebs'); tap(ed.quickColorsForTests.getChildAt(2), 4) (azul); write('Krebs', centrado no ciclo via world(1500; 1700) − meia largura, cap 70, pxPerFrame 45).",
+    "15. mark('zoom'); pinch(0,5w, 0,5h, 0,36w, 0,057w, 30): de 140% a cerca de 22%. Ajustar o 'to' até o conjunto B1–B8 ocupar cerca de 80% da largura.",
+    "16. mark('fim'); hold(18). Exportar touches.json, markers.json e view.json."
+   ],
+   "target_dur_s": 10,
+   "used_in_scenes": [
+    "S01-gancho-margem",
+    "S02-um-toque-infinita",
+    "S03-drop-escreve-arrasta",
+    "S04-pra-baixo",
+    "S05-aula-inteira",
+    "S17-cta-loop"
+   ]
+  },
+  {
+   "id": "R2-ferramentas",
+   "setup": "SCALE 1,5. Tema CLARO.\n\nfreshEditor('Resumo P1') em Biologia: tela infinita, Pontilhado (DOTS), barra horizontal no topo.\n\nEm quiet:\n- usePen(FOUNTAIN #1B1B1F 5f): write('Mitocôndria', 0,08w, 0,30h, cap 110).\n- usePen(PEN #1B1B1F 4f): write('gera NADH e FADH', 0,08w, 0,40h, cap 40).\n- anchor('marca', ed.highlighterButtonForTests); anchor('alca', ed.dockGripForTests).\n\nO marca-texto fica no padrão: amarelo, tamanho 20, 45%, 'Ajustar à altura da escrita' LIGADO.",
+   "steps": [
+    "1. mark('mt'); hold(3); tap(ed.highlighterButtonForTests, 6); hold(3).",
+    "2. mark('fina'); stroke de (0,06w; 0,40h-14) até (0,62w; 0,40h-14), 24 pontos com ondulação de ±2 px, pxPerFrame 40. A faixa sai fina. hold(6).",
+    "3. mark('alta'); stroke de (0,06w; 0,30h-40) até (0,86w; 0,30h-40), 30 pontos com ±2 px, pxPerFrame 50. A faixa sai alta. hold(10).",
+    "4. mark('barra'); tap(ed.penButtonForTests, 4) (volta para a caneta-tinteiro preta); dragDock(dx = 20 - x da alça, dy = 0,45h - y da alça, 16). A barra encosta na esquerda e fica em pé. mark('empe'); hold(6).",
+    "5. quiet{ pan(0,5w, 0,8h, 0, -0,30h, 1) } para abrir espaço limpo. mark('cores'); tap(quickColorsForTests.getChildAt(0), 4); write('ATP', 0,35w, 0,62h, cap 80, pxPerFrame 45).",
+    "6. tap(getChildAt(1), 4) (vermelho); stroke de elipse fechada com centro (0,46w; 0,60h), rx 0,17w, ry 0,045h, 46 pontos e 20° de sobreposição no fecho, pxPerFrame 70.",
+    "7. tap(getChildAt(2), 4) (azul); sublinhado ondulado de 0,32w a 0,62w em y 0,645h (amplitude 8 px, 4 ondas), pxPerFrame 60. hold(6).",
+    "8. mark('bandeja'); tap(ed.penButtonForTests, 6) (com a caneta ativa, abre a bandeja de canetas); hold(8); ed.closeTrayForTests().",
+    "9. quiet{ pan para uma área vazia: (0,5w; 0,85h), dy -0,75h, 1 quadro }. Grade 2x3: colunas em x 0,16w e 0,58w; linhas com base em 0,28h, 0,48h e 0,68h; cap 70; pxPerFrame 50.\n   - mark('b1'); usePen(FOUNTAIN #1B1B1F 5f); write('resumo', col1, l1)\n   - mark('b2'); usePen(PEN #1F5FD1 4f); write('revisão', col2, l1)\n   - mark('b3'); usePen(PENCIL #5F6368 5f); write('rascunho', col1, l2)\n   - mark('b4'); usePen(CALLIGRAPHY #D7263D 9f); write('fórmulas', col2, l2)\n   - mark('b5'); usePen(BRUSH #8E44AD 12f); write('mapas', col1, l3)\n   - quiet{ usePen(PEN #1B1B1F 4f); write('prova', col2, l3) }; mark('b6'); usePen(HIGHLIGHTER #FFE45C 20f, 45); stroke de (col2-10; l3-28) até (col2+0,22w; mesmo y), pxPerFrame 40\n   - Gravar anchors com o retângulo de cada célula. hold(6).",
+    "10. quiet{ pan para uma área vazia; usePen(PEN #D7263D 6f): elipse fechada com centro (0,50w; 0,38h), rx 0,22w, ry 0,08h, girada -10°; cristas = senoide de 0,32w a 0,68w em y 0,38h, amplitude 0,035h, 4,5 períodos; usePen(PEN #1B1B1F 4f): write('mitocondira', 0,24w, 0,62h, cap 60) }.",
+    "11. mark('laco'); lasso(oval solto com centro (0,50w; 0,38h), rx 0,30w, ry 0,12h, ruído de ±10 px, 40 pontos, pxPerFrame 70); hold(3).",
+    "12. mark('move'); dragSelection(0,50w, 0,38h, 0,10w, -0,05h, 12); hold(2).",
+    "13. mark('gira'); rotateSelection(-20f, 10); hold(2).",
+    "14. mark('aumenta'); scaleSelection(1,3f, 10); hold(3).",
+    "15. quiet{ desselecionar (toque em área vazia ou canvas.clearSelection) }. mark('borracha'); useTool(ERASER), com um toque sintético k='finger' na posição do botão Borracha da barra em pé, gravado como anchor; stroke em zigue-zague sobre 'mitocondira' (5 idas e voltas, 20 pontos), pxPerFrame 80; hold(8)."
+   ],
+   "target_dur_s": 11.2,
+   "used_in_scenes": [
+    "S06-marca-texto",
+    "S07-barra-em-pe",
+    "S08-seis-pinceis",
+    "S09-laco-borracha"
+   ]
+  },
+  {
+   "id": "R3-pastas-tema",
+   "setup": "SCALE 1,0. DemoKit com act = FoldersActivity; não chamar as funções do editor.\n\nBiblioteca semeada em quiet:\n- Pastas:\n  - 'Biologia' (vermelha, com capa = ilustração de mitocôndria em rosa sobre creme, renderizada em PNG pelo Chromium e salva em Library.coverFile(id))\n  - 'Química' (amarela)\n  - 'Física' (azul)\n  - 'Redação' (roxa)\n  - 'Anatomia' (verde)\n- Notas, criadas abrindo o editor em quiet e escrevendo algumas palavras; sair do editor salva a miniatura:\n  - 'Biologia celular' (Biologia)\n  - 'Resumo P1' (Biologia): fixada, etiquetas 'prova' e 'resumo'\n  - 'Ciclo de Krebs' (Biologia): favorita, etiqueta 'prova'\n  - 'Redação ENEM' (Redação)\n\nUi.setThemeChoice(app, 'light'); abrir FoldersActivity.\n\nanchors: 'tema' (botão sol/lua), 'chipProva', 'Biologia', 'Química', 'Física', 'Redação' (cartões).",
+   "steps": [
+    "1. mark('claro'); hold(36). Tela inicial clara parada; a montagem anima a câmera.",
+    "2. mark('sol'); tap(botão de tema, 4). Abre Ui.showThemeMenu. Se a opção 'Noturno' for alcançável por texto, tap nela (4 quadros). Se não, Ui.setThemeChoice(app, 'dark') e controller.recreate() no mesmo quadro, com k.act = nova instância.",
+    "3. mark('escuro'); hold(16). Tela inicial noturna; o sol vira lua.",
+    "4. mark('rola'); pan(0,5w, 0,78h, 0, -0,30h, 20, target = lista rolável). Se não rolar no Robolectric, usar scrollBy por quadro com o mesmo easing, registrando o dedo. hold(6).",
+    "5. mark('prova'); tap(chip de etiqueta 'prova', 4). A lista filtra; hold(14).",
+    "6. Atualizar anchors.json depois da rolagem, para os sprites das pastas e o adesivo."
+   ],
+   "target_dur_s": 5.6,
+   "used_in_scenes": [
+    "S10-break-madrugada",
+    "S11-drop2-noturno-modelos",
+    "S12-pastas-etiquetas"
+   ]
+  },
+  {
+   "id": "R4-noite-folhas-pdf",
+   "setup": "SCALE 1,5. Tema NOTURNO: Ui.setThemeChoice(app, 'dark'). Adaptar freshEditor para aceitar o tema, porque hoje ele força o claro.\n\nfreshEditor('Aula de Biologia'). Em quiet:\n- canvas.setPageLayout(paged=true, horizontal=false, landscape=false, endless=true, count=1).\n- setView para a metade de cima da folha 1 ocupar a largura (cerca de 100%).\n- Escrever DENTRO da folha (posições que leem bem em todos os modelos):\n  - FOUNTAIN, cap 80: 'Mitocôndria' em (0,34w; 0,22h).\n  - PEN tinta, cap 42: 'a usina de energia' em (0,34w; 0,30h) e 'da célula' em (0,34w; 0,36h).\n  - PEN vermelho #D7263D, cap 48: 'cai na prova!' em (0,34w; 0,46h), com elipse em volta.\n  - PEN azul, cap 42: 'tem DNA próprio' em (0,34w; 0,54h).\n\nPreparar o PNG do slide (1600x900) renderizado pelo Chromium: título 'Ciclo de Krebs', 3 tópicos ('Acetil-CoA entra no ciclo', 'gera 3 NADH + 1 FADH2', 'ocorre na matriz') e o rodapé '48/112'.",
+   "steps": [
+    "1. Para cada modelo, na ordem [LINES, GRID, COLLEGE, CORNELL, MUSIC, PLANNER]: quiet{ canvas.pageStyle = modelo; canvas.invalidate() }; mark(nome em minúsculas); hold(6). A escrita fica na mesma posição e com o mesmo zoom em todos.",
+    "2. quiet: canvas.setPageLayout(paged=false, …); pan para uma área vazia; inserir o slide como página de PDF importada, igual ao que o importador cria (ImageElement com pdfPage=1, travado), via canvas.addImage(slide.png, 1600, 900) + ajuste de pdfPage/locked. setView para o slide ocupar a largura entre 0,25h e 0,55h. Motivo: o PdfRenderer não roda no Robolectric.",
+    "3. mark('pdf'); hold(3); tap(quickColorsForTests.getChildAt(1), 4) (vermelho).",
+    "4. write('cai na prova!', 0,12w, 0,64h, cap 56, pxPerFrame 45). Abaixo do slide, perto do 2º tópico.",
+    "5. Elipse fechada em volta do 2º tópico do slide (32 pontos, pxPerFrame 70) e seta de 2 traços do texto até a elipse.",
+    "6. mark('fim'); hold(8)."
+   ],
+   "target_dur_s": 4,
+   "used_in_scenes": [
+    "S11-drop2-noturno-modelos",
+    "S13-pdf-do-slide"
+   ]
+  },
+  {
+   "id": "R5-espiral-logo",
+   "setup": "SCALE 2,0. Tema NOTURNO.\n\nfreshEditor('Rosa'): tela infinita, PageStyle.BLANK.\n\nusePen(PEN #D7263D 16f, opacidade 100).\n\nMapeamento logo→tela: X = 616 + (lx - 55,5)·14 e Y = 1200 + (ly - 42)·14, com lx, ly no viewBox 108 de logo.svg. Gravar o mapeamento em markers.json para a montagem alinhar o SVG exatamente sobre a tinta.",
+   "steps": [
+    "1. mark('espiral'); stroke com pontos a cada 3 px da curva do miolo de logo.svg (M54.5,37 C52.5,36 50.5,38 51.8,40.2 C53.3,42.6 58,41.6 58,37.6 C58,33.2 52.5,31.6 49.6,34.6 C46.4,38 47.6,44.6 54,45.6 C60.5,46.5 64.8,42 64.6,36), convertida pelo mapeamento, pxPerFrame 30.",
+    "2. mark('arco'); stroke da curva M42.5,40 C42.5,49.5 48.5,53.8 55,53.8 C62,53.8 67.5,49.5 68.5,42.5, convertida, pxPerFrame 30.",
+    "3. mark('fim'); hold(6)."
+   ],
+   "target_dur_s": 1.6,
+   "used_in_scenes": [
+    "S15-tinta-na-ponta",
+    "S16-logo"
+   ]
+  }
+ ],
+ "grafted_ideas": [
+  "Do roteiro viral: o gancho com o APP REAL em macro desde o quadro 0. A letra é espremida em escadinha na borda de uma folha Universitário, com freeze, círculo vermelho e 'socorro' em Caveat em 1,2 s, sobreposto à frase cultural 'NÃO ESCREVA FORA DA MARGEM.' do roteiro de lançamento.",
+  "Do roteiro viral: a solução dentro do app em 3,2 s. REBOBINA em VHS, a bandeja Página real e o toque em 'Infinita', com o ∞ nascendo do botão e virando portal. No drop, a escrita atravessa o lugar onde ficava a borda, que estoura em partículas (o 'puf' da borda vem do roteiro de história).",
+  "Do roteiro viral: 150 BPM com grade inteira de 12 quadros por tempo, no estilo funk 150. O cowbell fica discreto e há acabamento premium, para não puxar a marca para o meme.",
+  "Do roteiro viral: macro em tela cheia seguindo a ponta da S Pen em cerca de 70% do tempo, no lugar do celular de 640 px. Scale 2,0 só nos takes com recorte maior que 1,8x (R1 e R5).",
+  "Do roteiro viral: ritmo escreve–arrasta com arrastos reais de 12 quadros a 1x e o odômetro '21 cm → 1 m → 10 m → ∞'. A fita métrica e a esteira de setas saíram, para aliviar a cena.",
+  "Do roteiro viral: 'INTEIRA' em sanduíche (metade atrás, metade na frente do celular) e a cópia da gravação vazando para fora da moldura no zoom-out.",
+  "Do roteiro viral: barra em pé com 'em pé' escrito na vertical e as 3 cores em 3 tempos, com cliques afinados na melodia.",
+  "Do roteiro viral: laço com verbos na batida ('Laça' trocado por 'Circula') e a gag 'mitocondira', 'Errou? kkkk Apaga.' com a borracha real.",
+  "Do roteiro viral: modelos de folha trocando a cada tempo com a MESMA escrita por cima. Foi regravado dentro de uma folha (modo Folhas), porque Cornell, Partitura, Semanal e Universitário só existem lá.",
+  "Do roteiro viral: madrugada com o celular deitado, bloom, relógio saltando a cada tempo e o callback 'socorro, meus olhos', culminando na revelação circular do noturno no drop 2.",
+  "Do roteiro viral: o CTA 'Comenta ROSA que eu te mando o link' e o loop sem emenda de volta ao enquadramento do quadro 0.",
+  "Do roteiro de história: 'Respira.' com dois batimentos cardíacos no silêncio antes do drop 2.",
+  "Do roteiro de história: odômetro de zoom ('140%' → '22%') sincronizado com o view.json e zoom-out duplo (pinça real + câmera recuando para o celular 3D).",
+  "Do roteiro de história: conteúdo de biologia e medicina natural ('a usina de energia da célula', 'cai na prova!', ciclo de Krebs, NADH, FADH2), texto em adesivos com faixa de marca-texto no clap e o toque real no chip '#prova' filtrando a lista.",
+  "Do roteiro de história: o colchete-régua do marca-texto, que aqui cresce com mola da faixa fina para a alta.",
+  "Do jurado-estudante: uma cena de PDF do slide com escrita por cima no app (página semeada como ImageElement com pdfPage=1, igual ao que o importador cria).",
+  "Do roteiro de lançamento (base): a grade de pontos presa ao mundo via view.json, a varredura gigante de marca-texto, a grade 2x3 de pincéis que se junta numa tela só e a lista cumulativa 'E ainda:' a 0,4 s por item, revelada por marca-texto oliva, no lugar do estrobo de 0,2 s.",
+  "Do roteiro de lançamento (base): o match cut da espiral desenhada no app com os paths reais de logo.svg para o miolo da rosa, e a música resolvendo em maior pela primeira vez na logo.",
+  "Do roteiro de lançamento (base): o slogan 'Escreva fora da margem.' abrindo e fechando o vídeo, com o último traço da S Pen cruzando a linha da margem e saindo da tela.",
+  "Correções técnicas exigidas pelos jurados:\n- API real do DemoKit: write() já faz acentos; usar quickColorsForTests.getChildAt(i), highlighterButtonForTests, penButtonForTests, closeTrayForTests, dragDock, lasso, dragSelection.\n- Helpers novos explícitos: quiet, setView/world, view.json, anchor, rotateSelection, scaleSelection, tapAt.\n- A escadinha é feita com write() letra a letra, sem rotação por letra.\n- Para o tema: fallback setThemeChoice + recreate, porque o sol abre um menu.\n- Sem rastro de cometa na cena de latência.\n- 'Baixe agora' trocado por 'Comenta ROSA'.\n- 'o vermelho continua vermelho' trocado por 'pra virar a noite'."
+ ]
+}

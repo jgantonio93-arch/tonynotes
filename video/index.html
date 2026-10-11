@@ -1,0 +1,103 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=block">
+<style>
+@font-face { font-family: Fraunces; src: url(fonts/Fraunces.ttf); font-weight: 100 900; font-style: normal; }
+@font-face { font-family: FrauncesI; src: url(fonts/Fraunces.ttf); font-weight: 100 900; }
+@font-face { font-family: Onest; src: url(fonts/Onest.ttf); font-weight: 100 900; }
+:root { --paper: #F6F4EF; --ink: #1B1B1F; --red: #C2253B; --redn: #F28A97; --rose1: #E8404F; --rose2: #A3162B; --petal: #FFC9D1; --marker: #FFE45C; --blue: #1F5FD1; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1080px; height: 1920px; overflow: hidden; background: var(--paper); }
+body { font-family: Onest, sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+#stage { position: absolute; inset: 0; transform-origin: 50% 50%; }
+.scene { position: absolute; inset: 0; overflow: hidden; display: none; }
+.abs { position: absolute; }
+/* Tipografia */
+.disp { font-family: Fraunces; font-weight: 900; letter-spacing: -.03em; line-height: .95; font-variation-settings: "opsz" 144, "SOFT" 0, "WONK" 0; }
+.disp i, .it { font-style: italic; font-family: Fraunces; font-synthesis: style; }
+.lab { font-family: Onest; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; font-variant-numeric: tabular-nums; }
+.hand { font-family: Caveat, cursive; font-weight: 700; }
+/* Adesivo de papel atrás de textos sobre o app */
+.sticker { background: rgba(246,244,239,.94); box-shadow: 6px 6px 0 rgba(27,27,31,.25); padding: 10px 26px 16px; display: inline-block; }
+.sticker.dark { background: rgba(20,14,16,.9); box-shadow: 6px 6px 0 rgba(0,0,0,.45); color: #F6F4EF; }
+/* Faixa de marca-texto atrás da palavra (--hl de 0 a 1) */
+.hl { position: relative; z-index: 0; --hl: 0; }
+.hl::before { content: ""; position: absolute; z-index: -1; left: -.06em; top: .42em; bottom: .02em; width: calc((100% + .12em) * var(--hl)); background: var(--hlc, rgba(255,228,92,.85)); border-radius: .06em .2em .1em .25em; transform: skewX(-8deg) rotate(-1deg); }
+.mask { overflow: hidden; display: block; }
+/* Visor do app */
+.viewer { position: absolute; overflow: hidden; background: #fff; }
+.vw-in { position: absolute; left: 0; top: 0; }
+.vw-img { position: absolute; left: 0; top: 0; display: block; }
+.vw-over, .vw-ann { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; }
+/* S Pen genérica: grafite, ponta clara, botão lateral, inclinada 32° vindo da direita-baixo */
+.spen { position: absolute; width: 0; height: 0; transform-origin: 0 0; }
+.spen i { position: absolute; display: block; }
+.spen .body { left: -11px; top: 0; width: 22px; height: 420px; border-radius: 4px 4px 11px 11px; background: linear-gradient(90deg, #1E1E22, #4A4A52 38%, #2B2B30 70%, #18181B); transform-origin: 11px 0; transform: translateY(26px) rotate(-32deg); box-shadow: 0 0 0 1px rgba(255,255,255,.06) inset; }
+.spen .btn { left: -6px; top: 0; width: 12px; height: 44px; border-radius: 6px; background: #3A3A42; transform-origin: 6px 0; transform: rotate(-32deg) translateY(120px) translateX(-9px); }
+.spen .tip { left: -5px; top: 0; width: 10px; height: 28px; border-radius: 5px 5px 2px 2px; background: linear-gradient(#ECEAE6, #BDB9B2); transform-origin: 5px 0; transform: rotate(-32deg); clip-path: polygon(30% 0, 70% 0, 100% 100%, 0 100%); }
+.spen .sh { left: 10px; top: 10px; width: 22px; height: 400px; border-radius: 11px; background: rgba(0,0,0,.16); filter: blur(10px); transform-origin: 0 0; transform: rotate(-38deg); }
+.spen .glow { left: -16px; top: -16px; width: 32px; height: 32px; border-radius: 50%; background: radial-gradient(circle, rgba(255,201,209,.95), rgba(255,201,209,0) 70%); }
+.finger { position: absolute; width: 96px; height: 96px; border-radius: 50%; background: rgba(255,255,255,.55); border: 4px solid rgba(255,255,255,.95); box-shadow: 0 8px 22px rgba(0,0,0,.25); }
+/* Celular 3D */
+.phone3d { position: absolute; border-radius: 78px; background: #0A0A0B; padding: 14px; box-shadow: 0 0 0 2px #2A2A2E, 0 60px 120px -40px rgba(0,0,0,.6), 0 30px 60px -30px rgba(80,10,20,.5); transform-style: preserve-3d; }
+.ph-screen { position: relative; border-radius: 64px; overflow: hidden; background: #fff; }
+.ph-glass { position: absolute; inset: 14px; border-radius: 64px; pointer-events: none; background: linear-gradient(115deg, rgba(255,255,255,0) 30%, rgba(255,255,255,.14) 42%, rgba(255,255,255,0) 54%); background-size: 300% 100%; background-position: var(--gl, 100%) 0; }
+/* Pétalas e efeitos globais */
+.petal { position: absolute; width: 30px; height: 20px; border-radius: 60% 40% 60% 40%; }
+#petals, #flash, #grain { position: absolute; inset: 0; pointer-events: none; }
+#flash { opacity: 0; }
+#grain { opacity: .05; mix-blend-mode: multiply; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1.2 0'/></filter><rect width='240' height='240' filter='url(%23n)'/></svg>"); }
+.dots { background-image: radial-gradient(circle at center, rgba(27,27,31,.16) 1.6px, transparent 2.2px); background-size: 46px 46px; }
+.dots.night { background-image: radial-gradient(circle at center, rgba(246,244,239,.08) 1.6px, transparent 2.2px); }
+</style></head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <filter id="blurX0"><feGaussianBlur stdDeviation="0 0"/></filter>
+  <filter id="blurX20" x="-50%" width="200%"><feGaussianBlur stdDeviation="20 0"/></filter>
+  <filter id="blurX40" x="-50%" width="200%"><feGaussianBlur stdDeviation="40 0"/></filter>
+  <filter id="blurY0"><feGaussianBlur stdDeviation="0 0"/></filter>
+  <filter id="blurY20" y="-50%" height="200%"><feGaussianBlur stdDeviation="0 20"/></filter>
+  <filter id="blurY40" y="-50%" height="200%"><feGaussianBlur stdDeviation="0 40"/></filter>
+  <linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E8404F"/><stop offset="1" stop-color="#A3162B"/></linearGradient>
+</defs></svg>
+<div id="stage"></div>
+<div id="petals"></div>
+<div id="grain"></div>
+<div id="flash"></div>
+
+<script src="engine.js"></script>
+<script src="kit.js"></script>
+<script src="rec/data.js"></script>
+<script src="scenes/s01-s05.js"></script>
+<script src="scenes/s06-s09.js"></script>
+<script src="scenes/s10-s13.js"></script>
+<script src="scenes/s14-s17.js"></script>
+<script>
+// Cada arquivo de cena chama K.scene({ id, start, end, setup(root), render(t, root) }).
+// start/end em segundos; a cena só é desenhada (display) dentro desse intervalo.
+window.DURATION = 40;
+window.EVENTS = window.EVENTS || { pen: [], marker: [], taps: [], notes: [] };
+const roots = new Map();
+for (const sc of (window.SCENES || [])) {
+  const root = document.createElement("section");
+  root.className = "scene"; root.id = "sc-" + sc.id;
+  E.$("stage").appendChild(root);
+  roots.set(sc, root);
+  if (sc.setup) { try { sc.setup(root); } catch (e) { console.error(`setup ${sc.id}: ${e && e.stack || e}`); } }
+}
+window.EVENTS.hits = K.fx.hits;
+async function render(t) {
+  for (const sc of window.SCENES) {
+    const root = roots.get(sc);
+    const on = t >= sc.start && t < sc.end;
+    root.style.display = on ? "block" : "none";
+    if (on && sc.render) {
+      try { await sc.render(t, root); } catch (e) { console.error(`cena ${sc.id} t=${t.toFixed(2)}: ${e && e.stack || e}`); }
+    }
+  }
+  K.applyFx(t);
+}
+window.render = render;
+window.ready = render(0);
+</script>
+</body></html>
