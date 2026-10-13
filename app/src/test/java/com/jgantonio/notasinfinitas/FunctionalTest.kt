@@ -1229,4 +1229,28 @@ class FunctionalTest {
         assertNotNull(NoteStorage.load(Library.noteFile(note.id)))
         assertEquals(0, DriveSync.backup(app, drive).uploaded)
     }
+
+    @Test
+    fun tela_girada_desenha_ate_os_cantos() {
+        val w = canvas.width.toFloat()
+        val h = canvas.height.toFloat()
+        for (deg in listOf(20f, 45f, 90f, -135f, 170f)) {
+            canvas.setViewRotation(deg)
+            val vis = canvas.visibleWorldForTests()
+            val v = canvas.viewForTests
+            val a = Math.toRadians(deg.toDouble())
+            val c = Math.cos(a).toFloat()
+            val s = Math.sin(a).toFloat()
+            // Cada canto da tela, desgirado e levado para o mundo, tem que estar na área desenhada.
+            for ((x, y) in listOf(0f to 0f, w to 0f, 0f to h, w to h)) {
+                val dx = x - w / 2f
+                val dy = y - h / 2f
+                val ux = w / 2f + dx * c + dy * s
+                val uy = h / 2f - dx * s + dy * c
+                val wx = (ux - v[0]) / v[2]
+                val wy = (uy - v[1]) / v[2]
+                assertTrue("$deg°: canto ($x,$y) -> ($wx,$wy) fora de $vis", wx >= vis.left - 1f && wx <= vis.right + 1f && wy >= vis.top - 1f && wy <= vis.bottom + 1f)
+            }
+        }
+    }
 }

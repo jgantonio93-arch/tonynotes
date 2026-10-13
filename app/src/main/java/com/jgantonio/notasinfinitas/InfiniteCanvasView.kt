@@ -2474,8 +2474,20 @@ class InfiniteCanvasView(context: Context) : View(context) {
         cornerPts[0] = 0f; cornerPts[1] = 0f; cornerPts[2] = w; cornerPts[3] = 0f
         cornerPts[4] = 0f; cornerPts[5] = h; cornerPts[6] = w; cornerPts[7] = h
         rotInv.mapPoints(cornerPts)
-        visibleWorld.set(Float.MAX_VALUE, Float.MAX_VALUE, -Float.MAX_VALUE, -Float.MAX_VALUE)
-        for (i in 0 until 4) visibleWorld.union(wx(cornerPts[i * 2]), wy(cornerPts[i * 2 + 1]))
+        // (RectF.union(x, y) não serve: partindo de um retângulo "vazio" ele só ajusta um lado,
+        // e a área visível saía menor que a tela, cortando o desenho.)
+        var l = Float.MAX_VALUE; var t = Float.MAX_VALUE; var r = -Float.MAX_VALUE; var b = -Float.MAX_VALUE
+        for (i in 0 until 4) {
+            val x = wx(cornerPts[i * 2])
+            val y = wy(cornerPts[i * 2 + 1])
+            l = min(l, x); t = min(t, y); r = max(r, x); b = max(b, y)
+        }
+        visibleWorld.set(l, t, r, b)
+    }
+
+    internal fun visibleWorldForTests(): RectF {
+        computeVisibleWorld()
+        return RectF(visibleWorld)
     }
 
     private fun drawSelection(canvas: Canvas) {
