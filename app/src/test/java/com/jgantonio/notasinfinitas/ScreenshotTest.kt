@@ -69,6 +69,9 @@ class ScreenshotTest {
         editor.canvasForTests.setViewRotation(20f)
         save(snap(editor), "7c-tela-girada")
         editor.canvasForTests.setViewRotation(0f)
+        editor.canvasForTests.setRulerForTests(app.resources.displayMetrics.widthPixels / 2f, 1100f, -12f)
+        save(snap(editor), "7d-regua")
+        editor.canvasForTests.rulerOn = false
 
         // Imagem: seleção com alças, ajustes e recorte
         val canvas = editor.canvasForTests
