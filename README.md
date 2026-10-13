@@ -97,7 +97,9 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
 - O editor pede a taxa de atualização máxima da tela (ex.: 120 Hz).
 - A previsão de movimento entra no próprio traço (mesma textura e transparência).
 - Traços translúcidos (marca-texto, lápis) são desenhados sem camada extra por traço.
-- Pode ser desligada no menu ⋮ ("Tinta de latência mínima").
+- O front buffer é **experimental e vem desligado**: ligue no menu ⋮ ("Tinta de latência
+  mínima (experimental)"). Se a camada falhar no meio do traço, ele continua pelo caminho
+  normal; a camada é recriada ao voltar para a nota.
 
 ### Texto (como no Samsung Notes)
 - Toque com a ferramenta **T** e digite direto na tela. A barra acima do teclado tem

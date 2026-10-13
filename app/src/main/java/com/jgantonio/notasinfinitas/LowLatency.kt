@@ -75,8 +75,16 @@ class WetInkLayer(context: Context) : SurfaceView(context) {
         super.onDetachedFromWindow()
     }
 
-    fun draw(seg: InkSegment) {
-        try { renderer?.renderFrontBufferedLayer(seg) } catch (_: Throwable) { }
+    /** Desenha o pedaço no front buffer; falso se a camada não está mais usável. */
+    fun draw(seg: InkSegment): Boolean {
+        val r = renderer ?: return false
+        return try {
+            if (!r.isValid()) return false
+            r.renderFrontBufferedLayer(seg)
+            true
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     fun clear() {

@@ -151,7 +151,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
     var liveInk: View? = null
     /** Camada de front buffer (tinta aparece sem esperar o próximo quadro). */
     var wetInk: WetInkLayer? = null
-    var lowLatency = true
+    var lowLatency = false
     private var wetActive = false
     private var wetSent = 0
     private var pendingWetClear = false
@@ -1274,7 +1274,11 @@ class InfiniteCanvasView(context: Context) : View(context) {
     private fun inkUpdated(e: MotionEvent) {
         val b = builder ?: return
         if (wetActive) {
-            val wet = wetInk ?: return
+            val wet = wetInk
+            if (wet == null || !wet.ready) {
+                leaveWetInk()
+                return
+            }
             val start = max(0, wetSent - 1)
             val n = b.n - start
             if (b.n <= wetSent || n <= 0) return
@@ -1284,13 +1288,26 @@ class InfiniteCanvasView(context: Context) : View(context) {
             // O pedaço vira o mesmo contorno do traço pronto (montado aqui, na thread
             // principal): ao "secar", a tinta não muda de forma.
             val outline = StrokeRenderer.buildPath(xs, ys, ws, n, uniform = false, into = Path())
-            wet.draw(InkSegment(outline, if (nightInk) Night.map(b.pen.color) else b.pen.color))
+            if (!wet.draw(InkSegment(outline, if (nightInk) Night.map(b.pen.color) else b.pen.color))) {
+                leaveWetInk()
+                return
+            }
             wetSent = b.n
             return
         }
         if (usePrediction && Build.VERSION.SDK_INT >= 34) predict(e)
         // O marca-texto é desenhado na própria tela, por baixo da escrita.
         (if (b.pen.type == BrushType.HIGHLIGHTER) this else liveInk ?: this).invalidate()
+    }
+
+    /**
+     * A camada de latência mínima falhou no meio do traço (superfície perdida, buffer
+     * inválido): o traço continua pelo caminho normal, sem a tinta sumir.
+     */
+    private fun leaveWetInk() {
+        wetActive = false
+        wetInk?.clear()
+        (liveInk ?: this).invalidate()
     }
 
     /** Previsão de movimento (Android 14+): desenha um pedacinho à frente da caneta. */

@@ -150,11 +150,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         val live = LiveInkView(this, canvasView)
         stage.addView(live, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         canvasView.liveInk = live
-        if (prefs.lowLatency) {
-            val wet = WetInkLayer(this)
-            stage.addView(wet, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-            canvasView.wetInk = wet
-        }
+        attachWetInk()
 
         zoomLabel = TextView(this).apply {
             textSize = 12f
@@ -250,8 +246,32 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         }
     }
 
+    /**
+     * Camada de latência mínima (opcional). É recriada ao voltar para a nota: a superfície
+     * antiga pode ficar inválida depois de sair do app, e a tinta parava de aparecer.
+     */
+    private fun attachWetInk() {
+        canvasView.wetInk?.let { stage.removeView(it) }
+        canvasView.wetInk = null
+        if (!prefs.lowLatency) return
+        val wet = WetInkLayer(this)
+        stage.addView(wet, 2, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        canvasView.wetInk = wet
+    }
+
+    private var wetStale = false
+
+    override fun onResume() {
+        super.onResume()
+        if (wetStale) {
+            wetStale = false
+            attachWetInk()
+        }
+    }
+
     override fun onPause() {
         super.onPause()
+        wetStale = true
         if (::textEditor.isInitialized && textEditor.isActive) textEditor.finish()
         // A gravação para quando a nota sai da tela (o áudio já fica salvo).
         audioNotes?.let { if (it.isRecording) { it.stop(); updateAudioPill() } }
@@ -941,10 +961,11 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             prefs.fingerDraws = it
             applyPrefs()
         })
-        finger.addView(switchRow(Icon.EDIT, "Tinta de latência mínima", prefs.lowLatency) {
+        finger.addView(switchRow(Icon.EDIT, "Tinta de latência mínima (experimental)", prefs.lowLatency) {
             prefs.lowLatency = it
             applyPrefs()
-            toast(if (it) "Reabra a nota para ativar a tinta de latência mínima." else "Tinta de latência mínima desligada.")
+            attachWetInk()
+            toast(if (it) "Tinta de latência mínima ligada (experimental)." else "Tinta de latência mínima desligada.")
         })
         actionSheet(null, listOf(
             SheetItem(Icon.PAGE, "Página (infinita ou folhas)") {

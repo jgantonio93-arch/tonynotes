@@ -98,10 +98,14 @@ class PenPrefs(context: Context) {
         get() = sp.getBoolean("auto_shapes", false)
         set(v) = sp.edit().putBoolean("auto_shapes", v).apply()
 
-    /** Tinta em front buffer (latência mínima). Pode ser desligada se algum aparelho não se der bem. */
+    /**
+     * Tinta em front buffer (latência mínima). Experimental e desligada por padrão: em alguns
+     * aparelhos a tinta parava de aparecer no meio da escrita. Chave nova para desligar também
+     * para quem estava com o padrão antigo (ligado).
+     */
     var lowLatency: Boolean
-        get() = sp.getBoolean("low_latency", true)
-        set(v) = sp.edit().putBoolean("low_latency", v).apply()
+        get() = sp.getBoolean("low_latency_v2", false)
+        set(v) = sp.edit().putBoolean("low_latency_v2", v).apply()
 
     var spenButtonErases: Boolean
         get() = sp.getBoolean("spen_button_erases", true)
