@@ -17,7 +17,7 @@ android {
         minSdk = 29
         targetSdk = 35
         versionCode = if (ciBuild > 0) 1000 + ciBuild else 11
-        versionName = "0.13.1"
+        versionName = "0.14.0"
         buildConfigField("int", "BUILD_NUMBER", ciBuild.toString())
     }
 

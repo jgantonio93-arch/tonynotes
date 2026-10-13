@@ -172,8 +172,13 @@ class InlineTextEditor(
         val z = canvas.zoom
         e.setTextSize(TypedValue.COMPLEX_UNIT_PX, size * z)
         val lp = e.layoutParams as? FrameLayout.LayoutParams ?: return
-        lp.leftMargin = (canvas.screenX(anchorX) - PAD).roundToInt()
-        lp.topMargin = (canvas.screenY(anchorY) - PAD).roundToInt()
+        // Com a tela girada, a caixa gira junto, presa na âncora do texto.
+        val p = canvas.screenPoint(anchorX, anchorY)
+        lp.leftMargin = (p.x - PAD).roundToInt()
+        lp.topMargin = (p.y - PAD).roundToInt()
+        e.pivotX = PAD.toFloat()
+        e.pivotY = PAD.toFloat()
+        e.rotation = canvas.viewRotation
         e.layoutParams = lp
     }
 

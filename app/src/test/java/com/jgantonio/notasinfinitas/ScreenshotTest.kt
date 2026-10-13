@@ -63,6 +63,13 @@ class ScreenshotTest {
         editor.showMoreMenu()
         save(withDialog(editor), "7-menu")
 
+        editor.openDockTray()
+        save(snap(editor), "7b-bandeja-barra")
+        editor.closeTrayForTests()
+        editor.canvasForTests.setViewRotation(20f)
+        save(snap(editor), "7c-tela-girada")
+        editor.canvasForTests.setViewRotation(0f)
+
         // Imagem: seleção com alças, ajustes e recorte
         val canvas = editor.canvasForTests
         val photo = canvas.elementsSnapshot().first { it is ImageElement }

@@ -46,6 +46,11 @@ import com.jgantonio.notasinfinitas.Ui.promptText
 import com.jgantonio.notasinfinitas.Ui.ripple
 import com.jgantonio.notasinfinitas.Ui.switchRow
 import com.jgantonio.notasinfinitas.Ui.vertical
+import com.jgantonio.notasinfinitas.Ui.rounded
+import com.jgantonio.notasinfinitas.Ui.sectionLabel
+import com.jgantonio.notasinfinitas.Ui.title
+import com.jgantonio.notasinfinitas.Ui.wrapRow
+import kotlin.math.roundToInt
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -81,6 +86,8 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     private lateinit var selectionBar: View
     private lateinit var selectionLabel: TextView
     private lateinit var zoomLabel: TextView
+    private lateinit var angleLabel: TextView
+    private lateinit var viewPills: LinearLayout
     private lateinit var ephemeralPill: TextView
     private lateinit var audioPill: TextView
     private var audioNotes: AudioNotes? = null
@@ -169,7 +176,29 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             contentDescription = "Zoom"
             setOnClickListener { showZoomMenu() }
         }
-        stage.addView(zoomLabel, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.START).apply {
+        angleLabel = TextView(this).apply {
+            textSize = 12f
+            typeface = Ui.MEDIUM
+            setTextColor(Ui.MUTED)
+            gravity = Gravity.CENTER
+            minHeight = dpi(32f)
+            setPadding(dpi(10f), 0, dpi(12f), 0)
+            background = ripple(floating(100f), pill(Color.WHITE, 0))
+            fontFeatureSettings = "tnum"
+            setCompoundDrawablesRelativeWithIntrinsicBounds(icon(Icon.ROTATE, Ui.MUTED, 15f), null, null, null)
+            compoundDrawablePadding = dpi(5f)
+            Ui.run { softShadow(2f) }
+            contentDescription = "Girar a tela"
+            setOnClickListener { showRotateMenu() }
+        }
+        // Zoom e ângulo lado a lado, no canto de baixo.
+        viewPills = horizontal().apply {
+            addView(zoomLabel)
+            addView(angleLabel, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                marginStart = dpi(8f)
+            })
+        }
+        stage.addView(viewPills, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.START).apply {
             setMargins(dpi(14f), 0, 0, dpi(14f))
         })
 
@@ -614,20 +643,8 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         layoutDock(animateFrom = left to top)
     }
 
-    private fun showDockMenu() {
-        closeTray()
-        fun place(mode: String) {
-            prefs.dockMode = mode
-            layoutDock(animateFrom = dock.left.toFloat() to dock.top.toFloat())
-        }
-        actionSheet("Barra de ferramentas", listOf(
-            SheetItem(Icon.DOCK_TOP, "No topo (deitada)") { place("top") },
-            SheetItem(Icon.DOCK_LEFT, "À esquerda (em pé, com 3 cores)") { place("left") },
-            SheetItem(Icon.DOCK_RIGHT, "À direita (em pé, com 3 cores)") { place("right") },
-        ), header = label("Dica: arraste pela alça ⋮⋮ para levar a barra a qualquer lugar.", 13f).apply {
-            setPadding(dpi(4f), 0, 0, dpi(8f))
-        })
-    }
+    /** Toque na alça: a bandeja de posição abre colada na barra (como as das canetas). */
+    private fun showDockMenu() = toggleTray("dock")
 
     /** As 3 cores rápidas da barra em pé. */
     private fun fillQuickColors() {
@@ -744,6 +761,9 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     fun openPenTray() = showTray("pen")
     fun openEraserTray() = showTray("eraser")
     fun openSelectTray() = showTray("select")
+    fun openDockTray() = showTray("dock")
+    internal val openTrayForTests get() = openTray
+    internal fun closeTrayForTests() = closeTray()
 
     @SuppressLint("ClickableViewAccessibility")
     private fun showTray(which: String) {
@@ -770,7 +790,8 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         // A bandeja tem uma folga em volta para a sombra (TRAY_SHADOW_DP): compensa aqui
         // para o cartão ficar exatamente no lugar.
         val room = dpi(TRAY_SHADOW_DP)
-        val lp = FrameLayout.LayoutParams(width + room * 2, ViewGroup.LayoutParams.WRAP_CONTENT)
+        val trayWidth = if (which == "dock") min(width, dpi(320f)) else width
+        val lp = FrameLayout.LayoutParams(trayWidth + room * 2, ViewGroup.LayoutParams.WRAP_CONTENT)
         lp.bottomMargin = dpi(12f) - room
         lp.topMargin = dpi(12f) - room / 2
         var fromX = 0f
@@ -791,6 +812,11 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
                 applyPrefs()
                 refresh()
             }, onFavoritesChanged = { refresh() }, widthPx = width)
+            "dock" -> DockTray(this, prefs.dockMode) { mode ->
+                prefs.dockMode = mode
+                closeTray()
+                layoutDock(animateFrom = dock.left.toFloat() to dock.top.toFloat())
+            }
             "select" -> SelectTray(this, prefs) {
                 applyPrefs()
                 refresh()
@@ -1027,45 +1053,139 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
 
     fun showMoreMenu() {
         closeTray()
-        val finger = vertical()
-        finger.addView(switchRow(Icon.TOUCH, "Escrever com o dedo", prefs.fingerDraws) {
-            prefs.fingerDraws = it
-            applyPrefs()
+        sheet(null) { box, dialog ->
+            fun act(block: () -> Unit): () -> Unit = { dialog.dismiss(); block() }
+            // Cabeçalho: nome da nota e "Renomear"
+            box.addView(title(note.title, 22f).apply {
+                isSingleLine = true
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+            box.addView(label("Renomear nota", 13.5f, Ui.ACCENT, bold = true).apply {
+                setPadding(0, dpi(4f), 0, dpi(16f))
+                setOnClickListener(act { rename() })
+            })
+            // Atalhos em cartões
+            val tiles = mutableListOf(
+                menuTile(Icon.PAGE, "Página", act { Panels.showPage(this, canvasView, prefs) { onStateChanged() } }),
+                menuTile(if (Ui.isDark) Icon.MOON else Icon.SUN, "Tema", act { Ui.showThemeMenu(this) }),
+                menuTile(Icon.TOUCH, "Laser", act { setEphemeral(InfiniteCanvasView.Ephemeral.LASER) }),
+                menuTile(Icon.EDIT, "Tinta que some", act { setEphemeral(InfiniteCanvasView.Ephemeral.VANISH) }),
+                if (audio.isRecording) menuTile(Icon.CLOSE, "Parar gravação", act { audio.stop(); updateAudioPill() })
+                else menuTile(Icon.MIC, "Gravar áudio", act { startRecording() }),
+            )
+            if (audio.recordings.isNotEmpty()) tiles.add(menuTile(Icon.MIC, "Áudios (${audio.recordings.size})", act { showRecordings() }))
+            while (tiles.size % 3 != 0) tiles.add(View(this).apply { layoutParams = LinearLayout.LayoutParams(0, 1, 1f) })
+            box.addView(wrapRow(tiles, 3))
+
+            box.addView(menuSection("Arquivo"))
+            box.addView(menuRow(Icon.PDF, "Importar PDF", act { pickPdf() }))
+            box.addView(menuRow(Icon.EXPORT, "Exportar como imagem", act { exportPng() }))
+            box.addView(menuRow(Icon.PDF, "Exportar como PDF", act { exportPdf() }))
+            if (canvasView.pdfPages().isNotEmpty()) {
+                box.addView(menuRow(Icon.PDF, "Exportar PDF anotado (páginas originais)", act { exportAnnotatedPdf() }))
+            }
+            if (canvasView.pdfPageCount > 0) {
+                if (canvasView.lockedPdfPageCount > 0) box.addView(menuRow(Icon.UNLOCK, "Destravar todas as páginas do PDF", act { canvasView.setAllPdfPagesLocked(false) }))
+                else box.addView(menuRow(Icon.LOCK, "Travar todas as páginas do PDF", act { canvasView.setAllPdfPagesLocked(true) }))
+            }
+
+            box.addView(menuSection("Nota"))
+            box.addView(menuRow(Icon.SELECT_ALL, "Selecionar tudo", act { canvasView.selectAll(); refresh() }))
+            box.addView(menuRow(Icon.CENTER, "Centralizar conteúdo", act { canvasView.recenter() }))
+            box.addView(menuRow(Icon.MOVE, "Mover para outra pasta", act { moveToFolder() }))
+
+            box.addView(menuSection("Ajustes"))
+            box.addView(switchRow(Icon.TOUCH, "Escrever com o dedo", prefs.fingerDraws) {
+                prefs.fingerDraws = it
+                applyPrefs()
+            })
+            box.addView(switchRow(Icon.EDIT, "Tinta de latência mínima (experimental)", prefs.lowLatency) {
+                prefs.lowLatency = it
+                applyPrefs()
+                attachWetInk()
+                toast(if (it) "Tinta de latência mínima ligada (experimental)." else "Tinta de latência mínima desligada.")
+            })
+        }
+    }
+
+    /** Cartão de atalho do menu ⋮: ícone num círculo suave e o nome embaixo. */
+    private fun menuTile(ic: Icon, text: String, onClick: () -> Unit): View = vertical().apply {
+        gravity = Gravity.CENTER_HORIZONTAL
+        setPadding(dpi(4f), dpi(12f), dpi(4f), dpi(10f))
+        background = ripple(rounded(Ui.FIELD, 16f), rounded(Color.WHITE, 16f))
+        contentDescription = text
+        setOnClickListener { onClick() }
+        Ui.run { pressable(0.96f) }
+        addView(ImageView(this@EditorActivity).apply {
+            setImageDrawable(icon(ic, Ui.ACCENT, 22f))
+            scaleType = ImageView.ScaleType.CENTER
+            background = circle(Ui.ACCENT_SOFT, 0, 0f)
+        }, LinearLayout.LayoutParams(dpi(42f), dpi(42f)))
+        addView(label(text, 12.5f, Ui.INK).apply {
+            gravity = Gravity.CENTER
+            maxLines = 2
+            setPadding(0, dpi(6f), 0, 0)
         })
-        finger.addView(switchRow(Icon.EDIT, "Tinta de latência mínima (experimental)", prefs.lowLatency) {
-            prefs.lowLatency = it
-            applyPrefs()
-            attachWetInk()
-            toast(if (it) "Tinta de latência mínima ligada (experimental)." else "Tinta de latência mínima desligada.")
-        })
-        actionSheet(null, listOf(
-            SheetItem(Icon.PAGE, "Página (infinita ou folhas)") {
-                Panels.showPage(this, canvasView, prefs) { onStateChanged() }
-            },
-            SheetItem(if (Ui.isDark) Icon.MOON else Icon.SUN, "Tema (claro ou noturno)") { Ui.showThemeMenu(this) },
-            if (audio.isRecording) SheetItem(Icon.CLOSE, "Parar gravação") { audio.stop(); updateAudioPill() }
-            else SheetItem(Icon.TOUCH, "Gravar áudio com a escrita") { startRecording() },
-        ) + (if (audio.recordings.isEmpty()) emptyList() else listOf(
-            SheetItem(Icon.TOUCH, "Áudios da nota (${audio.recordings.size})") { showRecordings() },
-        )) + listOf(
-            SheetItem(Icon.TOUCH, "Ponteiro laser (some na hora)") { setEphemeral(InfiniteCanvasView.Ephemeral.LASER) },
-            SheetItem(Icon.EDIT, "Tinta que some (para explicar)") { setEphemeral(InfiniteCanvasView.Ephemeral.VANISH) },
-            SheetItem(Icon.PDF, "Importar PDF") { pickPdf() },
-            SheetItem(Icon.SELECT_ALL, "Selecionar tudo") { canvasView.selectAll(); refresh() },
-            SheetItem(Icon.EXPORT, "Exportar como imagem") { exportPng() },
-            SheetItem(Icon.PDF, "Exportar como PDF") { exportPdf() },
-        ) + (if (canvasView.pdfPages().isEmpty()) emptyList() else listOf(
-            SheetItem(Icon.PDF, "Exportar PDF anotado (páginas originais)") { exportAnnotatedPdf() },
-        )) + (if (canvasView.pdfPageCount == 0) emptyList()
-        else if (canvasView.lockedPdfPageCount > 0) listOf(
-            SheetItem(Icon.UNLOCK, "Destravar todas as páginas do PDF") { canvasView.setAllPdfPagesLocked(false) },
-        ) else listOf(
-            SheetItem(Icon.LOCK, "Travar todas as páginas do PDF") { canvasView.setAllPdfPagesLocked(true) },
-        )) + listOf(
-            SheetItem(Icon.CENTER, "Centralizar conteúdo") { canvasView.recenter() },
-            SheetItem(Icon.EDIT, "Renomear nota") { rename() },
-            SheetItem(Icon.MOVE, "Mover para outra pasta") { moveToFolder() },
-        ), header = finger)
+        layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+            setMargins(dpi(4f), dpi(4f), dpi(4f), dpi(4f))
+        }
+    }
+
+    private fun menuSection(text: String) = sectionLabel(text).apply { setPadding(dpi(4f), dpi(18f), 0, dpi(4f)) }
+
+    /** Linha do menu ⋮: ícone e texto, com toque arredondado. */
+    private fun menuRow(ic: Icon, text: String, onClick: () -> Unit): View = horizontal().apply {
+        minimumHeight = dpi(50f)
+        setPadding(dpi(8f), 0, dpi(8f), 0)
+        background = ripple(null, rounded(Color.WHITE, 14f))
+        setOnClickListener { onClick() }
+        addView(ImageView(this@EditorActivity).apply { setImageDrawable(icon(ic, Ui.INK, 22f)) },
+            LinearLayout.LayoutParams(dpi(24f), dpi(24f)).apply { marginEnd = dpi(16f) })
+        addView(label(text, 15.5f, Ui.INK))
+    }
+
+    // ---- Girar a tela -------------------------------------------------------------------
+
+    /** Ímã nos ângulos retos do slider (±2°). */
+    private fun snapAngle(a: Float): Float {
+        val r = (a / 90f).roundToInt() * 90f
+        return if (kotlin.math.abs(a - r) < 2f) r else a
+    }
+
+    private fun showRotateMenu() {
+        lateinit var heading: TextView
+        lateinit var slider: AngleSlider
+        fun show() { heading.text = "Girar a tela: ${canvasView.viewRotation.roundToInt()}°" }
+        fun apply(deg: Float) {
+            canvasView.setViewRotation(deg)
+            slider.value = canvasView.viewRotation
+            show()
+        }
+        val dialog = sheet(null) { box, d ->
+            heading = title("", 19f)
+            box.addView(heading)
+            box.addView(label("Só a tela gira: a escrita, o PDF e as imagens exportadas continuam retos.", 13f).apply {
+                setPadding(0, dpi(4f), 0, dpi(10f))
+            })
+            slider = AngleSlider(this, canvasView.viewRotation) { v ->
+                canvasView.setViewRotation(snapAngle(v))
+                show()
+            }
+            box.addView(slider, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            box.addView(buttonRow(
+                secondaryButton("−90°") { apply(canvasView.viewRotation - 90f) },
+                secondaryButton("−15°") { apply(canvasView.viewRotation - 15f) },
+                secondaryButton("+15°") { apply(canvasView.viewRotation + 15f) },
+                secondaryButton("+90°") { apply(canvasView.viewRotation + 90f) },
+            ))
+            box.addView(buttonRow(
+                secondaryButton("Endireitar (0°)") { apply(0f) },
+                primaryButton("Pronto") { d.dismiss() },
+            ))
+            show()
+        }
+        // Sem escurecer o fundo: dá para ver a nota girando.
+        dialog.window?.setDimAmount(0f)
     }
 
     private fun rename() {
@@ -1094,6 +1214,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         undoButton.alpha = if (canvasView.canUndo) 1f else 0.3f
         redoButton.alpha = if (canvasView.canRedo) 1f else 0.3f
         zoomLabel.text = "${canvasView.zoomPercent}%"
+        angleLabel.text = "${canvasView.viewRotation.roundToInt()}°"
     }
 
     override fun onSelectionChanged(count: Int) {
@@ -1106,7 +1227,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             selectionBar.animate().alpha(1f).translationY(0f).setDuration(260).setInterpolator(Ui.EASE).start()
         }
         // A barra fica embaixo, no lugar do contador de zoom.
-        zoomLabel.visibility = if (selectionBar.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        viewPills.visibility = if (selectionBar.visibility == View.VISIBLE) View.GONE else View.VISIBLE
         if (selectionBar.visibility == View.VISIBLE) fillSelectionBar()
         refresh()
     }

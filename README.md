@@ -133,6 +133,10 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
   Formato conforme a engenharia reversa de twangodev/sdocx e bxff/samsung-notes-format.
 
 ### Outras ferramentas
+- **Girar a tela**: a pílula de ângulo ao lado do zoom abre um controle de -180° a 180°
+  (com ímã nos ângulos retos, botões de ±15° e ±90° e "Endireitar"). Só a visão gira: a
+  escrita, as exportações e as miniaturas continuam retas. O ângulo fica salvo na nota.
+- Tocar na alça ⋮⋮ abre a **bandeja de posição da barra** colada nela (topo, esquerda, direita).
 - **Tela cheia** (botão ⛶ no canto da barra de cima): somem a barra de cima e as do sistema;
   fica só a barra de ferramentas e, num cantinho, desfazer, refazer e sair (o voltar também sai).
 - **Borracha** (toque de novo para opções): **borracha de traço** ou **borracha de área**,

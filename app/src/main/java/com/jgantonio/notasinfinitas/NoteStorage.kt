@@ -11,7 +11,7 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 
 /** Posição da câmera sobre a tela infinita. */
-data class ViewState(val offsetX: Float, val offsetY: Float, val scale: Float)
+data class ViewState(val offsetX: Float, val offsetY: Float, val scale: Float, val rotation: Float = 0f)
 
 enum class PageStyle(val label: String) {
     BLANK("Em branco"), DOTS("Pontilhado"), LINES("Pautado"), GRID("Quadriculado"),
@@ -83,10 +83,11 @@ class NoteData(
  * Versão 3: imagens com rotação, recorte, filtros, moldura, trava etc. (tipo 4).
  * Versão 4: textos com rotação, espelhamento, fonte, alinhamento e estilos por trecho (tipo 5).
  * Versão 5: modo de página (infinita ou folhas) logo depois da cor do papel.
+ * Versão 6: ângulo da tela (rotação da visão) logo depois do zoom.
  */
 object NoteStorage {
     private const val MAGIC = 0x4E494E46 // "NINF"
-    private const val VERSION = 5
+    private const val VERSION = 6
 
     private const val TYPE_STROKE = 1
     private const val TYPE_TEXT = 2
@@ -104,6 +105,7 @@ object NoteStorage {
             out.writeFloat(v.offsetX)
             out.writeFloat(v.offsetY)
             out.writeFloat(v.scale)
+            out.writeFloat(v.rotation)
             out.writeInt(data.style.ordinal)
             out.writeInt(data.paperColor)
             val l = data.layout
@@ -177,6 +179,7 @@ object NoteStorage {
                     1 -> readV1(input)
                     2, 3, 4 -> readV2(input, false)
                     5 -> readV2(input, true)
+                    6 -> readV2(input, true, hasRotation = true)
                     else -> null
                 }
             }
@@ -203,8 +206,9 @@ object NoteStorage {
         return NoteData(elements, state)
     }
 
-    private fun readV2(input: DataInputStream, hasLayout: Boolean): NoteData {
-        val state = ViewState(input.readFloat(), input.readFloat(), input.readFloat())
+    private fun readV2(input: DataInputStream, hasLayout: Boolean, hasRotation: Boolean = false): NoteData {
+        val state = ViewState(input.readFloat(), input.readFloat(), input.readFloat(),
+            if (hasRotation) input.readFloat() else 0f)
         val style = PageStyle.entries.getOrElse(input.readInt()) { PageStyle.DOTS }
         val paper = input.readInt()
         val layout = if (hasLayout) PageLayout(

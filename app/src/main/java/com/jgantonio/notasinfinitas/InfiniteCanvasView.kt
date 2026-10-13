@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.DashPathEffect
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
@@ -334,6 +335,39 @@ class InfiniteCanvasView(context: Context) : View(context) {
     var touchInterceptor: (() -> Boolean)? = null
 
     val zoom get() = scale
+
+    // ---- Ângulo da tela --------------------------------------------------------------
+    //
+    // A visão pode girar em volta do centro da tela. O desenho inteiro gira junto, e os
+    // toques são desgirados antes de tudo: o resto da tela trabalha como se estivesse reta.
+
+    /** Ângulo da visão, em graus (-180..180). Não muda o conteúdo da nota. */
+    var viewRotation = 0f
+        private set
+    private val rotM = Matrix()
+    private val rotInv = Matrix()
+    private val cornerPts = FloatArray(8)
+
+    fun setViewRotation(deg: Float) {
+        viewRotation = ImageElement.normalizeAngle(deg)
+        updateRotation()
+        invalidate()
+        liveInk?.invalidate()
+        listener?.onStateChanged()
+    }
+
+    private fun updateRotation() {
+        rotM.setRotate(viewRotation, width / 2f, height / 2f)
+        rotM.invert(rotInv)
+    }
+
+    /** Ponto do mundo na tela (já com o ângulo da visão). */
+    fun screenPoint(wx: Float, wy: Float): android.graphics.PointF {
+        val p = floatArrayOf(wx * scale + offsetX, wy * scale + offsetY)
+        if (viewRotation != 0f) rotM.mapPoints(p)
+        return android.graphics.PointF(p[0], p[1])
+    }
+
     fun screenX(wx: Float) = wx * scale + offsetX
     fun screenY(wy: Float) = wy * scale + offsetY
     fun worldX(sx: Float) = wx(sx)
@@ -898,7 +932,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
         return hs[hs.size / 2]
     }
 
-    fun snapshot() = NoteData(ArrayList(elements), ViewState(offsetX, offsetY, scale), pageStyle, paperColor, pageLayout)
+    fun snapshot() = NoteData(ArrayList(elements), ViewState(offsetX, offsetY, scale, viewRotation), pageStyle, paperColor, pageLayout)
 
     fun markSaved() {
         dirty = false
@@ -913,6 +947,8 @@ class InfiniteCanvasView(context: Context) : View(context) {
             offsetX = it.offsetX
             offsetY = it.offsetY
             scale = it.scale.coerceIn(MIN_SCALE, MAX_SCALE)
+            viewRotation = ImageElement.normalizeAngle(it.rotation)
+            updateRotation()
             hasInitialPosition = true
         }
         pageStyle = note.style
@@ -1148,6 +1184,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
+        updateRotation()
         if (!hasInitialPosition && w > 0) {
             // Começa abaixo do dock de ferramentas, que flutua no topo.
             offsetX = w * 0.08f
@@ -1159,6 +1196,18 @@ class InfiniteCanvasView(context: Context) : View(context) {
     private var swallowing = false
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
+        if (viewRotation == 0f) return handleTouch(e)
+        // Tela girada: desgira o toque (todos os dedos e o histórico) e segue normalmente.
+        val ev = MotionEvent.obtain(e)
+        ev.transform(rotInv)
+        try {
+            return handleTouch(ev)
+        } finally {
+            ev.recycle()
+        }
+    }
+
+    private fun handleTouch(e: MotionEvent): Boolean {
         // Um toque fora do texto em edição só termina a edição (não risca a nota).
         if (e.actionMasked == MotionEvent.ACTION_DOWN && touchInterceptor?.invoke() == true) {
             swallowing = true
@@ -1289,6 +1338,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
             // O pedaço vira o mesmo contorno do traço pronto (montado aqui, na thread
             // principal): ao "secar", a tinta não muda de forma.
             val outline = StrokeRenderer.buildPath(xs, ys, ws, n, uniform = false, into = Path())
+            if (viewRotation != 0f) outline.transform(rotM)
             if (!wet.draw(InkSegment(outline, if (nightInk) Night.map(b.pen.color) else b.pen.color))) {
                 leaveWetInk()
                 return
@@ -1337,6 +1387,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
         val b = builder ?: return
         if (wetActive || b.pen.type == BrushType.HIGHLIGHTER) return
         canvas.save()
+        if (viewRotation != 0f) canvas.rotate(viewRotation, width / 2f, height / 2f)
         canvas.translate(offsetX, offsetY)
         canvas.scale(scale, scale)
         StrokeRenderer.zoom = scale
@@ -1750,7 +1801,9 @@ class InfiniteCanvasView(context: Context) : View(context) {
                 }
             }
         }
-        visibleWorld.set(wx(0f), wy(0f), wx(width.toFloat()), wy(height.toFloat()))
+        computeVisibleWorld()
+        canvas.save()
+        if (viewRotation != 0f) canvas.rotate(viewRotation, width / 2f, height / 2f)
         if (pageLayout.hasPages) {
             drawPages(canvas)
         } else {
@@ -1791,6 +1844,22 @@ class InfiniteCanvasView(context: Context) : View(context) {
         if (eraserX >= 0f) {
             canvas.drawCircle(eraserX, eraserY, eraserSize * density, eraserPaint)
         }
+        canvas.restore()
+    }
+
+    /** Parte do mundo que aparece na tela: com a tela girada, envolve os 4 cantos. */
+    private fun computeVisibleWorld() {
+        if (viewRotation == 0f) {
+            visibleWorld.set(wx(0f), wy(0f), wx(width.toFloat()), wy(height.toFloat()))
+            return
+        }
+        val w = width.toFloat()
+        val h = height.toFloat()
+        cornerPts[0] = 0f; cornerPts[1] = 0f; cornerPts[2] = w; cornerPts[3] = 0f
+        cornerPts[4] = 0f; cornerPts[5] = h; cornerPts[6] = w; cornerPts[7] = h
+        rotInv.mapPoints(cornerPts)
+        visibleWorld.set(Float.MAX_VALUE, Float.MAX_VALUE, -Float.MAX_VALUE, -Float.MAX_VALUE)
+        for (i in 0 until 4) visibleWorld.union(wx(cornerPts[i * 2]), wy(cornerPts[i * 2 + 1]))
     }
 
     private fun drawSelection(canvas: Canvas) {

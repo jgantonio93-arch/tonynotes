@@ -854,4 +854,34 @@ class FunctionalTest {
         assertTrue(!editor.isFinishing)
         assertTrue(!editor.prefsForTests.fullscreen)
     }
+
+    @Test
+    fun tela_girada_desenha_no_lugar_certo_e_fica_salva() {
+        canvas.setViewRotation(90f)
+        // Traço da esquerda para a direita na tela: com a tela girada 90°, no mundo ele é vertical.
+        drag(line(300f, 900f, 700f, 900f))
+        val s = strokes()[0]
+        val dx = s.xs.maxOrNull()!! - s.xs.minOrNull()!!
+        val dy = s.ys.maxOrNull()!! - s.ys.minOrNull()!!
+        assertTrue("vertical no mundo: dx=$dx dy=$dy", dy > 5 * dx && dy > 100f)
+        canvas.setViewRotation(0f)
+        drag(line(300f, 1100f, 700f, 1100f))
+        val h = strokes()[1]
+        assertTrue("reta de novo na horizontal", h.xs.maxOrNull()!! - h.xs.minOrNull()!! > 5 * (h.ys.maxOrNull()!! - h.ys.minOrNull()!!))
+
+        // O ângulo fica salvo na nota.
+        canvas.setViewRotation(30f)
+        controller.pause().stop().destroy()
+        Library.io.submit {}.get()
+        openEditor()
+        assertEquals(30f, canvas.viewRotation, 0.01f)
+    }
+
+    @Test
+    fun toque_na_alca_abre_a_bandeja_da_barra_ao_lado() {
+        editor.openDockTray()
+        assertEquals("dock", editor.openTrayForTests)
+        editor.closeTrayForTests()
+        assertNull(editor.openTrayForTests)
+    }
 }

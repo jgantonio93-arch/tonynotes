@@ -151,6 +151,27 @@ class SizeSlider(context: Context, min: Float, max: Float, value: Float, onChang
     }
 }
 
+/** Slider de ângulo (-180° a 180°): trilho reto, marcas a cada 90° e o trecho desde o 0° em destaque. */
+class AngleSlider(context: Context, value: Float, onChange: (Float) -> Unit) :
+    FancySlider(context, -180f, 180f, value, onChange) {
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    override fun drawTrack(canvas: Canvas, cy: Float) {
+        val h = context.dp(2f)
+        paint.color = Ui.TRACK
+        canvas.drawRoundRect(left, cy - h, right, cy + h, h, h, paint)
+        paint.color = Ui.MUTED
+        for (a in listOf(-180f, -90f, 0f, 90f, 180f)) {
+            val x = left + (right - left) * ((a + 180f) / 360f)
+            val t = if (a == 0f) context.dp(9f) else context.dp(5f)
+            canvas.drawRect(x - context.dp(1f), cy - t, x + context.dp(1f), cy + t, paint)
+        }
+        paint.color = Ui.ACCENT
+        val zero = (left + right) / 2f
+        canvas.drawRoundRect(kotlin.math.min(zero, thumbX), cy - h, kotlin.math.max(zero, thumbX), cy + h, h, h, paint)
+    }
+}
+
 /**
  * Slider de opacidade: xadrez + degradê do transparente à cor.
  * Com [reversed], vai da cor ao transparente (slider de transparência).

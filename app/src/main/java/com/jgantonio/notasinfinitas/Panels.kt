@@ -353,6 +353,51 @@ class SelectTray(context: Context, prefs: PenPrefs, onChange: () -> Unit) : Line
     }
 }
 
+/** Posição da barra de ferramentas: abre colada na barra, como as bandejas das canetas. */
+@SuppressLint("ViewConstructor")
+class DockTray(context: Context, current: String, onPick: (String) -> Unit) : LinearLayout(context) {
+    init {
+        orientation = VERTICAL
+        shadowRoom()
+        val c = context
+        val card = c.trayCard()
+        addView(card, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        card.addView(Ui.run { c.title("Barra de ferramentas", 17f) }.apply { setPadding(0, 0, 0, c.dpi(12f)) })
+        val row = c.horizontal()
+        for ((mode, icon, text) in listOf(
+            Triple("top", Icon.DOCK_TOP, "No topo"),
+            Triple("left", Icon.DOCK_LEFT, "Esquerda"),
+            Triple("right", Icon.DOCK_RIGHT, "Direita"),
+        )) {
+            val sel = mode == current
+            val cell = c.vertical().apply {
+                gravity = Gravity.CENTER
+                setPadding(0, c.dpi(12f), 0, c.dpi(10f))
+                background = Ui.ripple(
+                    c.rounded(if (sel) Ui.ACCENT_SOFT else Ui.FIELD, 14f, if (sel) Ui.ACCENT else 0, 1.5f),
+                    c.rounded(Color.WHITE, 14f),
+                )
+                contentDescription = text
+                setOnClickListener { onPick(mode) }
+            }
+            cell.addView(ImageView(c).apply { setImageDrawable(c.icon(icon, if (sel) Ui.ACCENT else Ui.INK, 30f)) },
+                LayoutParams(c.dpi(34f), c.dpi(34f)))
+            cell.addView(c.label(text, 13f, if (sel) Ui.ACCENT else Ui.INK, bold = sel).apply {
+                gravity = Gravity.CENTER
+                setPadding(0, c.dpi(6f), 0, 0)
+            })
+            row.addView(cell, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                setMargins(c.dpi(4f), 0, c.dpi(4f), 0)
+            })
+        }
+        card.addView(row)
+        card.addView(c.label("Em pé, a barra mostra 3 cores rápidas. Arraste pela alça ⋮⋮ para levá-la a qualquer lugar.", 12.5f).apply {
+            setPadding(c.dpi(4f), c.dpi(12f), c.dpi(4f), 0)
+            setLineSpacing(0f, 1.1f)
+        })
+    }
+}
+
 fun <T : View> T.withSize(c: Context, sizeDp: Float, marginDp: Float = 2f): T {
     layoutParams = LinearLayout.LayoutParams(c.dpi(sizeDp), c.dpi(sizeDp)).apply {
         val m = c.dpi(marginDp)

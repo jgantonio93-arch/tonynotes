@@ -19,7 +19,7 @@ enum class Icon {
     ROTATE, LOCK, UNLOCK, CROP, FLIP_H, FLIP_V, ADJUST, TO_FRONT, TO_BACK, DOWNLOAD, RESET, ZOOM, SELECT_ALL,
     SEARCH, MARKER, ALIGN_LEFT, ALIGN_CENTER, ALIGN_RIGHT, TEXT_BIGGER, TEXT_SMALLER,
     RECT_SELECT, PARTIAL, STRAIGHT, GRIP, INFINITE, PAGES_V, PAGES_H, DOCK_TOP, DOCK_LEFT, DOCK_RIGHT,
-    SUN, MOON, THEME_AUTO, PAGE_PORTRAIT, PAGE_LANDSCAPE, FULLSCREEN, FULLSCREEN_EXIT
+    SUN, MOON, THEME_AUTO, PAGE_PORTRAIT, PAGE_LANDSCAPE, FULLSCREEN, FULLSCREEN_EXIT, MIC
 }
 
 /** Rótulo em português para leitores de tela (botões só com ícone). */
@@ -43,7 +43,7 @@ val Icon.label: String
         Icon.THEME_AUTO -> "Tema do celular"; Icon.PAGE_PORTRAIT -> "Folha vertical"; Icon.PAGE_LANDSCAPE -> "Folha horizontal"
         Icon.ALIGN_CENTER -> "Centralizar texto"; Icon.ALIGN_RIGHT -> "Alinhar à direita"
         Icon.TEXT_BIGGER -> "Aumentar"; Icon.TEXT_SMALLER -> "Diminuir"
-        Icon.FULLSCREEN -> "Tela cheia"; Icon.FULLSCREEN_EXIT -> "Sair da tela cheia"
+        Icon.FULLSCREEN -> "Tela cheia"; Icon.FULLSCREEN_EXIT -> "Sair da tela cheia"; Icon.MIC -> "Áudio"
     }
 
 class IconDrawable(
@@ -279,6 +279,11 @@ class IconDrawable(
             Icon.RESET -> c.drawPath(path {
                 arcTo(RectF(4f, 4f, 20f, 20f), 200f, -290f, true)
                 moveTo(3.5f, 4.5f); lineTo(4.4f, 9.4f); lineTo(9.2f, 8.4f)
+            }, stroke)
+            Icon.MIC -> c.drawPath(path {
+                rrect(9f, 3f, 15f, 14.5f, 3f)
+                moveTo(5.5f, 11f); quadTo(5.5f, 17.5f, 12f, 17.5f); quadTo(18.5f, 17.5f, 18.5f, 11f)
+                moveTo(12f, 17.5f); lineTo(12f, 21f)
             }, stroke)
             // Quatro cantos: para fora (entrar na tela cheia) ou para dentro (sair).
             Icon.FULLSCREEN -> c.drawPath(path {
