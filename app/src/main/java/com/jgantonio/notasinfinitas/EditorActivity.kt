@@ -763,7 +763,6 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     fun openSelectTray() = showTray("select")
     fun openDockTray() = showTray("dock")
     internal val openTrayForTests get() = openTray
-    internal fun closeTrayForTests() = closeTray()
 
     @SuppressLint("ClickableViewAccessibility")
     private fun showTray(which: String) {
@@ -1062,7 +1061,8 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             })
             box.addView(label("Renomear nota", 13.5f, Ui.ACCENT, bold = true).apply {
                 setPadding(0, dpi(4f), 0, dpi(16f))
-                setOnClickListener(act { rename() })
+                val renameNote = act { rename() }
+                setOnClickListener { renameNote() }
             })
             // Atalhos em cartões
             val tiles = mutableListOf(
