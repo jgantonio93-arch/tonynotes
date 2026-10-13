@@ -480,10 +480,12 @@ object SamsungNotesImporter {
                 val base = max(0.6f, st.size * k)
                 val xs = FloatArray(n) { ox + st.xs[it] * k }
                 val ys = FloatArray(n) { oy + st.ys[it] * k }
-                val ws = if (type == BrushType.HIGHLIGHTER) FloatArray(n) { base } else {
-                    // A pressão gravada é baixa (0..~0,4): normaliza pelo máximo do traço.
-                    val top = max(0.05f, st.ps.maxOrNull() ?: 1f)
-                    FloatArray(n) { base * (0.7f + 0.45f * (st.ps[it] / top).coerceIn(0f, 1f)) }
+                // No Samsung Notes, as canetas sensíveis à pressão desenham com diâmetro de
+                // "tamanho × pressão" (e a pressão gravada costuma ficar entre 0,1 e 0,4).
+                val ws = when (type) {
+                    BrushType.HIGHLIGHTER -> FloatArray(n) { base }
+                    BrushType.PEN -> FloatArray(n) { base * 0.8f }
+                    else -> FloatArray(n) { base * (0.3f + 1.5f * st.ps[it]).coerceIn(0.3f, 1f) }
                 }
                 val alpha = if (type == BrushType.HIGHLIGHTER) min(Color.alpha(st.color), 115) else Color.alpha(st.color).coerceAtLeast(12)
                 val color = st.color or (0xFF shl 24)
