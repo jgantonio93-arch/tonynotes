@@ -1382,11 +1382,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
                 val f = gestureFrame ?: return
                 val a0 = Math.toDegrees(atan2((startWY - f.cy).toDouble(), (startWX - f.cx).toDouble()))
                 val a1 = Math.toDegrees(atan2((wy(y) - f.cy).toDouble(), (wx(x) - f.cx).toDouble()))
-                var rot = (a1 - a0).toFloat()
-                // "Imã" nos ângulos retos
-                val target = f.angle + rot
-                val snapped = (target / 90f).roundToInt() * 90f
-                if (abs(target - snapped) < 4f) rot = snapped - f.angle
+                val rot = snapRotation(f.angle, (a1 - a0).toFloat())
                 selT = Transform(rotation = rot, ox = f.cx, oy = f.cy)
                 invalidate()
             }
@@ -1951,5 +1947,17 @@ class InfiniteCanvasView(context: Context) : View(context) {
         private const val MAX_PAGES = 9999
         /** Lado menor de uma folha nova (dp): perto da largura de um celular a 100%. */
         private const val PAGE_SHORT_DP = 400f
+
+        /**
+         * "Ímã" nos ângulos retos ao girar a seleção: perto de 0°, 90°, 180° ou 270° o giro
+         * gruda no ângulo reto, para endireitar o que está torto. O ângulo reto de onde o giro
+         * começou não puxa: assim dá para inclinar só um pouquinho (1°, 2°...).
+         */
+        internal fun snapRotation(startAngle: Float, rotation: Float): Float {
+            val target = startAngle + rotation
+            val snapped = (target / 90f).roundToInt() * 90f
+            val fromRight = abs(ImageElement.normalizeAngle(snapped - startAngle)) < 0.5f
+            return if (!fromRight && abs(target - snapped) < 3f) snapped - startAngle else rotation
+        }
     }
 }

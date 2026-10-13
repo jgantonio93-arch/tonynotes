@@ -763,4 +763,17 @@ class FunctionalTest {
             assertTrue(e.message!!.contains("Samsung Notes"))
         }
     }
+
+    @Test
+    fun girar_selecao_aceita_angulos_pequenos() {
+        // Saindo de 0°: inclinar 2° funciona (antes o ímã voltava para 0°).
+        assertEquals(2f, InfiniteCanvasView.snapRotation(0f, 2f), 0.001f)
+        assertEquals(-1f, InfiniteCanvasView.snapRotation(0f, -1f), 0.001f)
+        assertEquals(15f, InfiniteCanvasView.snapRotation(0f, 15f), 0.001f)
+        // Algo torto (5°) gruda em 0° ao chegar perto, e em 90° também.
+        assertEquals(-5f, InfiniteCanvasView.snapRotation(5f, -3.5f), 0.001f)
+        assertEquals(85f, InfiniteCanvasView.snapRotation(5f, 83f), 0.001f)
+        // Saindo de 90°: girar 1° a mais também funciona.
+        assertEquals(1f, InfiniteCanvasView.snapRotation(90f, 1f), 0.001f)
+    }
 }
