@@ -485,6 +485,18 @@ class InfiniteCanvasView(context: Context) : View(context) {
         listener?.onStateChanged()
     }
 
+    /** Posição exata da tela (para voltar depois de um pulo pelo sumário). */
+    data class ViewSpot(val offsetX: Float, val offsetY: Float, val scale: Float, val rotation: Float)
+
+    fun currentSpot() = ViewSpot(offsetX, offsetY, scale, viewRotation)
+
+    fun restoreSpot(s: ViewSpot) {
+        offsetX = s.offsetX
+        offsetY = s.offsetY
+        scale = s.scale.coerceIn(MIN_SCALE, MAX_SCALE)
+        setViewRotation(s.rotation)
+    }
+
     fun removeBookmark(b: Bookmark) {
         bookmarks.remove(b)
         dirty = true

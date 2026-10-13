@@ -1404,4 +1404,44 @@ class FunctionalTest {
         assertTrue(abs(vis.centerX() - page.bounds.centerX()) < 5f && abs(vis.centerY() - page.bounds.centerY()) < 5f)
         assertTrue("ocupa boa parte da tela", page.bounds.width() > vis.width() * 0.8f || page.bounds.height() > vis.height() * 0.8f)
     }
+
+    @Test
+    fun voltar_depois_do_sumario_restaura_posicao_e_zoom() {
+        twoDocs()
+        canvas.setViewRotation(12f)
+        canvas.goTo(Bookmark("", 500f, 400f, 0.37f))
+        val before = canvas.currentSpot()
+        assertEquals(View.GONE, editor.backPillForTests.visibility)
+        editor.showContents()
+        ShadowLooper.idleMainLooper()
+        clickInDialog("Slides.pptx")
+        clickInDialog("Página 2")
+        assertEquals(View.VISIBLE, editor.backPillForTests.visibility)
+        assertTrue("a tela mudou", abs(canvas.currentSpot().scale - before.scale) > 0.01f || abs(canvas.currentSpot().offsetX - before.offsetX) > 1f)
+        // Segundo pulo: o Voltar continua indo para antes do primeiro.
+        editor.showContents()
+        ShadowLooper.idleMainLooper()
+        clickInDialog("Aula 1.pdf")
+        clickInDialog("Página 3")
+        clickText("Voltar")
+        val after = canvas.currentSpot()
+        assertEquals(before.offsetX, after.offsetX, 0.01f)
+        assertEquals(before.offsetY, after.offsetY, 0.01f)
+        assertEquals(before.scale, after.scale, 0.0001f)
+        assertEquals(before.rotation, after.rotation, 0.01f)
+        assertEquals(View.GONE, editor.backPillForTests.visibility)
+    }
+
+    @Test
+    fun fechar_o_voltar_nao_mexe_na_tela() {
+        twoDocs()
+        editor.showContents()
+        ShadowLooper.idleMainLooper()
+        clickInDialog("Aula 1.pdf")
+        clickInDialog("Página 2")
+        val there = canvas.currentSpot()
+        findAll(editor.window.decorView).first { it.contentDescription?.toString() == "Fechar Voltar" }.performClick()
+        assertEquals(View.GONE, editor.backPillForTests.visibility)
+        assertEquals(there, canvas.currentSpot())
+    }
 }

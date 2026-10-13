@@ -233,6 +233,14 @@ class ScreenshotTest {
         Library.io.submit {}.get()
         Thread.sleep(200)
         save(withDialog(editor), "25-sumario-paginas")
+        editor.showContents()
+        ShadowLooper.idleMainLooper()
+        var w: View? = allViews(ShadowDialog.getLatestDialog()!!.window!!.decorView).first { it is android.widget.TextView && it.text.toString() == "Aula 2 – Glicólise.pdf" }
+        while (w != null && !w.hasOnClickListeners()) w = w.parent as? View
+        w!!.performClick()
+        ShadowLooper.idleMainLooper()
+        allViews(ShadowDialog.getLatestDialog()!!.window!!.decorView).first { it.contentDescription?.toString() == "Página 2" }.performClick()
+        save(snap(editor), "26-voltar-depois-do-sumario")
     }
 
     /** Slides de exemplo abertos pelo leitor offline de PowerPoint. */

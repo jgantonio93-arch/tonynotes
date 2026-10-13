@@ -91,6 +91,10 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     private lateinit var angleLabel: TextView
     private lateinit var viewPills: LinearLayout
     private lateinit var pastePill: TextView
+    private lateinit var backPill: LinearLayout
+    internal val backPillForTests get() = backPill
+    /** Onde a tela estava antes de pular pelo sumário. */
+    private var backSpot: InfiniteCanvasView.ViewSpot? = null
     private lateinit var ephemeralPill: TextView
     private lateinit var audioPill: TextView
     private var audioNotes: AudioNotes? = null
@@ -209,12 +213,41 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             Ui.run { softShadow(2f) }
             setOnClickListener { pasteClipboard() }
         }
+        backPill = horizontal().apply {
+            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = dpi(32f)
+            background = pill(Ui.ACCENT, 0)
+            Ui.run { softShadow(2f) }
+            visibility = View.GONE
+            addView(TextView(this@EditorActivity).apply {
+                text = "Voltar"
+                textSize = 12f
+                typeface = Ui.MEDIUM
+                setTextColor(Ui.ON_ACCENT)
+                gravity = Gravity.CENTER_VERTICAL
+                minHeight = dpi(32f)
+                setPadding(dpi(10f), 0, dpi(6f), 0)
+                setCompoundDrawablesRelativeWithIntrinsicBounds(icon(Icon.UNDO, Ui.ON_ACCENT, 15f), null, null, null)
+                compoundDrawablePadding = dpi(5f)
+                contentDescription = "Voltar para onde estava"
+                setOnClickListener { goBackSpot() }
+            })
+            addView(ImageView(this@EditorActivity).apply {
+                setImageDrawable(icon(Icon.CLOSE, Ui.ON_ACCENT, 13f))
+                setPadding(dpi(6f), dpi(8f), dpi(10f), dpi(8f))
+                contentDescription = "Fechar Voltar"
+                setOnClickListener { clearBackSpot() }
+            }, LinearLayout.LayoutParams(dpi(30f), dpi(32f)))
+        }
         viewPills = horizontal().apply {
             addView(zoomLabel)
             addView(angleLabel, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                 marginStart = dpi(8f)
             })
             addView(pastePill, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                marginStart = dpi(8f)
+            })
+            addView(backPill, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                 marginStart = dpi(8f)
             })
         }
@@ -1413,7 +1446,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
                     gravity = Gravity.CENTER_HORIZONTAL
                     setPadding(dpi(4f), dpi(6f), dpi(4f), dpi(4f))
                     background = ripple(rounded(Ui.FIELD, 14f), rounded(Color.WHITE, 14f))
-                    setOnClickListener { dialog.dismiss(); canvasView.goToPage(p) }
+                    setOnClickListener { dialog.dismiss(); jumpToPage(p) }
                     contentDescription = "Página ${p.pdfPage}"
                     layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
                         setMargins(dpi(4f), dpi(4f), dpi(4f), dpi(4f))
@@ -1440,6 +1473,23 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
                 if (back) secondaryButton("Voltar") { dialog.dismiss(); showContents() } else secondaryButton("Fechar") { dialog.dismiss() },
             ))
         }
+    }
+
+    /** Vai até a página e oferece voltar ao ponto de antes do primeiro pulo. */
+    private fun jumpToPage(p: ImageElement) {
+        if (backSpot == null) backSpot = canvasView.currentSpot()
+        canvasView.goToPage(p)
+        backPill.visibility = View.VISIBLE
+    }
+
+    internal fun goBackSpot() {
+        backSpot?.let { canvasView.restoreSpot(it) }
+        clearBackSpot()
+    }
+
+    internal fun clearBackSpot() {
+        backSpot = null
+        backPill.visibility = View.GONE
     }
 
     /** Miniatura da página, lida em segundo plano e reduzida. */

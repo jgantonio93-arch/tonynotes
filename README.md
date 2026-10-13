@@ -139,7 +139,8 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
 - **Páginas numeradas e sumário**: cada página de PDF/PowerPoint mostra "3 / 12" no canto
   (só na tela, não sai na exportação). O botão **Sumário** na barra de cima (aparece quando a
   nota tem documentos) lista os documentos com miniatura e abre a grade de páginas; tocar numa
-  página leva até ela.
+  página leva até ela. Depois do pulo aparece **Voltar** no canto de baixo, que devolve a tela
+  ao ponto de antes (mesma posição, zoom e ângulo).
 - **Exportar PDF anotado**: menu ⋮ gera um PDF com as mesmas páginas, no tamanho original,
   com tudo o que foi escrito por cima.
 - **Importar do Samsung Notes** (`SamsungNotesImporter.kt`): lê o arquivo `.sdocx`
