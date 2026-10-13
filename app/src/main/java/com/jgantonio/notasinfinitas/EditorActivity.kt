@@ -938,12 +938,20 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         // Área marcada com o laço/retângulo: print só do que está dentro dela.
         if (canvasView.hasRegion) row.addView(pillButton(Icon.CROP, "Print da área") { printRegion() })
         row.addView(pillButton(Icon.CARDS, if (pendingQuestion == null) "Criar cartão" else "Usar como resposta") { cardStep() })
+        // Área sobre um PDF: copiar o recorte (mesmo sem itens) ou a página inteira.
+        val pageUnder = canvasView.pdfPageUnderRegion()
+        if (items.isEmpty() && canvasView.regionTouchesImages) row.addView(pillButton(Icon.COPY, "Copiar") { copySelection(cut = false) })
+        if (pageUnder != null) row.addView(pillButton(Icon.COPY, "Copiar página inteira") { copyWholePage(pageUnder) })
         if (items.isEmpty()) {
             row.addView(pillButton(Icon.CLOSE, "Cancelar") { canvasView.clearSelection() })
             return
         }
-        row.addView(pillButton(Icon.COPY, "Copiar") { copySelection(cut = false) })
-        if (!canvasView.selectionLocked) row.addView(pillButton(Icon.COPY, "Recortar") { copySelection(cut = true) })
+        if (pdfOnlyTapped(items)) {
+            row.addView(pillButton(Icon.COPY, "Copiar página") { copyWholePage(img!!) })
+        } else {
+            row.addView(pillButton(Icon.COPY, "Copiar") { copySelection(cut = false) })
+            if (!canvasView.selectionLocked) row.addView(pillButton(Icon.COPY, "Recortar") { copySelection(cut = true) })
+        }
         // Página de PDF (travada ou não) tem as mesmas ferramentas da imagem; travada, ela só
         // não sai do lugar ao escrever por cima.
         val pdfPage = img != null && img.pdfPage > 0
@@ -1066,13 +1074,36 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
 
     // ---- Copiar, colar e print da área -------------------------------------------------
 
+    /** Só uma página de PDF selecionada por toque (sem área marcada). */
+    private fun pdfOnlyTapped(items: List<Element>) =
+        !canvasView.hasRegion && items.size == 1 && (items[0] as? ImageElement)?.pdfPage?.let { it > 0 } == true
+
+    /**
+     * Copia a seleção. Com uma área marcada sobre imagens ou PDF, vai junto o pedaço delas
+     * recortado pelo laço (por baixo), e a escrita continua editável por cima.
+     */
     private fun copySelection(cut: Boolean) {
         val items = canvasView.selectedItems
-        if (items.isEmpty()) return
-        Clipboard.copy(this, items, Library.assetsDir(note.id))
-        if (cut) canvasView.deleteSelection()
+        val piece = if (canvasView.hasRegion) canvasView.renderRegionImages() else null
+        if (items.isEmpty() && piece == null) return
+        // Imagens que entram no recorte não vão também inteiras.
+        val keep = if (piece != null) items.filter { it !is ImageElement } else items
+        Clipboard.copy(this, keep, Library.assetsDir(note.id), piece)
+        piece?.first?.recycle()
+        if (cut) {
+            canvasView.deleteSelectionWhere { piece == null || it !is ImageElement }
+        }
+        canvasView.clearSelection()
         updatePastePill()
         toast(if (cut) "Recortado. Toque em Colar (aqui ou em outra nota)." else "Copiado. Toque em Colar (aqui ou em outra nota).")
+    }
+
+    /** Página inteira do PDF (ou imagem), com a escrita que está em cima dela. */
+    private fun copyWholePage(page: ImageElement) {
+        Clipboard.copy(this, canvasView.elementsOnImage(page), Library.assetsDir(note.id))
+        canvasView.clearSelection()
+        updatePastePill()
+        toast("Página copiada. Toque em Colar (aqui ou em outra nota).")
     }
 
     private fun printRegion() {
@@ -1541,6 +1572,14 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         actionSheet("Folha ${i + 1}", listOfNotNull(
             if (i > 0) SheetItem(Icon.TO_FRONT, "Mover para cima") { canvasView.swapPages(i, i - 1); again() } else null,
             if (i < n - 1) SheetItem(Icon.TO_BACK, "Mover para baixo") { canvasView.swapPages(i, i + 1); again() } else null,
+            SheetItem(Icon.COPY, "Copiar folha (para colar aqui ou em outra nota)") {
+                val els = canvasView.elementsOnPage(i)
+                if (els.isEmpty()) toast("A folha está vazia.") else {
+                    Clipboard.copy(this, els, Library.assetsDir(note.id))
+                    updatePastePill()
+                    toast("Folha copiada. Toque em Colar.")
+                }
+            },
             SheetItem(Icon.COPY, "Duplicar") { canvasView.duplicatePage(i); again() },
             SheetItem(Icon.PLUS, "Inserir folha em branco depois") { canvasView.insertBlankPageAfter(i); again() },
             if (n > 1) SheetItem(Icon.TRASH, "Excluir folha", danger = true) {

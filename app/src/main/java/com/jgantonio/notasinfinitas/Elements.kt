@@ -491,7 +491,12 @@ class ImageElement(
         )
     }
 
-    override fun insideLasso(lasso: Lasso) = !locked && lasso.contains(centerX, centerY)
+    /** Só entra no laço inteira (os 4 cantos dentro): um laço sobre um pedaço da imagem não a pega toda. */
+    override fun insideLasso(lasso: Lasso): Boolean {
+        if (locked) return false
+        val c = corners()
+        return (0 until 4).all { lasso.contains(c[it * 2], c[it * 2 + 1]) }
+    }
 
     override fun touchesLasso(lasso: Lasso): Boolean {
         if (locked) return false

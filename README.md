@@ -150,6 +150,10 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
   zoom cola no centro da tela, na mesma nota ou em outra (vale para traços, textos, imagens e PDF).
 - **Print da área**: desenhe um laço ou retângulo com a seleção (mesmo sobre um PDF travado) e
   toque em **Print da área**: tudo o que aparece dentro do contorno vira uma imagem para colar.
+  Com uma área sobre um PDF ou imagem, **Copiar** leva só o pedaço recortado pelo contorno (por
+  baixo) e a escrita selecionada continua editável. **Copiar página** (tocando na página) e
+  **Copiar página inteira** (com a área) levam a página toda com o que está escrito nela; no painel
+  de Folhas há **Copiar folha**.
 - **Compartilhar e imprimir** (menu ⋮): manda a nota como PDF ou imagem para qualquer app e
   imprime pelo Android. O RosaNotes também **recebe PDFs** compartilhados de outros apps.
 - **Girar a tela**: a pílula de ângulo ao lado do zoom abre um controle de -180° a 180°

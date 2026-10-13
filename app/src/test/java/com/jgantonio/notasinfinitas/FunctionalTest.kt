@@ -1071,4 +1071,62 @@ class FunctionalTest {
         canvas.updateCard(c, c.with(2, 12345L))
         assertEquals(2, canvas.cards.single().box)
     }
+
+    private fun pdfPageForTests(): ImageElement {
+        val dir = Library.assetsDir(note.id).apply { mkdirs() }
+        Bitmap.createBitmap(90, 127, Bitmap.Config.ARGB_8888).also { b ->
+            b.eraseColor(Color.rgb(30, 120, 220))
+            File(dir, "pdf_t_p1.jpg").outputStream().use { b.compress(Bitmap.CompressFormat.JPEG, 95, it) }
+        }
+        val page = ImageElement("pdf_t_p1.jpg", RectF(0f, 0f, 900f, 1270f), shadow = true, locked = true, pdfPage = 1)
+        canvas.addPages(listOf(page))
+        return page
+    }
+
+    @Test
+    fun copiar_area_sobre_pdf_copia_so_o_pedaco_e_a_escrita_editavel() {
+        val page = pdfPageForTests()
+        val v = canvas.viewForTests
+        fun sx(x: Float) = x * v[2] + v[0]
+        fun sy(y: Float) = y * v[2] + v[1]
+        canvas.pen = PenSettings.default(BrushType.PEN, Color.BLACK)
+        drag(line(sx(200f), sy(300f), sx(700f), sy(300f)))
+        // Retângulo só na metade de cima da página.
+        canvas.tool = InfiniteCanvasView.Tool.SELECT
+        canvas.selectRect = true
+        drag(line(sx(100f), sy(150f), sx(800f), sy(500f)))
+        assertTrue(canvas.hasRegion)
+        assertTrue("a página não entra inteira", canvas.selectedItems.none { it is ImageElement })
+        assertEquals(1, canvas.selectedItems.count { it is StrokeElement })
+        assertTrue(canvas.regionTouchesImages)
+        val piece = canvas.renderRegionImages()!!
+        assertTrue("recorte do tamanho da área", piece.second.height() < page.rect.height() * 0.4f)
+        Clipboard.copy(app, canvas.selectedItems.filter { it !is ImageElement }, Library.assetsDir(note.id), piece)
+        val pasted = Clipboard.paste(app, Library.assetsDir(note.id))
+        assertEquals(2, pasted.size)
+        val img = pasted.filterIsInstance<ImageElement>().single()
+        assertEquals(piece.second.width(), img.rect.width(), 0.5f)
+        assertTrue("a escrita continua editável", pasted.any { it is StrokeElement })
+        assertEquals(page, canvas.pdfPageUnderRegion())
+    }
+
+    @Test
+    fun copiar_pagina_inteira_leva_a_escrita_de_cima() {
+        val page = pdfPageForTests()
+        val v = canvas.viewForTests
+        drag(line(200f * v[2] + v[0], 300f * v[2] + v[1], 700f * v[2] + v[0], 300f * v[2] + v[1]))
+        val all = canvas.elementsOnImage(items().filterIsInstance<ImageElement>().single())
+        assertEquals(2, all.size)
+        Clipboard.copy(app, all, Library.assetsDir(note.id))
+        val pasted = Clipboard.paste(app, Library.assetsDir(note.id))
+        val img = pasted.filterIsInstance<ImageElement>().single()
+        assertEquals(page.rect.width(), img.rect.width(), 0.5f)
+        assertTrue(!img.locked)
+        assertEquals(0, img.pdfPage)
+        assertEquals(1, pasted.count { it is StrokeElement })
+
+        // Folhas: copiar a folha leva o que está nela.
+        canvas.setPageLayout(true, false, false, false, 2)
+        assertTrue(canvas.elementsOnPage(0).isNotEmpty() || canvas.elementsOnPage(1).isNotEmpty())
+    }
 }

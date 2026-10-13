@@ -716,6 +716,48 @@ class InfiniteCanvasView(context: Context) : View(context) {
         return bmp
     }
 
+    /** Alguma imagem ou página de PDF cruza a área marcada? */
+    val regionTouchesImages: Boolean
+        get() {
+            val l = region ?: return false
+            return elements.any { it is ImageElement && RectF.intersects(it.bounds, l.bounds) && it.touchesLassoAny(l) }
+        }
+
+    private fun ImageElement.touchesLassoAny(l: Lasso): Boolean = with(locked = false).touchesLasso(l)
+
+    /**
+     * Só as imagens e páginas de PDF dentro da área marcada, recortadas pelo contorno do
+     * laço e com fundo transparente: o "pedaço do PDF" para copiar. Junto, o retângulo no mundo.
+     */
+    fun renderRegionImages(maxPx: Int = 3000): Pair<Bitmap, RectF>? {
+        val l = region ?: return null
+        if (!regionTouchesImages) return null
+        val b = RectF(l.bounds)
+        if (b.width() < 1f || b.height() < 1f) return null
+        val k = min(max(2f * scale, 1f), maxPx / max(b.width(), b.height()))
+        val bmp = Bitmap.createBitmap(max(1, kotlin.math.ceil(b.width() * k).toInt()), max(1, kotlin.math.ceil(b.height() * k).toInt()), Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        c.scale(k, k)
+        c.translate(-b.left, -b.top)
+        c.clipPath(l.path())
+        for (e in elements) if (e is ImageElement && RectF.intersects(e.bounds, b)) drawElement(c, e, k, sync = true)
+        return bmp to b
+    }
+
+    /** A página (imagem) e tudo o que está escrito em cima dela (pelo centro). */
+    fun elementsOnImage(img: ImageElement): List<Element> =
+        listOf(img) + elements.filter { it !== img && it !is ImageElement && img.contains(it.bounds.centerX(), it.bounds.centerY()) }
+
+    /** Página de PDF sob a área marcada (a maior que ela cruza). */
+    fun pdfPageUnderRegion(): ImageElement? {
+        val l = region ?: return null
+        return elements.filterIsInstance<ImageElement>().filter { it.pdfPage > 0 && RectF.intersects(it.bounds, l.bounds) }
+            .maxByOrNull { r -> RectF().let { if (it.setIntersect(r.bounds, l.bounds)) it.width() * it.height() else 0f } }
+    }
+
+    /** Tudo o que está na folha [i] (pelo centro). */
+    fun elementsOnPage(i: Int): List<Element> = if (!pageLayout.hasPages) emptyList() else elements.filter { pageOf(it) == i }
+
     /** Cola [items] no centro da tela (um passo de desfazer) e deixa-os selecionados. */
     fun pasteElements(items: List<Element>) {
         if (items.isEmpty()) return
@@ -777,6 +819,16 @@ class InfiniteCanvasView(context: Context) : View(context) {
         begin()
         for (i in elements.indices.reversed()) if (elements[i] in selectionSet) removeAt(i)
         insertAt(elements.size, e)
+        commit()
+        clearSelection()
+    }
+
+    /** Apaga só os itens selecionados que satisfazem [keep] (ex.: a escrita, sem o PDF). */
+    fun deleteSelectionWhere(which: (Element) -> Boolean) {
+        val del = selection.filter(which).toSet()
+        if (del.isEmpty()) return
+        begin()
+        for (i in elements.indices.reversed()) if (elements[i] in del) removeAt(i)
         commit()
         clearSelection()
     }

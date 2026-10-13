@@ -17,9 +17,12 @@ object Clipboard {
 
     fun hasContent(c: Context) = file(c).exists()
 
-    /** Copia [items]; as imagens são lidas de [assetDir] (a pasta da nota de origem). */
-    fun copy(c: Context, items: List<Element>, assetDir: File?) {
-        if (items.isEmpty()) return
+    /**
+     * Copia [items]; as imagens são lidas de [assetDir] (a pasta da nota de origem).
+     * [piece] é um pedaço recortado (de um PDF ou imagem) que vai por baixo, no retângulo dado.
+     */
+    fun copy(c: Context, items: List<Element>, assetDir: File?, piece: Pair<Bitmap, RectF>? = null) {
+        if (items.isEmpty() && piece == null) return
         val d = dir(c)
         d.deleteRecursively()
         d.mkdirs()
@@ -27,8 +30,14 @@ object Clipboard {
             val src = assetDir?.let { File(it, img.file) } ?: continue
             if (src.exists()) src.copyTo(File(d, img.file), overwrite = true)
         }
-        val unlocked = items.map { if (it is ImageElement && it.locked) it.with(locked = false) else it }
-        NoteStorage.save(file(c), NoteData(unlocked, null))
+        // A cópia vira imagem comum: destravada e fora das "páginas do PDF" da nota de destino.
+        val copied = items.map { if (it is ImageElement) it.with(locked = false, pdfPage = 0) else it }
+        val all = if (piece == null) copied else {
+            val name = "recorte_${UUID.randomUUID().toString().take(8)}.png"
+            FileOutputStream(File(d, name)).use { piece.first.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            listOf(ImageElement(name, RectF(piece.second))) + copied
+        }
+        NoteStorage.save(file(c), NoteData(all, null))
     }
 
     /** Print de uma área: a imagem [bmp] ocupando [w]×[h] no mundo. */
