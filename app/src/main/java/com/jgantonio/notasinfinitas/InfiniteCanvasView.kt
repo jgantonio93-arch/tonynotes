@@ -680,13 +680,20 @@ class InfiniteCanvasView(context: Context) : View(context) {
         canvas.save()
         canvas.translate(rulerCx, rulerCy)
         canvas.rotate(rulerAngle)
+        val body = Path().apply { addRoundRect(-l / 2f, -w / 2f, l / 2f, w / 2f, 8f * density, 8f * density, Path.Direction.CW) }
+        // Sombra suave, corpo translúcido (dá para ver a nota por baixo) e borda.
         rulerFill.style = Paint.Style.FILL
-        rulerFill.color = if (Ui.isDark) Color.argb(205, 44, 42, 38) else Color.argb(215, 255, 255, 255)
-        canvas.drawRoundRect(-l / 2f, -w / 2f, l / 2f, w / 2f, 8f * density, 8f * density, rulerFill)
+        rulerFill.color = Color.argb(28, 0, 0, 0)
+        canvas.save()
+        canvas.translate(0f, 2f * density)
+        canvas.drawPath(body, rulerFill)
+        canvas.restore()
+        rulerFill.color = if (Ui.isDark) Color.argb(215, 52, 50, 46) else Color.argb(200, 226, 232, 240)
+        canvas.drawPath(body, rulerFill)
         rulerFill.style = Paint.Style.STROKE
-        rulerFill.strokeWidth = 1f * density
-        rulerFill.color = Ui.MUTED
-        canvas.drawRoundRect(-l / 2f, -w / 2f, l / 2f, w / 2f, 8f * density, 8f * density, rulerFill)
+        rulerFill.strokeWidth = 1.5f * density
+        rulerFill.color = if (Ui.isDark) Color.argb(200, 160, 155, 145) else Color.argb(200, 120, 130, 145)
+        canvas.drawPath(body, rulerFill)
         // Marcas de milímetro (tamanho real da tela), centímetros mais longos e numerados.
         val mm = resources.displayMetrics.xdpi / 25.4f
         rulerTick.color = Ui.INK
