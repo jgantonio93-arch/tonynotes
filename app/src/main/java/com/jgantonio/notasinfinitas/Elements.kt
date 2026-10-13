@@ -552,6 +552,52 @@ class FillElement(
         insideLasso(lasso) || lasso.crosses(xs, ys, n, closed = true) || (0 until n).any { lasso.contains(xs[it], ys[it]) }
 }
 
+/**
+ * Fita para esconder (como no GoodNotes): uma faixa reta e opaca por cima do que se quer
+ * estudar. Tocar nela revela ([revealed]: só um contorno) e tocar de novo esconde.
+ */
+class TapeElement(
+    val x0: Float, val y0: Float, val x1: Float, val y1: Float,
+    val width: Float,
+    val color: Int,
+    val revealed: Boolean = false,
+) : Element() {
+    override val bounds: RectF = RectF(
+        kotlin.math.min(x0, x1) - width / 2f, kotlin.math.min(y0, y1) - width / 2f,
+        kotlin.math.max(x0, x1) + width / 2f, kotlin.math.max(y0, y1) + width / 2f,
+    )
+
+    fun contains(px: Float, py: Float) = Geometry.segmentDist(px, py, x0, y0, x1, y1) <= width / 2f
+
+    fun toggled() = TapeElement(x0, y0, x1, y1, width, color, !revealed)
+    fun withRevealed(r: Boolean) = TapeElement(x0, y0, x1, y1, width, color, r)
+    fun withColor(c: Int) = TapeElement(x0, y0, x1, y1, width, c, revealed)
+
+    override fun transformed(t: Transform) =
+        TapeElement(t.x(x0, y0), t.y(x0, y0), t.x(x1, y1), t.y(x1, y1), width * t.scale, color, revealed)
+
+    override fun insideLasso(lasso: Lasso) = lasso.contains((x0 + x1) / 2f, (y0 + y1) / 2f)
+
+    override fun touchesLasso(lasso: Lasso) = insideLasso(lasso) || lasso.contains(x0, y0) || lasso.contains(x1, y1) ||
+        lasso.crosses(floatArrayOf(x0, x1), floatArrayOf(y0, y1), 2, closed = false)
+}
+
+/** Marcador: um título e o ponto da nota (centro da tela e zoom) para voltar até ele. */
+class Bookmark(val title: String, val x: Float, val y: Float, val scale: Float)
+
+/**
+ * Cartão de estudo: a pergunta e a resposta são áreas da própria nota (desenhadas na hora
+ * da revisão). [box] é a caixa de Leitner e [due] quando o cartão volta a aparecer.
+ */
+class Flashcard(val question: RectF, val answer: RectF, val box: Int = 0, val due: Long = 0L) {
+    fun with(box: Int, due: Long) = Flashcard(question, answer, box, due)
+
+    companion object {
+        /** Dias até a próxima revisão em cada caixa. */
+        val INTERVAL_DAYS = intArrayOf(0, 1, 3, 7, 14, 30)
+    }
+}
+
 class Lasso(private val xs: FloatArray, private val ys: FloatArray) {
     companion object {
         /** Retângulo de seleção entre dois cantos. */

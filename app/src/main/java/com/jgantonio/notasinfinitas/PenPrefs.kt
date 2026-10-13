@@ -60,6 +60,15 @@ class PenPrefs(context: Context) {
         get() = sp.getBoolean("select_rect", false)
         set(v) = sp.edit().putBoolean("select_rect", v).apply()
 
+    /** Fita para esconder: cor e largura (dp). */
+    var tapeColor: Int
+        get() = sp.getInt("tape_color", TAPE_COLORS[0])
+        set(v) = sp.edit().putInt("tape_color", v).apply()
+
+    var tapeWidth: Float
+        get() = sp.getFloat("tape_width", 26f)
+        set(v) = sp.edit().putFloat("tape_width", v).apply()
+
     var selectPartial: Boolean
         get() = sp.getBoolean("select_partial", false)
         set(v) = sp.edit().putBoolean("select_partial", v).apply()
@@ -118,6 +127,8 @@ class PenPrefs(context: Context) {
 
     companion object {
         const val MAX_FAVORITES = 10
+        val TAPE_COLORS = listOf("#F4A3B4", "#F9C784", "#FFE680", "#A8DDB5", "#9CC9F0", "#C3B1E1", "#B8B3AA")
+            .map(android.graphics.Color::parseColor)
         const val MAX_CUSTOM = 12
 
         val INK_TYPES = BrushType.entries.filter { it != BrushType.HIGHLIGHTER }

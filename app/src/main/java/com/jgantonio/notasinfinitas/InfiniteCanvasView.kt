@@ -37,7 +37,7 @@ import kotlin.math.sqrt
  */
 class InfiniteCanvasView(context: Context) : View(context) {
 
-    enum class Tool { PEN, ERASER, SELECT, TEXT }
+    enum class Tool { PEN, ERASER, SELECT, TEXT, TAPE }
 
     /** Formatos do modo de recorte. */
     enum class CropShape { RECT, SQUARE, WIDE, ELLIPSE, LASSO }
@@ -49,7 +49,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
         fun onCropModeChanged(active: Boolean)
     }
 
-    private enum class Gesture { NONE, DRAW, ERASE, NAVIGATE, LASSO, MOVE_SEL, SCALE_SEL, ROTATE_SEL, TAP_TEXT, CROP }
+    private enum class Gesture { NONE, DRAW, ERASE, NAVIGATE, LASSO, MOVE_SEL, SCALE_SEL, ROTATE_SEL, TAP_TEXT, CROP, TAPE }
 
     // ---- Configuração ------------------------------------------------------
 
@@ -439,6 +439,102 @@ class InfiniteCanvasView(context: Context) : View(context) {
 
     // ---- Seleção -----------------------------------------------------------
 
+    // ---- Fita, marcadores e cartões ------------------------------------------------------
+
+    var tapeColor = Color.parseColor("#F4A3B4")
+    /** Largura da fita na tela (dp). */
+    var tapeWidthDp = 26f
+    private var tapeX0 = 0f
+    private var tapeY0 = 0f
+    private var tapeX1 = 0f
+    private var tapeY1 = 0f
+
+    /** Revela/esconde a fita no ponto do mundo; false se não houver fita ali. */
+    fun toggleTapeAt(px: Float, py: Float): Boolean {
+        val i = elements.indexOfLast { it is TapeElement && it.contains(px, py) }
+        if (i < 0) return false
+        val t = elements[i] as TapeElement
+        replaceAll(listOf(t to t.toggled()))
+        return true
+    }
+
+    val tapeCount get() = elements.count { it is TapeElement }
+    val hiddenTapeCount get() = elements.count { it is TapeElement && !it.revealed }
+
+    fun setAllTapes(revealed: Boolean) {
+        val pairs = elements.filterIsInstance<TapeElement>().filter { it.revealed != revealed }.map { it to it.withRevealed(revealed) }
+        if (pairs.isNotEmpty()) replaceAll(pairs)
+    }
+
+    val bookmarks = ArrayList<Bookmark>()
+    val cards = ArrayList<Flashcard>()
+
+    /** Marca o ponto que está no centro da tela, com o zoom atual. */
+    fun addBookmark(title: String) {
+        bookmarks.add(Bookmark(title, wx(width / 2f), wy(height / 2f), scale))
+        dirty = true
+        listener?.onStateChanged()
+    }
+
+    fun goTo(b: Bookmark) {
+        scale = b.scale.coerceIn(MIN_SCALE, MAX_SCALE)
+        offsetX = width / 2f - b.x * scale
+        offsetY = height / 2f - b.y * scale
+        invalidate()
+        listener?.onStateChanged()
+    }
+
+    fun removeBookmark(b: Bookmark) {
+        bookmarks.remove(b)
+        dirty = true
+    }
+
+    fun renameBookmark(b: Bookmark, title: String) {
+        val i = bookmarks.indexOf(b)
+        if (i >= 0) bookmarks[i] = Bookmark(title, b.x, b.y, b.scale)
+        dirty = true
+    }
+
+    fun addCard(question: RectF, answer: RectF) {
+        cards.add(Flashcard(RectF(question), RectF(answer), 0, 0L))
+        dirty = true
+    }
+
+    fun updateCard(old: Flashcard, new: Flashcard) {
+        val i = cards.indexOf(old)
+        if (i >= 0) cards[i] = new
+        dirty = true
+    }
+
+    fun removeCard(c: Flashcard) {
+        cards.remove(c)
+        dirty = true
+    }
+
+    /** Área da seleção (ou da área marcada) no mundo, com uma folga. */
+    fun selectionArea(): RectF? {
+        val r = region?.bounds?.let { RectF(it) } ?: run {
+            if (selection.isEmpty()) return null
+            RectF(selection[0].bounds).also { b -> selection.forEach { b.union(it.bounds) } }
+        }
+        val pad = 8f * density / scale
+        r.inset(-pad, -pad)
+        return r
+    }
+
+    /** Desenha a área [r] do mundo num bitmap (papel por baixo), com até [maxPx] px no lado maior. */
+    fun renderArea(r: RectF, maxPx: Int): Bitmap? {
+        if (r.width() < 1f || r.height() < 1f) return null
+        val k = maxPx / max(r.width(), r.height())
+        val bmp = Bitmap.createBitmap(max(1, (r.width() * k).toInt()), max(1, (r.height() * k).toInt()), Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        c.drawColor(paperColor)
+        c.scale(k, k)
+        c.translate(-r.left, -r.top)
+        drawContent(c, r, k)
+        return bmp
+    }
+
     // ---- Conta-gotas e balde ----------------------------------------------------------
 
     enum class PickMode { EYEDROPPER, BUCKET }
@@ -714,6 +810,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
                 is TextElement -> it.withColor(color)
                 is ImageElement -> it.with(borderColor = color, borderWidth = if (it.borderWidth > 0f) it.borderWidth else 6f)
                 is FillElement -> it.withColor(color)
+                is TapeElement -> it.withColor(color)
             }
         }
         replaceAll(pairs)
@@ -1137,7 +1234,8 @@ class InfiniteCanvasView(context: Context) : View(context) {
         return hs[hs.size / 2]
     }
 
-    fun snapshot() = NoteData(ArrayList(elements), ViewState(offsetX, offsetY, scale, viewRotation), pageStyle, paperColor, pageLayout)
+    fun snapshot() = NoteData(ArrayList(elements), ViewState(offsetX, offsetY, scale, viewRotation), pageStyle, paperColor, pageLayout,
+        ArrayList(bookmarks), ArrayList(cards))
 
     fun markSaved() {
         dirty = false
@@ -1146,6 +1244,10 @@ class InfiniteCanvasView(context: Context) : View(context) {
     fun load(note: NoteData) {
         elements.clear()
         elements.addAll(note.elements)
+        bookmarks.clear()
+        bookmarks.addAll(note.bookmarks)
+        cards.clear()
+        cards.addAll(note.cards)
         undoStack.clear()
         redoStack.clear()
         note.viewState?.let {
@@ -1371,11 +1473,13 @@ class InfiniteCanvasView(context: Context) : View(context) {
             if (i == size) beforeInk()
             for (j in start until i) {
                 val e = list[j]
-                if (!(e is StrokeElement && e.type == BrushType.HIGHLIGHTER) && e !is FillElement) action(e)
+                if (!(e is StrokeElement && e.type == BrushType.HIGHLIGHTER) && e !is FillElement && e !is TapeElement) action(e)
             }
             if (i < size) action(list[i])
             start = i + 1
         }
+        // Fitas sempre por cima de tudo.
+        for (e in list) if (e is TapeElement) action(e)
     }
 
     fun drawContent(canvas: Canvas, clip: RectF?, renderScale: Float = 1f) {
@@ -1486,6 +1590,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
             tool == Tool.PEN -> Gesture.DRAW
             tool == Tool.ERASER -> Gesture.ERASE
             tool == Tool.TEXT -> Gesture.TAP_TEXT
+            tool == Tool.TAPE -> Gesture.TAPE
             else -> selGesture ?: Gesture.LASSO
         }
         when (gesture) {
@@ -1512,6 +1617,9 @@ class InfiniteCanvasView(context: Context) : View(context) {
                 begin()
                 lastEraseWX = Float.NaN
                 eraseAt(x, y)
+            }
+            Gesture.TAPE -> {
+                tapeX0 = wx(x); tapeY0 = wy(y); tapeX1 = tapeX0; tapeY1 = tapeY0
             }
             Gesture.LASSO -> {
                 lassoXs.clear(); lassoYs.clear()
@@ -1670,6 +1778,13 @@ class InfiniteCanvasView(context: Context) : View(context) {
                 for (h in 0 until e.historySize) eraseAt(e.getHistoricalX(idx, h), e.getHistoricalY(idx, h))
                 eraseAt(x, y)
             }
+            Gesture.TAPE -> {
+                tapeX1 = wx(x); tapeY1 = wy(y)
+                // Quase na horizontal ou vertical: fica reta.
+                if (abs(tapeY1 - tapeY0) < abs(tapeX1 - tapeX0) * 0.105f) tapeY1 = tapeY0
+                else if (abs(tapeX1 - tapeX0) < abs(tapeY1 - tapeY0) * 0.105f) tapeX1 = tapeX0
+                invalidate()
+            }
             Gesture.LASSO -> {
                 if (selectRect) {
                     lassoPath.rewind()
@@ -1754,6 +1869,9 @@ class InfiniteCanvasView(context: Context) : View(context) {
                     // Não entra na nota: some sozinho (o laser rápido, a tinta depois de um tempo).
                     fading.add(Fading(b.build(), SystemClock.uptimeMillis(), if (mode == Ephemeral.LASER) LASER_LIFE else VANISH_LIFE))
                     invalidate()
+                } else if (b != null && b.n > 0 && tapped && toggleTapeAt(wx(downX), wy(downY))) {
+                    // Toque de caneta numa fita: revela/esconde (não deixa ponto).
+                    invalidate()
                 } else if (b != null && b.n > 0) {
                     var stroke = b.build()
                     if (autoShapes) {
@@ -1802,6 +1920,15 @@ class InfiniteCanvasView(context: Context) : View(context) {
                     commitSelectionTransform()
                 }
             }
+            Gesture.TAPE -> {
+                if (tapped) toggleTapeAt(wx(downX), wy(downY))
+                else if (hypot(tapeX1 - tapeX0, tapeY1 - tapeY0) > 4f * density / scale) {
+                    begin()
+                    insertAt(elements.size, TapeElement(tapeX0, tapeY0, tapeX1, tapeY1, tapeWidthDp * density / scale, tapeColor))
+                    commit()
+                }
+                invalidate()
+            }
             Gesture.TAP_TEXT -> {
                 if (tapped) {
                     val px = wx(downX)
@@ -1828,6 +1955,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
                 is TextElement -> e.contains(px, py)
                 is StrokeElement -> e.hits(px, py, r)
                 is FillElement -> e.contains(px, py)
+                is TapeElement -> e.contains(px, py)
             }
             if (hit) return e
         }
@@ -1926,8 +2054,8 @@ class InfiniteCanvasView(context: Context) : View(context) {
     private fun eraseWorld(px: Float, py: Float, r: Float) {
         var i = elements.size - 1
         while (i >= 0) {
-            val f = elements[i] as? FillElement
-            if (f != null && !eraserHighlighterOnly && f.contains(px, py)) {
+            val f = elements[i]
+            if (!eraserHighlighterOnly && ((f is FillElement && f.contains(px, py)) || (f is TapeElement && f.contains(px, py)))) {
                 removeAt(i)
                 dirty = true
                 i--
@@ -2062,6 +2190,9 @@ class InfiniteCanvasView(context: Context) : View(context) {
             }
         }
         if (fading.isNotEmpty()) drawFading(canvas)
+        if (gesture == Gesture.TAPE && (tapeX1 != tapeX0 || tapeY1 != tapeY0)) {
+            drawTape(canvas, TapeElement(tapeX0, tapeY0, tapeX1, tapeY1, tapeWidthDp * density / scale, tapeColor))
+        }
         if (liveInk == null && !wetActive && liveHighlighter == null) builder?.let { StrokeRenderer.drawBuilder(canvas, it, predXs, predYs, predN) }
         if (crop != null) drawCrop(canvas, crop)
         canvas.restore()
@@ -2211,11 +2342,55 @@ class InfiniteCanvasView(context: Context) : View(context) {
                 fillPaint.colorFilter = if (StrokeRenderer.night) Night.filter else null
                 canvas.drawPath(e.path, fillPaint)
             }
+            is TapeElement -> drawTape(canvas, e)
         }
     }
 
     private val textBg = Paint(Paint.ANTI_ALIAS_FLAG)
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val tapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.BUTT }
+    private val tapeEdge = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+
+    /** Fita escondida: faixa opaca. Revelada: só um véu e um contorno tracejado (não sai nas exportações). */
+    private fun drawTape(canvas: Canvas, e: TapeElement) {
+        val dx = e.x1 - e.x0
+        val dy = e.y1 - e.y0
+        val len = max(0.001f, hypot(dx, dy))
+        val nx = -dy / len * e.width / 2f
+        val ny = dx / len * e.width / 2f
+        val outline = Path().apply {
+            moveTo(e.x0 + nx, e.y0 + ny); lineTo(e.x1 + nx, e.y1 + ny)
+            lineTo(e.x1 - nx, e.y1 - ny); lineTo(e.x0 - nx, e.y0 - ny); close()
+        }
+        if (e.revealed) {
+            if (exporting) return
+            fillPaint.color = e.color or (0xFF shl 24)
+            fillPaint.alpha = 34
+            fillPaint.colorFilter = null
+            canvas.drawPath(outline, fillPaint)
+            tapeEdge.color = e.color or (0xFF shl 24)
+            tapeEdge.strokeWidth = 1.5f * density / scale
+            tapeEdge.pathEffect = DashPathEffect(floatArrayOf(6f * density / scale, 4f * density / scale), 0f)
+            canvas.drawPath(outline, tapeEdge)
+        } else {
+            fillPaint.color = e.color or (0xFF shl 24)
+            fillPaint.alpha = 255
+            fillPaint.colorFilter = null
+            canvas.drawPath(outline, fillPaint)
+            // Listras finas, como fita de papel.
+            tapeEdge.pathEffect = null
+            tapeEdge.strokeWidth = e.width * 0.04f
+            tapeEdge.color = Color.argb(40, 255, 255, 255)
+            val step = e.width * 0.5f
+            var d = step / 2f
+            while (d < len) {
+                val cx = e.x0 + dx / len * d
+                val cy = e.y0 + dy / len * d
+                canvas.drawLine(cx + nx * 0.8f, cy + ny * 0.8f, cx - nx * 0.8f, cy - ny * 0.8f, tapeEdge)
+                d += step
+            }
+        }
+    }
 
     private fun drawText(canvas: Canvas, e: TextElement) {
         canvas.save()

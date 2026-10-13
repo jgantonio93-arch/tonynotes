@@ -409,6 +409,45 @@ class DockTray(context: Context, current: String, onPick: (String) -> Unit) : Li
     }
 }
 
+/** Fita para esconder: cor e largura. */
+@SuppressLint("ViewConstructor")
+class TapeTray(context: Context, prefs: PenPrefs, onChange: () -> Unit) : LinearLayout(context) {
+    init {
+        orientation = VERTICAL
+        shadowRoom()
+        val c = context
+        val card = c.trayCard()
+        addView(card, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        card.addView(Ui.run { c.title("Fita para esconder", 17f) }.apply { setPadding(0, 0, 0, c.dpi(6f)) })
+        card.addView(c.label("Arraste para cobrir o que quer estudar. Toque na fita (com qualquer ferramenta) para revelar e esconder.", 13f).apply {
+            setPadding(c.dpi(2f), 0, 0, c.dpi(10f))
+            setLineSpacing(0f, 1.1f)
+        })
+        val dots = ArrayList<View>()
+        lateinit var refresh: () -> Unit
+        for (col in PenPrefs.TAPE_COLORS) {
+            dots.add(ColorDot(c, col, col == prefs.tapeColor) {
+                prefs.tapeColor = col
+                refresh()
+                onChange()
+            }.withSize(c, 38f))
+        }
+        refresh = { dots.forEach { (it as ColorDot).checked = it.color == prefs.tapeColor } }
+        card.addView(c.wrapRow(dots, 7))
+        val value = c.label("${prefs.tapeWidth.toInt()}", 14f, Ui.INK, bold = true)
+        val row = c.horizontal().apply { setPadding(0, c.dpi(12f), 0, 0) }
+        row.addView(c.label("Largura", 13f), LayoutParams(c.dpi(92f), ViewGroup.LayoutParams.WRAP_CONTENT))
+        row.addView(SizeSlider(c, 12f, 64f, prefs.tapeWidth) { v ->
+            prefs.tapeWidth = Math.round(v).toFloat()
+            value.text = "${prefs.tapeWidth.toInt()}"
+            onChange()
+        }, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        value.gravity = Gravity.END
+        row.addView(value, LayoutParams(c.dpi(42f), ViewGroup.LayoutParams.WRAP_CONTENT))
+        card.addView(row)
+    }
+}
+
 fun <T : View> T.withSize(c: Context, sizeDp: Float, marginDp: Float = 2f): T {
     layoutParams = LinearLayout.LayoutParams(c.dpi(sizeDp), c.dpi(sizeDp)).apply {
         val m = c.dpi(marginDp)

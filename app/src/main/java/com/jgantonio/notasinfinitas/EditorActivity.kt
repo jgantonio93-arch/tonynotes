@@ -360,6 +360,8 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         canvasView.lowLatency = prefs.lowLatency
         canvasView.selectRect = prefs.selectRect
         canvasView.selectPartial = prefs.selectPartial
+        canvasView.tapeColor = prefs.tapeColor
+        canvasView.tapeWidthDp = prefs.tapeWidth
     }
 
     /** Pede a maior taxa de atualização da tela (ex.: 120 Hz): a tinta acompanha a caneta mais de perto. */
@@ -534,6 +536,9 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             if (canvasView.tool == InfiniteCanvasView.Tool.SELECT) toggleTray("select") else setTool(InfiniteCanvasView.Tool.SELECT)
         }
         toolButtons[InfiniteCanvasView.Tool.TEXT] = toolButton(icon(Icon.TEXT), "Texto") { setTool(InfiniteCanvasView.Tool.TEXT) }
+        toolButtons[InfiniteCanvasView.Tool.TAPE] = toolButton(icon(Icon.TAPE), "Fita para esconder") {
+            if (canvasView.tool == InfiniteCanvasView.Tool.TAPE) toggleTray("tape") else setTool(InfiniteCanvasView.Tool.TAPE)
+        }
         toolsInDock.clear()
         toolsInDock.addAll(toolButtons.values)
         toolsInDock.add(1, highlighterButton)
@@ -845,6 +850,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
                 closeTray()
                 layoutDock(animateFrom = dock.left.toFloat() to dock.top.toFloat())
             }
+            "tape" -> TapeTray(this, prefs) { applyPrefs() }
             "select" -> SelectTray(this, prefs) {
                 applyPrefs()
                 refresh()
@@ -931,6 +937,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         })
         // Área marcada com o laço/retângulo: print só do que está dentro dela.
         if (canvasView.hasRegion) row.addView(pillButton(Icon.CROP, "Print da área") { printRegion() })
+        row.addView(pillButton(Icon.CARDS, if (pendingQuestion == null) "Criar cartão" else "Usar como resposta") { cardStep() })
         if (items.isEmpty()) {
             row.addView(pillButton(Icon.CLOSE, "Cancelar") { canvasView.clearSelection() })
             return
@@ -1220,6 +1227,8 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             val tiles = mutableListOf(
                 menuTile(Icon.PAGE, "Página", act { Panels.showPage(this, canvasView, prefs) { onStateChanged() } }),
                 menuTile(Icon.PAGES_V, "Folhas", act { showPageManager() }),
+                menuTile(Icon.BOOKMARK, "Marcadores", act { showBookmarks() }),
+                menuTile(Icon.CARDS, if (dueCards() > 0) "Revisar (${dueCards()})" else "Cartões", act { showCards() }),
                 menuTile(if (Ui.isDark) Icon.MOON else Icon.SUN, "Tema", act { Ui.showThemeMenu(this) }),
                 menuTile(Icon.TOUCH, "Laser", act { setEphemeral(InfiniteCanvasView.Ephemeral.LASER) }),
                 menuTile(Icon.EDIT, "Tinta que some", act { setEphemeral(InfiniteCanvasView.Ephemeral.VANISH) }),
@@ -1227,6 +1236,10 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
                 else menuTile(Icon.MIC, "Gravar áudio", act { startRecording() }),
             )
             if (audio.recordings.isNotEmpty()) tiles.add(menuTile(Icon.MIC, "Áudios (${audio.recordings.size})", act { showRecordings() }))
+            if (canvasView.tapeCount > 0) {
+                val hide = canvasView.hiddenTapeCount == 0
+                tiles.add(menuTile(Icon.TAPE, if (hide) "Esconder fitas" else "Mostrar fitas", act { canvasView.setAllTapes(revealed = !hide); refresh() }))
+            }
             // Completa a última fileira com espaços do mesmo tamanho (os cartões não esticam).
             while (tiles.size % 3 != 0) tiles.add(View(this).apply {
                 layoutParams = LinearLayout.LayoutParams(0, 1, 1f).apply { setMargins(dpi(4f), dpi(4f), dpi(4f), dpi(4f)) }
@@ -1301,6 +1314,172 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         addView(ImageView(this@EditorActivity).apply { setImageDrawable(icon(ic, Ui.INK, 22f)) },
             LinearLayout.LayoutParams(dpi(24f), dpi(24f)).apply { marginEnd = dpi(16f) })
         addView(label(text, 15.5f, Ui.INK))
+    }
+
+    // ---- Marcadores -----------------------------------------------------------------------
+
+    private fun showBookmarks() {
+        sheet("Marcadores") { box, dialog ->
+            if (canvasView.bookmarks.isEmpty()) {
+                box.addView(label("Marque partes importantes da nota (por exemplo, “Aula 3 – Cardio”) para voltar a elas com um toque.", 14f).apply {
+                    setPadding(0, 0, 0, dpi(8f))
+                })
+            }
+            for (b in canvasView.bookmarks.toList()) {
+                val row = horizontal().apply {
+                    minimumHeight = dpi(50f)
+                    setPadding(dpi(8f), 0, 0, 0)
+                    background = ripple(null, rounded(Color.WHITE, 14f))
+                    setOnClickListener { dialog.dismiss(); canvasView.goTo(b) }
+                }
+                row.addView(ImageView(this).apply { setImageDrawable(icon(Icon.BOOKMARK, Ui.ACCENT, 22f)) },
+                    LinearLayout.LayoutParams(dpi(24f), dpi(24f)).apply { marginEnd = dpi(14f) })
+                row.addView(label(b.title, 15.5f, Ui.INK), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                row.addView(iconButton(Icon.EDIT, Ui.MUTED, 38f, "Renomear") {
+                    dialog.dismiss()
+                    promptText("Renomear marcador", b.title) { t -> if (t.isNotBlank()) canvasView.renameBookmark(b, t); showBookmarks() }
+                })
+                row.addView(iconButton(Icon.TRASH, Ui.MUTED, 38f, "Excluir") {
+                    canvasView.removeBookmark(b)
+                    dialog.dismiss()
+                    showBookmarks()
+                })
+                box.addView(row)
+            }
+            box.addView(buttonRow(
+                secondaryButton("Fechar") { dialog.dismiss() },
+                primaryButton("Marcar aqui") {
+                    dialog.dismiss()
+                    promptText("Novo marcador", "", "Ex.: Aula 3 – Cardio", "Marcar") { t ->
+                        canvasView.addBookmark(t.ifBlank { "Marcador ${canvasView.bookmarks.size + 1}" })
+                        toast("Marcador criado.")
+                    }
+                },
+            ))
+        }
+    }
+
+    // ---- Cartões de estudo (flashcards) ------------------------------------------------
+
+    /** Área da pergunta escolhida, esperando a resposta. */
+    private var pendingQuestion: RectF? = null
+
+    private fun dueCards(): Int {
+        val now = System.currentTimeMillis()
+        return canvasView.cards.count { it.due <= now }
+    }
+
+    private fun cardStep() {
+        val area = canvasView.selectionArea() ?: return
+        val q = pendingQuestion
+        if (q == null) {
+            pendingQuestion = area
+            canvasView.clearSelection()
+            toast("Pergunta marcada. Agora selecione a resposta e toque em “Usar como resposta”.")
+        } else {
+            canvasView.addCard(q, area)
+            pendingQuestion = null
+            canvasView.clearSelection()
+            toast("Cartão criado (${canvasView.cards.size} na nota).")
+        }
+        refresh()
+    }
+
+    private fun cardImage(r: RectF): View = ImageView(this).apply {
+        adjustViewBounds = true
+        scaleType = ImageView.ScaleType.FIT_CENTER
+        maxHeight = (resources.displayMetrics.heightPixels * 0.32f).toInt()
+        canvasView.renderArea(r, 1200)?.let { setImageBitmap(it) }
+        background = rounded(Color.WHITE, 12f, Ui.LINE, 1f)
+        setPadding(dpi(6f), dpi(6f), dpi(6f), dpi(6f))
+    }
+
+    private fun showCards() {
+        val cards = canvasView.cards.toList()
+        val due = dueCards()
+        sheet("Cartões de estudo") { box, dialog ->
+            box.addView(label(when {
+                cards.isEmpty() -> "Selecione um trecho (a pergunta), toque em “Criar cartão”; depois selecione a resposta e toque em “Usar como resposta”."
+                due == 0 -> "${cards.size} cartões. Nada para revisar hoje."
+                else -> "${cards.size} cartões, $due para revisar hoje."
+            }, 14f).apply { setPadding(0, 0, 0, dpi(8f)); setLineSpacing(0f, 1.1f) })
+            val now = System.currentTimeMillis()
+            cards.forEachIndexed { i, c ->
+                val row = horizontal().apply { setPadding(0, dpi(6f), 0, dpi(6f)); gravity = Gravity.CENTER_VERTICAL }
+                row.addView(ImageView(this).apply {
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    canvasView.renderArea(c.question, 240)?.let { setImageBitmap(it) }
+                    background = rounded(Color.WHITE, 8f, Ui.LINE, 1f)
+                }, LinearLayout.LayoutParams(dpi(76f), dpi(48f)).apply { marginEnd = dpi(12f) })
+                val days = ((c.due - now) / (24L * 60 * 60 * 1000)).toInt()
+                row.addView(label("Cartão ${i + 1}\n" + if (c.due <= now) "para revisar hoje" else "volta em ${max(1, days)} dia(s)", 13.5f, Ui.INK),
+                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                row.addView(iconButton(Icon.TRASH, Ui.MUTED, 38f, "Excluir cartão") {
+                    canvasView.removeCard(c)
+                    dialog.dismiss()
+                    showCards()
+                })
+                box.addView(row)
+            }
+            box.addView(buttonRow(
+                secondaryButton("Fechar") { dialog.dismiss() },
+                primaryButton(if (due > 0) "Revisar agora ($due)" else "Revisar todos") {
+                    dialog.dismiss()
+                    startReview(all = due == 0)
+                },
+            ))
+        }
+    }
+
+    /** Revisão com repetição espaçada simples (caixas de Leitner). */
+    private fun startReview(all: Boolean) {
+        val now = System.currentTimeMillis()
+        val queue = ArrayDeque(canvasView.cards.filter { all || it.due <= now })
+        if (queue.isEmpty()) {
+            toast("Nenhum cartão para revisar.")
+            return
+        }
+        var reviewed = 0
+        val missed = HashSet<Flashcard>()
+        fun day(n: Int) = n * 24L * 60 * 60 * 1000
+        fun next() {
+            val card = queue.removeFirstOrNull()
+            if (card == null) {
+                toast("Revisão concluída: $reviewed cartões.")
+                return
+            }
+            sheet("Revisar · faltam ${queue.size + 1}") { box, dialog ->
+                box.addView(sectionLabel("Pergunta"))
+                box.addView(cardImage(card.question))
+                val answer = vertical().apply { visibility = View.GONE }
+                answer.addView(sectionLabel("Resposta").apply { setPadding(0, dpi(14f), 0, dpi(6f)) })
+                answer.addView(cardImage(card.answer))
+                box.addView(answer)
+                fun grade(box2: Int, again: Boolean) {
+                    val t = System.currentTimeMillis()
+                    val updated = card.with(box2, if (again) t else t + day(Flashcard.INTERVAL_DAYS[box2]))
+                    canvasView.updateCard(card, updated)
+                    reviewed++
+                    if (again && updated !in missed) { missed.add(updated); queue.addLast(updated) }
+                    dialog.dismiss()
+                    next()
+                }
+                val grades = buttonRow(
+                    secondaryButton("Errei") { grade(0, again = true) },
+                    secondaryButton("Difícil") { grade(max(1, card.box).coerceAtMost(5), again = false) },
+                    primaryButton("Fácil") { grade((card.box + 1).coerceAtMost(5), again = false) },
+                ).apply { visibility = View.GONE }
+                lateinit var show: View
+                show = primaryButton("Mostrar resposta") {
+                    answer.visibility = View.VISIBLE
+                    grades.visibility = View.VISIBLE
+                    show.visibility = View.GONE
+                }
+                box.addView(show, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dpi(14f) })
+                box.addView(grades)
+            }
+        }
+        next()
     }
 
     // ---- Folhas em miniatura ------------------------------------------------------------

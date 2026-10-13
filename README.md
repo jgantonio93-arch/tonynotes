@@ -133,6 +133,13 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
   Formato conforme a engenharia reversa de twangodev/sdocx e bxff/samsung-notes-format.
 
 ### Outras ferramentas
+- **Fita para esconder** (botão na barra): arraste para cobrir respostas e termos; toque na fita
+  (com qualquer ferramenta) para revelar e esconder. O menu ⋮ mostra/esconde todas. Fitas
+  reveladas não saem nas exportações.
+- **Marcadores** (menu ⋮): marque partes da nota com um título e volte a elas com um toque.
+- **Cartões de estudo**: selecione a pergunta › **Criar cartão**, selecione a resposta › **Usar
+  como resposta**. Menu ⋮ › Revisar: pergunta, resposta e Errei/Difícil/Fácil, com repetição
+  espaçada (caixas de 0, 1, 3, 7, 14 e 30 dias). Os cartões mostram sempre a versão atual da nota.
 - **Folhas em miniatura** (menu ⋮ › Folhas): grade com as folhas da nota; toque para ir até
   uma, e ⋯ para mover para cima/baixo, duplicar, inserir folha em branco ou excluir.
 - **Lixeira**: notas excluídas (e as de pastas excluídas) ficam 30 dias na lixeira da tela

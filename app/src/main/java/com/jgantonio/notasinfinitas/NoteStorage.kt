@@ -72,6 +72,8 @@ class NoteData(
     val style: PageStyle = PageStyle.DOTS,
     val paperColor: Int = Color.WHITE,
     val layout: PageLayout = PageLayout(),
+    val bookmarks: List<Bookmark> = emptyList(),
+    val cards: List<Flashcard> = emptyList(),
 )
 
 /**
@@ -85,10 +87,11 @@ class NoteData(
  * Versão 5: modo de página (infinita ou folhas) logo depois da cor do papel.
  * Versão 6: ângulo da tela (rotação da visão) logo depois do zoom.
  * Versão 7: preenchimentos do balde (tipo 6).
+ * Versão 8: fitas para esconder (tipo 7) e, no fim, marcadores e cartões de estudo.
  */
 object NoteStorage {
     private const val MAGIC = 0x4E494E46 // "NINF"
-    private const val VERSION = 7
+    private const val VERSION = 8
 
     private const val TYPE_STROKE = 1
     private const val TYPE_TEXT = 2
@@ -96,6 +99,7 @@ object NoteStorage {
     private const val TYPE_IMAGE_V3 = 4
     private const val TYPE_TEXT_V4 = 5
     private const val TYPE_FILL = 6
+    private const val TYPE_TAPE = 7
 
     fun save(file: File, data: NoteData) {
         file.parentFile?.mkdirs()
@@ -171,6 +175,24 @@ object NoteStorage {
                     out.writeInt(e.n)
                     for (i in 0 until e.n) { out.writeFloat(e.xs[i]); out.writeFloat(e.ys[i]) }
                 }
+                is TapeElement -> {
+                    out.writeByte(TYPE_TAPE)
+                    out.writeFloat(e.x0); out.writeFloat(e.y0); out.writeFloat(e.x1); out.writeFloat(e.y1)
+                    out.writeFloat(e.width)
+                    out.writeInt(e.color)
+                    out.writeBoolean(e.revealed)
+                }
+            }
+            out.writeInt(data.bookmarks.size)
+            for (b in data.bookmarks) {
+                out.writeUTF(b.title)
+                out.writeFloat(b.x); out.writeFloat(b.y); out.writeFloat(b.scale)
+            }
+            out.writeInt(data.cards.size)
+            for (c in data.cards) {
+                for (r in listOf(c.question, c.answer)) { out.writeFloat(r.left); out.writeFloat(r.top); out.writeFloat(r.right); out.writeFloat(r.bottom) }
+                out.writeInt(c.box)
+                out.writeLong(c.due)
             }
         }
         if (!tmp.renameTo(file)) {
@@ -189,6 +211,7 @@ object NoteStorage {
                     2, 3, 4 -> readV2(input, false)
                     5 -> readV2(input, true)
                     6, 7 -> readV2(input, true, hasRotation = true)
+                    8 -> readV2(input, true, hasRotation = true, hasStudy = true)
                     else -> null
                 }
             }
@@ -215,7 +238,7 @@ object NoteStorage {
         return NoteData(elements, state)
     }
 
-    private fun readV2(input: DataInputStream, hasLayout: Boolean, hasRotation: Boolean = false): NoteData {
+    private fun readV2(input: DataInputStream, hasLayout: Boolean, hasRotation: Boolean = false, hasStudy: Boolean = false): NoteData {
         val state = ViewState(input.readFloat(), input.readFloat(), input.readFloat(),
             if (hasRotation) input.readFloat() else 0f)
         val style = PageStyle.entries.getOrElse(input.readInt()) { PageStyle.DOTS }
@@ -248,6 +271,10 @@ object NoteStorage {
                 TYPE_IMAGE -> elements.add(ImageElement(
                     input.readUTF(),
                     RectF(input.readFloat(), input.readFloat(), input.readFloat(), input.readFloat()),
+                ))
+                TYPE_TAPE -> elements.add(TapeElement(
+                    input.readFloat(), input.readFloat(), input.readFloat(), input.readFloat(),
+                    input.readFloat(), input.readInt(), input.readBoolean(),
                 ))
                 TYPE_FILL -> {
                     val color = input.readInt()
@@ -294,6 +321,15 @@ object NoteStorage {
                 else -> throw IllegalStateException("tipo de elemento desconhecido")
             }
         }
-        return NoteData(elements, state, style, paper, layout)
+        if (!hasStudy) return NoteData(elements, state, style, paper, layout)
+        val bookmarks = List(input.readInt()) {
+            Bookmark(input.readUTF(), input.readFloat(), input.readFloat(), input.readFloat())
+        }
+        val cards = List(input.readInt()) {
+            val q = RectF(input.readFloat(), input.readFloat(), input.readFloat(), input.readFloat())
+            val a = RectF(input.readFloat(), input.readFloat(), input.readFloat(), input.readFloat())
+            Flashcard(q, a, input.readInt(), input.readLong())
+        }
+        return NoteData(elements, state, style, paper, layout, bookmarks, cards)
     }
 }

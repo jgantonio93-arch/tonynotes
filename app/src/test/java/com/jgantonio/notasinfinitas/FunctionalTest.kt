@@ -3,6 +3,7 @@ package com.jgantonio.notasinfinitas
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.RectF
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
@@ -1019,5 +1020,55 @@ class FunctionalTest {
         Library.io.submit {}.get()
         openEditor()
         assertEquals(1, items().filterIsInstance<FillElement>().size)
+    }
+
+    @Test
+    fun fita_esconde_e_revela_com_um_toque() {
+        canvas.pen = PenSettings.default(BrushType.PEN, Color.BLACK)
+        drag(line(250f, 800f, 750f, 800f))
+        canvas.tool = InfiniteCanvasView.Tool.TAPE
+        drag(line(200f, 800f, 800f, 806f))
+        val tape = items().filterIsInstance<TapeElement>().single()
+        assertTrue("começa escondendo", !tape.revealed)
+        assertEquals("reta na horizontal", tape.y0, tape.y1, 0.01f)
+        // Toque com a caneta na fita: revela, sem deixar ponto.
+        canvas.tool = InfiniteCanvasView.Tool.PEN
+        tap(500f, 800f)
+        assertTrue(items().filterIsInstance<TapeElement>().single().revealed)
+        assertEquals(1, strokes().size)
+        tap(500f, 800f)
+        assertTrue(!items().filterIsInstance<TapeElement>().single().revealed)
+        canvas.setAllTapes(revealed = true)
+        assertEquals(0, canvas.hiddenTapeCount)
+        controller.pause().stop().destroy()
+        Library.io.submit {}.get()
+        openEditor()
+        assertTrue(items().filterIsInstance<TapeElement>().single().revealed)
+    }
+
+    @Test
+    fun marcadores_e_cartoes_ficam_salvos_na_nota() {
+        canvas.setViewForTests(0f, 0f, 1f)
+        canvas.addBookmark("Aula 3 – Cardio")
+        val b = canvas.bookmarks.single()
+        canvas.setViewForTests(-3000f, -5000f, 2f)
+        canvas.goTo(b)
+        val v = canvas.viewForTests
+        assertEquals(1f, v[2], 0.001f)
+
+        drag(line(200f, 700f, 800f, 700f))
+        canvas.selectAll()
+        val q = canvas.selectionArea()!!
+        canvas.addCard(q, RectF(q).apply { offset(0f, 400f) })
+        assertNotNull(canvas.renderArea(q, 300))
+
+        controller.pause().stop().destroy()
+        Library.io.submit {}.get()
+        openEditor()
+        assertEquals("Aula 3 – Cardio", canvas.bookmarks.single().title)
+        assertEquals(1, canvas.cards.size)
+        val c = canvas.cards.single()
+        canvas.updateCard(c, c.with(2, 12345L))
+        assertEquals(2, canvas.cards.single().box)
     }
 }
