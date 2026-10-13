@@ -88,6 +88,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     private lateinit var zoomLabel: TextView
     private lateinit var angleLabel: TextView
     private lateinit var viewPills: LinearLayout
+    private lateinit var pastePill: TextView
     private lateinit var ephemeralPill: TextView
     private lateinit var audioPill: TextView
     private var audioNotes: AudioNotes? = null
@@ -192,12 +193,30 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             setOnClickListener { showRotateMenu() }
         }
         // Zoom e ângulo lado a lado, no canto de baixo.
+        pastePill = TextView(this).apply {
+            text = "Colar"
+            textSize = 12f
+            typeface = Ui.MEDIUM
+            setTextColor(Ui.ACCENT)
+            gravity = Gravity.CENTER
+            minHeight = dpi(32f)
+            setPadding(dpi(10f), 0, dpi(12f), 0)
+            background = ripple(floating(100f), pill(Color.WHITE, 0))
+            setCompoundDrawablesRelativeWithIntrinsicBounds(icon(Icon.COPY, Ui.ACCENT, 15f), null, null, null)
+            compoundDrawablePadding = dpi(5f)
+            Ui.run { softShadow(2f) }
+            setOnClickListener { pasteClipboard() }
+        }
         viewPills = horizontal().apply {
             addView(zoomLabel)
             addView(angleLabel, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                 marginStart = dpi(8f)
             })
+            addView(pastePill, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                marginStart = dpi(8f)
+            })
         }
+        updatePastePill()
         stage.addView(viewPills, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.START).apply {
             setMargins(dpi(14f), 0, 0, dpi(14f))
         })
@@ -297,6 +316,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
 
     override fun onResume() {
         super.onResume()
+        updatePastePill()
         if (wetStale) {
             wetStale = false
             attachWetInk()
@@ -890,6 +910,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         val img = canvasView.selectedImage
         val txt = canvasView.selectedText
         selectionLabel.text = when {
+            items.isEmpty() -> "Área"
             img != null && img.pdfPage > 0 -> "Página ${img.pdfPage}"
             img != null -> "Imagem"
             txt != null -> "Texto"
@@ -899,6 +920,14 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         row.addView(selectionLabel, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             marginEnd = dpi(6f)
         })
+        // Área marcada com o laço/retângulo: print só do que está dentro dela.
+        if (canvasView.hasRegion) row.addView(pillButton(Icon.CROP, "Print da área") { printRegion() })
+        if (items.isEmpty()) {
+            row.addView(pillButton(Icon.CLOSE, "Cancelar") { canvasView.clearSelection() })
+            return
+        }
+        row.addView(pillButton(Icon.COPY, "Copiar") { copySelection(cut = false) })
+        if (!canvasView.selectionLocked) row.addView(pillButton(Icon.COPY, "Recortar") { copySelection(cut = true) })
         // Página de PDF (travada ou não) tem as mesmas ferramentas da imagem; travada, ela só
         // não sai do lugar ao escrever por cima.
         val pdfPage = img != null && img.pdfPage > 0
@@ -1019,6 +1048,120 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         })
     }
 
+    // ---- Copiar, colar e print da área -------------------------------------------------
+
+    private fun copySelection(cut: Boolean) {
+        val items = canvasView.selectedItems
+        if (items.isEmpty()) return
+        Clipboard.copy(this, items, Library.assetsDir(note.id))
+        if (cut) canvasView.deleteSelection()
+        updatePastePill()
+        toast(if (cut) "Recortado. Toque em Colar (aqui ou em outra nota)." else "Copiado. Toque em Colar (aqui ou em outra nota).")
+    }
+
+    private fun printRegion() {
+        val region = canvasView.region ?: return
+        val bmp = canvasView.renderRegion()
+        if (bmp == null) {
+            toast("Área pequena demais.")
+            return
+        }
+        Clipboard.copyImage(this, bmp, region.bounds.width(), region.bounds.height())
+        bmp.recycle()
+        canvasView.clearSelection()
+        updatePastePill()
+        toast("Print copiado. Toque em Colar (aqui ou em outra nota).")
+    }
+
+    private fun pasteClipboard() {
+        val items = Clipboard.paste(this, Library.assetsDir(note.id))
+        if (items.isEmpty()) {
+            toast("Nada para colar.")
+            return
+        }
+        canvasView.pasteElements(items)
+        refresh()
+    }
+
+    private fun updatePastePill() {
+        if (::pastePill.isInitialized) pastePill.visibility = if (Clipboard.hasContent(this)) View.VISIBLE else View.GONE
+    }
+
+    // ---- Compartilhar e imprimir --------------------------------------------------------
+
+    private fun shareFile(file: java.io.File, mime: String) {
+        val uri = ShareProvider.uriFor(this, file)
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = mime
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, note.title)
+            clipData = android.content.ClipData.newRawUri(note.title, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        try {
+            startActivity(Intent.createChooser(send, "Compartilhar nota").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+        } catch (e: Exception) {
+            toast("Nenhum app para compartilhar.")
+        }
+    }
+
+    private fun shareFileName(ext: String) = fileName(ext).replace(Regex("[^\\p{L}\\p{N} ._-]"), "_")
+
+    private fun shareNote() {
+        actionSheet("Compartilhar nota", listOf(
+            SheetItem(Icon.PDF, "Como PDF") {
+                val doc = buildPdf() ?: return@SheetItem
+                val f = java.io.File(ShareProvider.dir(this), shareFileName("pdf"))
+                Library.io.execute {
+                    val ok = try { f.outputStream().use { doc.writeTo(it) }; true } catch (e: Exception) { false } finally { doc.close() }
+                    main.post { if (ok) shareFile(f, "application/pdf") else toast("Não foi possível gerar o PDF.") }
+                }
+            },
+            SheetItem(Icon.IMAGE, "Como imagem") {
+                val bmp = canvasView.renderToBitmap(4096, 4096)
+                if (bmp == null) { toast("A nota está vazia."); return@SheetItem }
+                val f = java.io.File(ShareProvider.dir(this), shareFileName("png"))
+                Library.io.execute {
+                    val ok = try { f.outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }; true } catch (e: Exception) { false } finally { bmp.recycle() }
+                    main.post { if (ok) shareFile(f, "image/png") else toast("Não foi possível gerar a imagem.") }
+                }
+            },
+        ))
+    }
+
+    private fun printNote() {
+        val doc = buildPdf() ?: return
+        val f = java.io.File(ShareProvider.dir(this), shareFileName("pdf"))
+        Library.io.execute {
+            val ok = try { f.outputStream().use { doc.writeTo(it) }; true } catch (e: Exception) { false } finally { doc.close() }
+            main.post {
+                if (!ok) { toast("Não foi possível gerar o PDF."); return@post }
+                val pm = getSystemService(PRINT_SERVICE) as android.print.PrintManager
+                pm.print(note.title, PdfPrintAdapter(f, note.title), null)
+            }
+        }
+    }
+
+    /** Manda para a impressora um PDF já pronto. */
+    private class PdfPrintAdapter(private val file: java.io.File, private val name: String) : android.print.PrintDocumentAdapter() {
+        override fun onLayout(old: android.print.PrintAttributes?, new: android.print.PrintAttributes?, cancel: android.os.CancellationSignal?,
+                              cb: LayoutResultCallback, extras: Bundle?) {
+            if (cancel?.isCanceled == true) { cb.onLayoutCancelled(); return }
+            cb.onLayoutFinished(android.print.PrintDocumentInfo.Builder("$name.pdf")
+                .setContentType(android.print.PrintDocumentInfo.CONTENT_TYPE_DOCUMENT).build(), true)
+        }
+
+        override fun onWrite(pages: Array<out android.print.PageRange>?, dest: android.os.ParcelFileDescriptor, cancel: android.os.CancellationSignal?,
+                             cb: WriteResultCallback) {
+            try {
+                file.inputStream().use { input -> java.io.FileOutputStream(dest.fileDescriptor).use { input.copyTo(it) } }
+                cb.onWriteFinished(arrayOf(android.print.PageRange.ALL_PAGES))
+            } catch (e: Exception) {
+                cb.onWriteFailed(e.message)
+            }
+        }
+    }
+
     private fun saveSelectedImage() {
         val img = canvasView.selectedImage ?: return
         Library.io.execute {
@@ -1084,6 +1227,8 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             box.addView(menuRow(Icon.PDF, "Importar PDF", act { pickPdf() }))
             box.addView(menuRow(Icon.EXPORT, "Exportar como imagem", act { exportPng() }))
             box.addView(menuRow(Icon.PDF, "Exportar como PDF", act { exportPdf() }))
+            box.addView(menuRow(Icon.EXPORT, "Compartilhar (PDF ou imagem)", act { shareNote() }))
+            box.addView(menuRow(Icon.PDF, "Imprimir", act { printNote() }))
             if (canvasView.pdfPages().isNotEmpty()) {
                 box.addView(menuRow(Icon.PDF, "Exportar PDF anotado (páginas originais)", act { exportAnnotatedPdf() }))
             }
@@ -1093,6 +1238,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             }
 
             box.addView(menuSection("Nota"))
+            if (Clipboard.hasContent(this)) box.addView(menuRow(Icon.COPY, "Colar", act { pasteClipboard() }))
             box.addView(menuRow(Icon.SELECT_ALL, "Selecionar tudo", act { canvasView.selectAll(); refresh() }))
             box.addView(menuRow(Icon.CENTER, "Centralizar conteúdo", act { canvasView.recenter() }))
             box.addView(menuRow(Icon.MOVE, "Mover para outra pasta", act { moveToFolder() }))
@@ -1222,7 +1368,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
 
     override fun onSelectionChanged(count: Int) {
         val wasVisible = selectionBar.visibility == View.VISIBLE
-        selectionBar.visibility = if (count > 0 || canvasView.inCropMode) View.VISIBLE else View.GONE
+        selectionBar.visibility = if (count > 0 || canvasView.inCropMode || canvasView.hasRegion) View.VISIBLE else View.GONE
         if (!wasVisible && selectionBar.visibility == View.VISIBLE && Ui.animationsOn()) {
             // Barra sobe de baixo com a mesma curva das bandejas.
             selectionBar.alpha = 0f
@@ -1514,10 +1660,27 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
      * do PDF; na tela infinita, sai uma página do tamanho do conteúdo.
      */
     private fun exportPdf() {
+        val doc = buildPdf() ?: return
+        val name = fileName("pdf")
+        Library.io.execute {
+            val ok = try {
+                writeToMediaStore(MediaStore.Downloads.EXTERNAL_CONTENT_URI, name, "application/pdf",
+                    Environment.DIRECTORY_DOWNLOADS + "/RosaNotes") { out -> doc.writeTo(out); true }
+            } catch (e: Exception) {
+                false
+            } finally {
+                doc.close()
+            }
+            main.post { toast(if (ok) "PDF salvo em Downloads/RosaNotes" else "Não foi possível salvar o PDF.") }
+        }
+    }
+
+    /** O PDF da nota (null, com aviso, se ela estiver vazia). Quem chama fecha o documento. */
+    private fun buildPdf(): PdfDocument? {
         val content = canvasView.contentBounds()
         if (content == null) {
             toast("A nota está vazia.")
-            return
+            return null
         }
         val doc = PdfDocument()
         val pages = canvasView.usedPageRects()
@@ -1549,18 +1712,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             canvasView.drawContent(c, null)
             doc.finishPage(page)
         }
-        val name = fileName("pdf")
-        Library.io.execute {
-            val ok = try {
-                writeToMediaStore(MediaStore.Downloads.EXTERNAL_CONTENT_URI, name, "application/pdf",
-                    Environment.DIRECTORY_DOWNLOADS + "/RosaNotes") { out -> doc.writeTo(out); true }
-            } catch (e: Exception) {
-                false
-            } finally {
-                doc.close()
-            }
-            main.post { toast(if (ok) "PDF salvo em Downloads/RosaNotes" else "Não foi possível salvar o PDF.") }
-        }
+        return doc
     }
 
     /**

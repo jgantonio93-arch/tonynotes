@@ -133,6 +133,12 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
   Formato conforme a engenharia reversa de twangodev/sdocx e bxff/samsung-notes-format.
 
 ### Outras ferramentas
+- **Copiar e colar**: selecione e toque em **Copiar** (ou Recortar); a pílula **Colar** ao lado do
+  zoom cola no centro da tela, na mesma nota ou em outra (vale para traços, textos, imagens e PDF).
+- **Print da área**: desenhe um laço ou retângulo com a seleção (mesmo sobre um PDF travado) e
+  toque em **Print da área**: tudo o que aparece dentro do contorno vira uma imagem para colar.
+- **Compartilhar e imprimir** (menu ⋮): manda a nota como PDF ou imagem para qualquer app e
+  imprime pelo Android. O RosaNotes também **recebe PDFs** compartilhados de outros apps.
 - **Girar a tela**: a pílula de ângulo ao lado do zoom abre um controle de -180° a 180°
   (com ímã nos ângulos retos, botões de ±15° e ±90° e "Endireitar"). Só a visão gira: a
   escrita, as exportações e as miniaturas continuam retas. O ângulo fica salvo na nota.

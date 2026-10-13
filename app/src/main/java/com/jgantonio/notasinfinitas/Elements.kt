@@ -523,6 +523,22 @@ class Lasso(private val xs: FloatArray, private val ys: FloatArray) {
         xs.maxOrNull() ?: 0f, ys.maxOrNull() ?: 0f,
     )
 
+    /** Contorno do laço (para recortar o "print da área"). */
+    fun path(): android.graphics.Path = android.graphics.Path().apply {
+        if (xs.isEmpty()) return@apply
+        moveTo(xs[0], ys[0])
+        for (i in 1 until xs.size) lineTo(xs[i], ys[i])
+        close()
+    }
+
+    /** Pontos do laço na tela, para desenhar a área marcada. */
+    fun screenPath(sx: (Float) -> Float, sy: (Float) -> Float): android.graphics.Path = android.graphics.Path().apply {
+        if (xs.isEmpty()) return@apply
+        moveTo(sx(xs[0]), sy(ys[0]))
+        for (i in 1 until xs.size) lineTo(sx(xs[i]), sy(ys[i]))
+        close()
+    }
+
     fun contains(px: Float, py: Float): Boolean {
         if (!bounds.contains(px, py)) return false
         var inside = false

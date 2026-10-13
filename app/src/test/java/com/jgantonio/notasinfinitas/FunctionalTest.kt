@@ -884,4 +884,65 @@ class FunctionalTest {
         editor.closeTrayForTests()
         assertNull(editor.openTrayForTests)
     }
+
+    @Test
+    fun copiar_numa_nota_e_colar_em_outra_com_imagem() {
+        drag(line(200f, 700f, 800f, 700f))
+        val dir = Library.assetsDir(note.id).apply { mkdirs() }
+        Bitmap.createBitmap(40, 30, Bitmap.Config.ARGB_8888).also { b ->
+            File(dir, "foto.png").outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        }
+        canvas.addImage("foto.png", 40, 30)
+        canvas.selectAll()
+        assertEquals(2, canvas.selectedItems.size)
+        Clipboard.copy(app, canvas.selectedItems, dir)
+        assertTrue(Clipboard.hasContent(app))
+
+        // Outra nota: cola os dois itens, com a imagem copiada para a pasta dela.
+        controller.pause().stop().destroy()
+        Library.io.submit {}.get()
+        note = Library.createNote(Library.folders.first().id, "Destino")
+        openEditor()
+        val pasted = Clipboard.paste(app, Library.assetsDir(note.id))
+        canvas.pasteElements(pasted)
+        assertEquals(1, strokes().size)
+        val img = items().filterIsInstance<ImageElement>().single()
+        assertTrue("imagem copiada para a nota nova", File(Library.assetsDir(note.id), img.file).exists())
+        assertEquals("colados ficam selecionados", 2, canvas.selectedItems.size)
+    }
+
+    @Test
+    fun print_da_area_recorta_pelo_laco() {
+        canvas.pen = PenSettings.default(BrushType.PEN, Color.BLACK).copy(size = 20f)
+        drag(line(200f, 800f, 900f, 800f))
+        canvas.tool = InfiniteCanvasView.Tool.SELECT
+        // Laço em triângulo: só o que está dentro sai no print, o resto fica transparente.
+        val tri = listOf(150f to 600f, 950f to 600f, 550f to 1100f, 150f to 600f)
+        drag((0 until tri.size - 1).flatMap { k -> line(tri[k].first, tri[k].second, tri[k + 1].first, tri[k + 1].second, 20) })
+        assertTrue("área marcada", canvas.hasRegion)
+        val bmp = canvas.renderRegion()!!
+        assertTrue(bmp.width > 100 && bmp.height > 100)
+        assertEquals("canto de baixo à esquerda fica fora do triângulo", 0, Color.alpha(bmp.getPixel(2, bmp.height - 3)))
+        assertEquals("centro de cima é papel", 255, Color.alpha(bmp.getPixel(bmp.width / 2, 4)))
+        Clipboard.copyImage(app, bmp, 100f, 60f)
+        val pasted = Clipboard.paste(app, Library.assetsDir(note.id))
+        assertTrue(pasted.single() is ImageElement)
+
+        // Retângulo sobre uma área vazia também marca (sem itens selecionados).
+        canvas.clearSelection()
+        canvas.selectRect = true
+        drag(line(100f, 1300f, 600f, 1600f))
+        assertTrue(canvas.hasRegion)
+        assertEquals(0, canvas.selectedItems.size)
+    }
+
+    @Test
+    fun arquivo_para_compartilhar_sai_pelo_provider() {
+        Robolectric.setupContentProvider(ShareProvider::class.java, "com.jgantonio.notasinfinitas.share")
+        val f = File(ShareProvider.dir(app), "nota.pdf").apply { writeText("%PDF-teste") }
+        val uri = ShareProvider.uriFor(app, f)
+        assertEquals("application/pdf", app.contentResolver.getType(uri))
+        val text = app.contentResolver.openInputStream(uri)!!.use { it.readBytes().decodeToString() }
+        assertEquals("%PDF-teste", text)
+    }
 }

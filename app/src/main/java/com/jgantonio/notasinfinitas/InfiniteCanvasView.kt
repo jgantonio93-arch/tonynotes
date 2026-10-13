@@ -439,16 +439,67 @@ class InfiniteCanvasView(context: Context) : View(context) {
 
     // ---- Seleção -----------------------------------------------------------
 
+    // ---- Área marcada (print da área) ------------------------------------------------
+
+    /** Última área do laço/retângulo, mesmo sem itens dentro (para o "print da área"). */
+    var region: Lasso? = null
+        private set
+    val hasRegion get() = region != null
+
+    /**
+     * Desenha só o que está dentro da área marcada (recortado pelo contorno do laço),
+     * com o papel por baixo e transparente fora do laço. Resolução de até [maxPx] px.
+     */
+    fun renderRegion(maxPx: Int = 3000): Bitmap? {
+        val l = region ?: return null
+        val b = RectF(l.bounds)
+        if (b.width() < 1f || b.height() < 1f) return null
+        val k = min(max(2f * scale, 1f), maxPx / max(b.width(), b.height()))
+        val w = max(1, kotlin.math.ceil(b.width() * k).toInt())
+        val h = max(1, kotlin.math.ceil(b.height() * k).toInt())
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        c.scale(k, k)
+        c.translate(-b.left, -b.top)
+        c.clipPath(l.path())
+        c.drawColor(paperColor)
+        drawContent(c, b, k)
+        return bmp
+    }
+
+    /** Cola [items] no centro da tela (um passo de desfazer) e deixa-os selecionados. */
+    fun pasteElements(items: List<Element>) {
+        if (items.isEmpty()) return
+        val r = RectF(items[0].bounds)
+        for (e in items) r.union(e.bounds)
+        val t = Transform.translate(wx(width / 2f) - r.centerX(), wy(height / 2f) - r.centerY())
+        val placed = items.map { it.transformed(t) }
+        begin()
+        for (e in placed) insertAt(elements.size, e)
+        commit()
+        tool = Tool.SELECT
+        setSelection(placed)
+    }
+
     fun clearSelection() {
         finishDraft()
-        if (selection.isEmpty()) return
+        val hadRegion = region != null
+        region = null
+        if (selection.isEmpty()) {
+            if (hadRegion) {
+                listener?.onSelectionChanged(0)
+                invalidate()
+            }
+            return
+        }
         selection.clear()
         selectionSet.clear()
         listener?.onSelectionChanged(0)
         invalidate()
     }
 
-    private fun setSelection(list: List<Element>) {
+    private fun setSelection(list: List<Element>, keepRegion: Boolean = false) {
+        if (!keepRegion) region = null
         selection.clear()
         selection.addAll(list)
         selectionSet.clear()
@@ -1555,13 +1606,18 @@ class InfiniteCanvasView(context: Context) : View(context) {
                     val hit = hitTest(wx(downX), wy(downY))
                     if (hit != null) setSelection(listOf(hit)) else clearSelection()
                 } else {
+                    region = when {
+                        selectRect && lassoXs.size >= 2 -> Lasso.rect(lassoXs[0], lassoYs[0], lassoXs[1], lassoYs[1])
+                        !selectRect && lassoXs.size >= 3 -> Lasso(lassoXs.toFloatArray(), lassoYs.toFloatArray())
+                        else -> null
+                    }
                     val lasso = when {
                         selectRect && lassoXs.size >= 2 -> Lasso.rect(lassoXs[0], lassoYs[0], lassoXs[1], lassoYs[1])
                         !selectRect && lassoXs.size >= 3 -> Lasso(lassoXs.toFloatArray(), lassoYs.toFloatArray())
                         else -> null
                     }
                     if (lasso != null) {
-                        setSelection(elements.filter { if (selectPartial) it.touchesLasso(lasso) else it.insideLasso(lasso) })
+                        setSelection(elements.filter { if (selectPartial) it.touchesLasso(lasso) else it.insideLasso(lasso) }, keepRegion = true)
                     }
                 }
                 lassoPath.reset()
@@ -1841,6 +1897,10 @@ class InfiniteCanvasView(context: Context) : View(context) {
             canvas.drawPath(lassoPath, dashPaint)
         }
         if (crop == null) drawSelection(canvas)
+        // Área marcada para o "print da área".
+        region?.let { r ->
+            if (gesture != Gesture.LASSO) canvas.drawPath(r.screenPath({ it * scale + offsetX }, { it * scale + offsetY }), dashPaint)
+        }
         if (eraserX >= 0f) {
             canvas.drawCircle(eraserX, eraserY, eraserSize * density, eraserPaint)
         }

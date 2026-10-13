@@ -128,7 +128,7 @@ class FoldersActivity : Activity() {
         if (folderId == null) Updates.check(this)
         // Notas compartilhadas pelo Samsung Notes (ou abertas pelo app de arquivos).
         if (savedInstanceState == null && folderId == null) {
-            sharedUris(intent).takeIf { it.isNotEmpty() }?.let { uris -> root.post { importSamsung(uris) } }
+            sharedUris(intent).takeIf { it.isNotEmpty() }?.let { uris -> root.post { handleShared(uris) } }
         }
     }
 
@@ -604,6 +604,46 @@ class FoldersActivity : Activity() {
         Intent.ACTION_SEND_MULTIPLE -> i.getParcelableArrayListExtra<android.net.Uri>(Intent.EXTRA_STREAM)?.toList().orEmpty()
         Intent.ACTION_VIEW -> listOfNotNull(i.data)
         else -> emptyList()
+    }
+
+    /** Arquivos recebidos de outros apps: PDFs viram nota nova; o resto é do Samsung Notes. */
+    private fun handleShared(uris: List<android.net.Uri>) {
+        val pdfs = uris.filter { u ->
+            contentResolver.getType(u) == "application/pdf" ||
+                (PdfImporter.displayName(this, u) ?: u.lastPathSegment ?: "").lowercase().endsWith(".pdf")
+        }
+        val rest = uris - pdfs.toSet()
+        if (rest.isNotEmpty()) importSamsung(rest)
+        if (pdfs.isNotEmpty()) importSharedPdf(pdfs.first(), pdfs.size)
+    }
+
+    /** PDF recebido: copia para o app (o acesso compartilhado expira), pergunta a pasta e abre a nota. */
+    private fun importSharedPdf(uri: android.net.Uri, count: Int) {
+        val name = (PdfImporter.displayName(this, uri) ?: "PDF").removeSuffix(".pdf").removeSuffix(".PDF")
+        val dest = java.io.File(java.io.File(cacheDir, "recebidos").apply { mkdirs() }, "pdf_${System.currentTimeMillis()}.pdf")
+        Library.io.execute {
+            val ok = try {
+                contentResolver.openInputStream(uri)!!.use { input -> dest.outputStream().use { input.copyTo(it) } }
+                true
+            } catch (e: Exception) {
+                false
+            }
+            runOnUiThread {
+                if (!ok) {
+                    toast("Não foi possível abrir o PDF.")
+                    return@runOnUiThread
+                }
+                if (count > 1) toast("Abrindo o primeiro PDF (um por vez).")
+                Pickers.folder(this, "Salvar “$name” em", allowRoot = false, exclude = null, current = null) { fid ->
+                    val folder = fid ?: Library.folders.firstOrNull()?.id ?: return@folder
+                    val n = Library.createNote(folder, name)
+                    render()
+                    startActivity(Intent(this, EditorActivity::class.java)
+                        .putExtra(EditorActivity.EXTRA_NOTE, n.id)
+                        .putExtra(EditorActivity.EXTRA_PDF, android.net.Uri.fromFile(dest).toString()))
+                }
+            }
+        }
     }
 
     /** Pasta "Samsung Notes" na tela inicial (criada na primeira importação). */

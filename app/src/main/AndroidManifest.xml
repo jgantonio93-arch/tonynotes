@@ -31,6 +31,7 @@
                 <data android:mimeType="application/vnd.samsung.sdocx" />
                 <data android:mimeType="application/octet-stream" />
                 <data android:mimeType="application/zip" />
+                <data android:mimeType="application/pdf" />
             </intent-filter>
             <intent-filter android:label="Importar no RosaNotes">
                 <action android:name="android.intent.action.VIEW" />
@@ -39,6 +40,7 @@
                 <data android:mimeType="application/sdocx" />
                 <data android:mimeType="application/x-sdocx" />
                 <data android:mimeType="application/vnd.samsung.sdocx" />
+                <data android:mimeType="application/pdf" />
             </intent-filter>
         </activity>
 
@@ -47,5 +49,11 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
+        <!-- Arquivos gerados para compartilhar (PDF/imagem da nota), só leitura -->
+        <provider
+            android:name=".ShareProvider"
+            android:authorities="com.jgantonio.notasinfinitas.share"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 </manifest>
