@@ -707,7 +707,8 @@ class FoldersActivity : Activity() {
                     render()
                     startActivity(Intent(this, EditorActivity::class.java)
                         .putExtra(EditorActivity.EXTRA_NOTE, n.id)
-                        .putExtra(if (slides) EditorActivity.EXTRA_PPTX else EditorActivity.EXTRA_PDF, android.net.Uri.fromFile(dest).toString()))
+                        .putExtra(if (slides) EditorActivity.EXTRA_PPTX else EditorActivity.EXTRA_PDF, android.net.Uri.fromFile(dest).toString())
+                        .putExtra(EditorActivity.EXTRA_DOC_NAME, full))
                 }
             }
         }

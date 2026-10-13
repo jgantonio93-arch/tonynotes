@@ -1344,4 +1344,64 @@ class FunctionalTest {
         }
         assertEquals(3, canvas.lockedPdfPageCount)
     }
+
+    // ---- Sumário dos PDFs/PowerPoints ----------------------------------------------------
+
+    private fun twoDocs() {
+        canvas.addPages(PdfImporter.layout((1..3).map { PdfImporter.Page("pdf_aaaa_p$it.jpg", 595, 842) },
+            PdfImporter.Layout.VERTICAL, 0f, 0f, "Aula 1.pdf"))
+        canvas.addPages(PdfImporter.layout((1..2).map { PdfImporter.Page("pptx_bbbb_s$it.jpg", 960, 540) },
+            PdfImporter.Layout.VERTICAL, 2000f, 0f, "Slides.pptx"))
+    }
+
+    /** Toca no item clicável (ou num pai clicável) do último painel aberto que tenha [text]. */
+    private fun clickInDialog(text: String) {
+        val d = org.robolectric.shadows.ShadowDialog.getLatestDialog()!!
+        var v: View? = findAll(d.window!!.decorView).first {
+            (it is android.widget.TextView && it.text.toString() == text) || it.contentDescription?.toString() == text
+        }
+        while (v != null && !v.hasOnClickListeners()) v = v.parent as? View
+        v!!.performClick()
+        ShadowLooper.idleMainLooper()
+    }
+
+    @Test
+    fun sumario_agrupa_por_documento_numera_e_salva() {
+        twoDocs()
+        val docs = canvas.pdfDocuments()
+        assertEquals(listOf("Aula 1.pdf", "Slides.pptx"), docs.map { it.name })
+        assertEquals(listOf(1, 2, 3), docs[0].pages.map { it.pdfPage })
+        assertEquals(3, canvas.pageTotalOf(docs[0].pages[1]))
+        assertEquals(2, canvas.pageTotalOf(docs[1].pages[0]))
+        assertEquals(View.VISIBLE, editor.contentsButtonForTests.visibility)
+        controller.pause()
+        Library.io.submit {}.get()
+        openEditor()
+        assertEquals("nome do documento salvo (v9)", listOf("Aula 1.pdf", "Slides.pptx"), canvas.pdfDocuments().map { it.name })
+    }
+
+    @Test
+    fun sumario_de_notas_antigas_agrupa_pelo_lote() {
+        canvas.addPages(PdfImporter.layout((1..2).map { PdfImporter.Page("pdf_x1_p$it.jpg", 595, 842) }, PdfImporter.Layout.VERTICAL, 0f, 0f))
+        canvas.addPages(PdfImporter.layout((1..2).map { PdfImporter.Page("pdf_x2_p$it.jpg", 595, 842) }, PdfImporter.Layout.VERTICAL, 3000f, 0f))
+        canvas.addPages(PdfImporter.layout((1..4).map { PdfImporter.Page("pptx_y1_s$it.jpg", 960, 540) }, PdfImporter.Layout.VERTICAL, 6000f, 0f))
+        val docs = canvas.pdfDocuments()
+        assertEquals(listOf("PDF 1", "PDF 2", "PowerPoint 1"), docs.map { it.name })
+        assertEquals(4, docs[2].total)
+    }
+
+    @Test
+    fun sumario_leva_ate_a_pagina_escolhida() {
+        assertEquals(View.GONE, editor.contentsButtonForTests.visibility)
+        twoDocs()
+        editor.showContents()
+        ShadowLooper.idleMainLooper()
+        clickInDialog("Slides.pptx")
+        clickInDialog("Página 2")
+        val page = canvas.pdfDocuments()[1].pages[1]
+        val vis = canvas.visibleWorldForTests()
+        assertTrue("página inteira na tela: $vis x ${page.bounds}", vis.contains(page.bounds))
+        assertTrue(abs(vis.centerX() - page.bounds.centerX()) < 5f && abs(vis.centerY() - page.bounds.centerY()) < 5f)
+        assertTrue("ocupa boa parte da tela", page.bounds.width() > vis.width() * 0.8f || page.bounds.height() > vis.height() * 0.8f)
+    }
 }

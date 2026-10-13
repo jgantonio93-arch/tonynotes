@@ -9,6 +9,7 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import android.graphics.Typeface
 import android.os.Build
 import android.os.SystemClock
 import android.view.MotionEvent
@@ -2440,6 +2441,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
             }
         }
         if (fading.isNotEmpty()) drawFading(canvas)
+        if (crop == null) drawPageNumbers(canvas, if (moving) selectionSet else emptySet())
         if (gesture == Gesture.TAPE && (tapeX1 != tapeX0 || tapeY1 != tapeY0)) {
             drawTape(canvas, TapeElement(tapeX0, tapeY0, tapeX1, tapeY1, tapeWidthDp * density / scale, tapeColor))
         }
@@ -2739,6 +2741,99 @@ class InfiniteCanvasView(context: Context) : View(context) {
     }
 
     /** Páginas de PDF importadas, na ordem de leitura (de cima para baixo, da esquerda para a direita). */
+    // ---- Documentos (PDF/PowerPoint) e sumário ----------------------------------------------
+
+    /** Um PDF ou apresentação importado na nota, com as páginas em ordem. */
+    class PdfDoc(val key: String, val name: String, val pages: List<ImageElement>) {
+        val total get() = pages.maxOfOrNull { it.pdfPage } ?: 0
+    }
+
+    private var docsSig = Long.MIN_VALUE
+    private var docsCache: List<PdfDoc> = emptyList()
+    private val docTotals = java.util.IdentityHashMap<ImageElement, Int>()
+
+    /**
+     * Agrupa as páginas por documento: pelo lote da importação no nome do arquivo
+     * (pdf_<lote>_p3.jpg, pptx_<lote>_s3.jpg) ou, sem lote, pelo nome do documento.
+     */
+    fun pdfDocuments(): List<PdfDoc> {
+        var sig = elements.size.toLong()
+        for (e in elements) if (e is ImageElement && e.pdfPage > 0) sig = sig * 31 + System.identityHashCode(e)
+        if (sig == docsSig) return docsCache
+        val groups = LinkedHashMap<String, MutableList<ImageElement>>()
+        for (e in elements) {
+            if (e !is ImageElement || e.pdfPage <= 0) continue
+            val batch = BATCH.find(e.file)?.groupValues?.get(2)
+            val key = batch ?: "doc:${e.doc}"
+            groups.getOrPut(key) { ArrayList() }.add(e)
+        }
+        var pdfN = 0
+        var pptN = 0
+        val docs = groups.entries
+            .map { (k, list) -> k to list.sortedWith(compareBy<ImageElement> { it.pdfPage }.thenBy { it.rect.top }.thenBy { it.rect.left }) }
+            .sortedWith(compareBy<Pair<String, List<ImageElement>>> { it.second.first().rect.top }.thenBy { it.second.first().rect.left })
+            .map { (k, list) ->
+                val named = list.firstOrNull { it.doc.isNotEmpty() }?.doc
+                val slides = list.first().file.startsWith("pptx_")
+                val name = named ?: if (slides) "PowerPoint ${++pptN}" else "PDF ${++pdfN}"
+                PdfDoc(k, name, list)
+            }
+        docTotals.clear()
+        for (d in docs) {
+            val t = d.total
+            for (p in d.pages) docTotals[p] = t
+        }
+        docsCache = docs
+        docsSig = sig
+        return docs
+    }
+
+    private val badgeBg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x8C000000.toInt() }
+    private val badgeText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.DEFAULT_BOLD
+    }
+
+    /** Número "3 / 12" no canto inferior direito de cada página (só na tela). */
+    private fun drawPageNumbers(canvas: Canvas, skip: Set<Element>) {
+        if (exporting || docsCacheEmpty()) return
+        val u = density / scale
+        for (e in elements) {
+            if (e !is ImageElement || e.pdfPage <= 0 || e in skip) continue
+            if (!RectF.intersects(e.bounds, visibleWorld)) continue
+            if (min(e.rect.width(), e.rect.height()) * scale < 60f * density) continue
+            val total = docTotals[e] ?: continue
+            val text = if (total > 0) "${e.pdfPage} / $total" else "${e.pdfPage}"
+            badgeText.textSize = 11f * u
+            val h = 20f * u
+            val w = badgeText.measureText(text) + 14f * u
+            val m = 8f * u
+            canvas.save()
+            if (e.rotation != 0f) canvas.rotate(e.rotation, e.centerX, e.centerY)
+            val r = RectF(e.rect.right - m - w, e.rect.bottom - m - h, e.rect.right - m, e.rect.bottom - m)
+            canvas.drawRoundRect(r, h / 2, h / 2, badgeBg)
+            canvas.drawText(text, r.centerX(), r.centerY() - (badgeText.descent() + badgeText.ascent()) / 2, badgeText)
+            canvas.restore()
+        }
+    }
+
+    private fun docsCacheEmpty(): Boolean = pdfDocuments().isEmpty()
+
+    /** Total de páginas do documento desta página (para testes e para a barra). */
+    fun pageTotalOf(img: ImageElement): Int {
+        pdfDocuments()
+        return docTotals[img] ?: 0
+    }
+
+    /** Leva a tela até a página, inteira e centralizada. */
+    fun goToPage(img: ImageElement) {
+        val b = img.bounds
+        if (width == 0 || height == 0 || b.width() <= 0f || b.height() <= 0f) return
+        val s = min(width * 0.92f / b.width(), height * 0.92f / b.height())
+        goTo(Bookmark("", b.centerX(), b.centerY(), s))
+    }
+
     fun pdfPages(): List<ImageElement> =
         elements.filterIsInstance<ImageElement>().filter { it.pdfPage > 0 && it.rotation == 0f }
             .sortedWith(compareBy<ImageElement> { it.rect.top }.thenBy { it.rect.left })
@@ -2771,6 +2866,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
         val LASER_COLOR = Color.rgb(255, 45, 70)
         private const val LASER_LIFE = 900L
         private const val VANISH_LIFE = 3500L
+        private val BATCH = Regex("""^(pdf|pptx)_([^_]+)_""")
         private const val MIN_SCALE = 0.03f
         private const val MAX_SCALE = 8f
         private const val MAX_UNDO = 300

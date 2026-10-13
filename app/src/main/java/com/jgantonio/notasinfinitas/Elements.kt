@@ -397,6 +397,8 @@ class ImageElement(
     override val locked: Boolean = false,
     /** Página de PDF (informativo: aparece como "Página N" na barra). */
     val pdfPage: Int = 0,
+    /** Nome do documento (PDF/PowerPoint) de onde a página veio; "" em notas antigas. */
+    val doc: String = "",
 ) : Element() {
 
     fun with(
@@ -418,8 +420,9 @@ class ImageElement(
         shadow: Boolean = this.shadow,
         locked: Boolean = this.locked,
         pdfPage: Int = this.pdfPage,
+        doc: String = this.doc,
     ) = ImageElement(file, RectF(rect), normalizeAngle(rotation), flipH, flipV, RectF(crop), mask, freeMask, opacity,
-        filter, brightness, contrast, saturation, borderWidth, borderColor, shadow, locked, pdfPage)
+        filter, brightness, contrast, saturation, borderWidth, borderColor, shadow, locked, pdfPage, doc)
 
     val centerX get() = rect.centerX()
     val centerY get() = rect.centerY()

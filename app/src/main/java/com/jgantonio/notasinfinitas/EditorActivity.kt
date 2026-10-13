@@ -81,6 +81,8 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     internal val topBarForTests get() = topBar
     internal val fullscreenBoxForTests get() = fullscreenBox
     private lateinit var redoButton: View
+    private lateinit var contentsButton: View
+    internal val contentsButtonForTests get() = contentsButton
     private lateinit var dock: LinearLayout
     private lateinit var trayLayer: FrameLayout
     private lateinit var selectionBar: View
@@ -300,11 +302,13 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         intent.getStringExtra(EXTRA_PDF)?.let { u ->
             intent.removeExtra(EXTRA_PDF)
             // Espera a tela ter tamanho para enquadrar as páginas.
-            canvasView.post { importPdf(Uri.parse(u), PdfImporter.Layout.VERTICAL) }
+            val name = intent.getStringExtra(EXTRA_DOC_NAME)
+            canvasView.post { importPdf(Uri.parse(u), PdfImporter.Layout.VERTICAL, docName = name) }
         }
         intent.getStringExtra(EXTRA_PPTX)?.let { u ->
             intent.removeExtra(EXTRA_PPTX)
-            canvasView.post { importPdf(Uri.parse(u), PdfImporter.Layout.VERTICAL, slides = true) }
+            val name = intent.getStringExtra(EXTRA_DOC_NAME)
+            canvasView.post { importPdf(Uri.parse(u), PdfImporter.Layout.VERTICAL, slides = true, docName = name) }
         }
     }
 
@@ -411,6 +415,9 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         redoButton = iconButton(Icon.REDO) { finishTyping(); canvasView.redo() }
         bar.addView(undoButton)
         bar.addView(redoButton)
+        contentsButton = iconButton(Icon.CONTENTS, desc = "Sumário dos PDFs e slides") { finishTyping(); showContents() }
+        contentsButton.visibility = View.GONE
+        bar.addView(contentsButton)
         bar.addView(iconButton(Icon.FULLSCREEN, desc = "Tela cheia") { finishTyping(); setFullscreen(true) })
         bar.addView(iconButton(Icon.MORE) { finishTyping(); showMoreMenu() })
         return bar
@@ -439,6 +446,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             }
             box.addView(iconButton(Icon.UNDO, Ui.INK, 38f, "Desfazer") { finishTyping(); canvasView.undo() })
             box.addView(iconButton(Icon.REDO, Ui.INK, 38f, "Refazer") { finishTyping(); canvasView.redo() })
+            if (canvasView.pdfPageCount > 0) box.addView(iconButton(Icon.CONTENTS, Ui.INK, 38f, "Sumário") { finishTyping(); showContents() })
             box.addView(iconButton(Icon.FULLSCREEN_EXIT, Ui.INK, 38f, "Sair da tela cheia") { setFullscreen(false) })
             // No canto oposto ao da barra de ferramentas em pé.
             val side = if (prefs.dockMode == "right") Gravity.START else Gravity.END
@@ -710,6 +718,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
 
     private fun refresh() {
         titleView.text = note.title
+        if (::contentsButton.isInitialized) contentsButton.visibility = if (canvasView.pdfPageCount > 0) View.VISIBLE else View.GONE
         subtitleView.text = Library.pathOf(note.folder)
         val tool = canvasView.tool
         val pen = canvasView.pen
@@ -1002,7 +1011,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             row.addView(pillButton(Icon.DOWNLOAD, "Salvar") { saveSelectedImage() })
             row.addView(pillButton(Icon.RESET, "Original") {
                 canvasView.editImages {
-                    ImageElement(it.file, RectF(it.rect), locked = it.locked, pdfPage = it.pdfPage).let { base ->
+                    ImageElement(it.file, RectF(it.rect), locked = it.locked, pdfPage = it.pdfPage, doc = it.doc).let { base ->
                         // Volta ao arquivo original inteiro, mantendo o centro e a largura atual.
                         val full = it.fullLocalFrame()
                         val w = full.width()
@@ -1272,6 +1281,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
                 if (audio.isRecording) menuTile(Icon.CLOSE, "Parar gravação", act { audio.stop(); updateAudioPill() })
                 else menuTile(Icon.MIC, "Gravar áudio", act { startRecording() }),
             )
+            if (canvasView.pdfPageCount > 0) tiles.add(3, menuTile(Icon.CONTENTS, "Sumário", act { showContents() }))
             if (audio.recordings.isNotEmpty()) tiles.add(menuTile(Icon.MIC, "Áudios (${audio.recordings.size})", act { showRecordings() }))
             if (canvasView.tapeCount > 0) {
                 val hide = canvasView.hiddenTapeCount == 0
@@ -1285,6 +1295,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
 
             box.addView(menuSection("Arquivo"))
             box.addView(menuRow(Icon.PDF, "Importar PDF", act { pickPdf() }))
+            box.addView(menuRow(Icon.SLIDES, "Importar PowerPoint", act { pickPptx() }))
             box.addView(menuRow(Icon.EXPORT, "Exportar como imagem", act { exportPng() }))
             box.addView(menuRow(Icon.PDF, "Exportar como PDF", act { exportPdf() }))
             box.addView(menuRow(Icon.EXPORT, "Compartilhar (PDF ou imagem)", act { shareNote() }))
@@ -1354,6 +1365,99 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     }
 
     // ---- Marcadores -----------------------------------------------------------------------
+
+    // ---- Sumário dos PDFs e apresentações ----------------------------------------------------
+
+    internal fun showContents() {
+        val docs = canvasView.pdfDocuments()
+        when {
+            docs.isEmpty() -> toast("Esta nota não tem páginas de PDF ou PowerPoint.")
+            docs.size == 1 -> showContentsPages(docs[0], false)
+            else -> sheet("Sumário") { box, dialog ->
+                box.addView(label("Escolha o documento.", 13f).apply { setPadding(0, 0, 0, dpi(8f)) })
+                for (d in docs) {
+                    val row = horizontal().apply {
+                        gravity = Gravity.CENTER_VERTICAL
+                        minimumHeight = dpi(72f)
+                        setPadding(dpi(8f), dpi(6f), dpi(8f), dpi(6f))
+                        background = ripple(null, rounded(Color.WHITE, 14f))
+                        setOnClickListener { dialog.dismiss(); showContentsPages(d, true) }
+                    }
+                    val thumb = ImageView(this).apply {
+                        scaleType = ImageView.ScaleType.FIT_CENTER
+                        Ui.run { softShadow(2f) }
+                    }
+                    row.addView(thumb, LinearLayout.LayoutParams(dpi(64f), dpi(60f)).apply { marginEnd = dpi(14f) })
+                    loadPageThumb(d.pages.first(), thumb, dpi(120f))
+                    val texts = vertical()
+                    texts.addView(label(d.name, 15.5f, Ui.INK).apply { maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END })
+                    texts.addView(label(if (d.pages.size == 1) "1 página" else "${d.pages.size} páginas", 13f))
+                    row.addView(texts, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                    row.addView(ImageView(this).apply { setImageDrawable(icon(Icon.CHEVRON_RIGHT, Ui.MUTED, 20f)) },
+                        LinearLayout.LayoutParams(dpi(22f), dpi(22f)))
+                    box.addView(row)
+                }
+                box.addView(buttonRow(secondaryButton("Fechar") { dialog.dismiss() }))
+            }
+        }
+    }
+
+    private fun showContentsPages(d: InfiniteCanvasView.PdfDoc, back: Boolean) {
+        sheet(d.name) { box, dialog ->
+            box.addView(label("Toque numa página para ir até ela.", 13f).apply { setPadding(0, 0, 0, dpi(8f)) })
+            val cols = if (resources.configuration.smallestScreenWidthDp >= 600) 4 else 3
+            val total = d.total
+            val cells = ArrayList<View>()
+            for (p in d.pages) {
+                val cell = vertical().apply {
+                    gravity = Gravity.CENTER_HORIZONTAL
+                    setPadding(dpi(4f), dpi(6f), dpi(4f), dpi(4f))
+                    background = ripple(rounded(Ui.FIELD, 14f), rounded(Color.WHITE, 14f))
+                    setOnClickListener { dialog.dismiss(); canvasView.goToPage(p) }
+                    contentDescription = "Página ${p.pdfPage}"
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                        setMargins(dpi(4f), dpi(4f), dpi(4f), dpi(4f))
+                    }
+                }
+                val thumb = ImageView(this).apply {
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    Ui.run { softShadow(2f) }
+                }
+                val ratio = if (p.rect.width() > 0f) p.rect.height() / p.rect.width() else 1.4f
+                cell.addView(thumb, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (dpi(96f) * ratio.coerceIn(0.4f, 1.6f)).toInt()))
+                loadPageThumb(p, thumb, dpi(200f))
+                cell.addView(label(if (total > 0) "${p.pdfPage} / $total" else "${p.pdfPage}", 13f, Ui.INK, bold = true).apply {
+                    gravity = Gravity.CENTER
+                    setPadding(0, dpi(4f), 0, 0)
+                })
+                cells.add(cell)
+            }
+            while (cells.size % cols != 0) cells.add(View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(0, 1, 1f).apply { setMargins(dpi(4f), dpi(4f), dpi(4f), dpi(4f)) }
+            })
+            box.addView(wrapRow(cells, cols))
+            box.addView(buttonRow(
+                if (back) secondaryButton("Voltar") { dialog.dismiss(); showContents() } else secondaryButton("Fechar") { dialog.dismiss() },
+            ))
+        }
+    }
+
+    /** Miniatura da página, lida em segundo plano e reduzida. */
+    private fun loadPageThumb(p: ImageElement, into: ImageView, size: Int) {
+        val f = File(Library.assetsDir(note.id), p.file)
+        Library.io.execute {
+            val b = try {
+                val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(f.path, o)
+                var sample = 1
+                while (max(o.outWidth, o.outHeight) / (sample * 2) >= size) sample *= 2
+                BitmapFactory.decodeFile(f.path, BitmapFactory.Options().apply { inSampleSize = sample })
+            } catch (e: Throwable) {
+                null
+            }
+            if (b != null) main.post { into.setImageBitmap(b) }
+        }
+    }
 
     private fun showBookmarks() {
         sheet("Marcadores") { box, dialog ->
@@ -1668,6 +1772,10 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         if (::textEditor.isInitialized) textEditor.reposition()
         undoButton.alpha = if (canvasView.canUndo) 1f else 0.3f
         redoButton.alpha = if (canvasView.canRedo) 1f else 0.3f
+        val hasDocs = canvasView.pdfPageCount > 0
+        if (::contentsButton.isInitialized && (contentsButton.visibility == View.VISIBLE) != hasDocs) {
+            contentsButton.visibility = if (hasDocs) View.VISIBLE else View.GONE
+        }
         zoomLabel.text = "${canvasView.zoomPercent}%"
         angleLabel.text = "${canvasView.viewRotation.roundToInt()}°"
     }
@@ -1849,7 +1957,8 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         }
     }
 
-    private fun importPdf(uri: Uri, layout: PdfImporter.Layout, slides: Boolean = false) {
+    private fun importPdf(uri: Uri, layout: PdfImporter.Layout, slides: Boolean = false, docName: String? = null) {
+        val doc = docName ?: PdfImporter.displayName(this, uri) ?: if (slides) "Apresentação" else "PDF"
         var cancelled = false
         lateinit var status: TextView
         lateinit var bar: android.widget.ProgressBar
@@ -1881,7 +1990,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             }
             val result = try {
                 if (slides) {
-                    val name = PdfImporter.displayName(this, uri) ?: uri.lastPathSegment ?: "apresentacao.pptx"
+                    val name = PdfImporter.displayName(this, uri) ?: docName ?: uri.lastPathSegment ?: "apresentacao.pptx"
                     val token = if (DriveSync.connected(this)) DriveAuth.silentToken(this) else null
                     if (token != null) main.post { status.text = "Convertendo pelo Google Drive…" }
                     val r = PptxImporter.importAny(this, uri, name, dir, progress, { cancelled },
@@ -1904,7 +2013,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             main.post {
                 if (dialog.isShowing) dialog.dismiss()
                 if (!result.isNullOrEmpty()) {
-                    canvasView.addPages(PdfImporter.layout(result, layout, x0, y0))
+                    canvasView.addPages(PdfImporter.layout(result, layout, x0, y0, doc))
                     if (slides) toast((if (result.size == 1) "1 slide importado" else "${result.size} slides importados") +
                         if (viaGoogle) "" else ". Aberto no modo offline: o visual pode ficar um pouco diferente.")
                     else toast(if (result.size == 1) "1 página importada" else "${result.size} páginas importadas")
@@ -2188,6 +2297,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         const val EXTRA_NOTE = "note"
         const val EXTRA_PDF = "pdf"
         const val EXTRA_PPTX = "pptx"
+        const val EXTRA_DOC_NAME = "doc_name"
         private const val REQ_IMAGE = 41
         private const val REQ_REPLACE = 42
         private const val REQ_PDF = 43

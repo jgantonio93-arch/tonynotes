@@ -201,6 +201,40 @@ class ScreenshotTest {
         return base
     }
 
+    /** Páginas numeradas e o sumário com prévia dos documentos. */
+    @Test
+    fun captureContents() {
+        val app = ApplicationProvider.getApplicationContext<android.app.Application>()
+        Library.init(app, reload = true)
+        val n = Library.createNote(Library.folders.first().id, "Bioquímica")
+        val f = File(app.cacheDir, "exemplo.pptx")
+        javaClass.classLoader!!.getResourceAsStream("pptx/exemplo.pptx")!!.use { i -> f.outputStream().use { i.copyTo(it) } }
+        val dir = Library.assetsDir(n.id)
+        val a = PptxImporter.renderFile(f, dir, { _, _ -> }, { false })
+        val b = PptxImporter.renderFile(f, dir, { _, _ -> }, { false })
+        val editor = Robolectric.buildActivity(EditorActivity::class.java,
+            Intent(app, EditorActivity::class.java).putExtra(EditorActivity.EXTRA_NOTE, n.id)).setup().get()
+        snap(editor)
+        val c = editor.canvasForTests
+        c.addPages(PdfImporter.layout(a, PdfImporter.Layout.VERTICAL, 0f, 0f, "Ciclo de Krebs.pptx"))
+        c.addPages(PdfImporter.layout(b.take(2), PdfImporter.Layout.VERTICAL, 1700f, 0f, "Aula 2 – Glicólise.pdf"))
+        c.goToPage(c.pdfDocuments()[0].pages[1])
+        save(snap(editor), "23-paginas-numeradas")
+        editor.showContents()
+        Library.io.submit {}.get()
+        save(withDialog(editor), "24-sumario-documentos")
+        editor.showContents()
+        ShadowLooper.idleMainLooper()
+        val d = ShadowDialog.getLatestDialog()!!
+        var v: View? = allViews(d.window!!.decorView).first { it is android.widget.TextView && it.text.toString() == "Ciclo de Krebs.pptx" }
+        while (v != null && !v.hasOnClickListeners()) v = v.parent as? View
+        v!!.performClick()
+        ShadowLooper.idleMainLooper()
+        Library.io.submit {}.get()
+        Thread.sleep(200)
+        save(withDialog(editor), "25-sumario-paginas")
+    }
+
     /** Slides de exemplo abertos pelo leitor offline de PowerPoint. */
     @Test
     fun capturePowerPoint() {

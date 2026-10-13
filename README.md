@@ -136,6 +136,10 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
   o Google converte em PDF com visual idêntico (arquivo temporário apagado logo depois);
   sem Drive ou sem internet, o leitor próprio desenha offline fundo, formas, textos,
   imagens e tabelas (aproximado). `.ppt` antigo só abre pelo Google.
+- **Páginas numeradas e sumário**: cada página de PDF/PowerPoint mostra "3 / 12" no canto
+  (só na tela, não sai na exportação). O botão **Sumário** na barra de cima (aparece quando a
+  nota tem documentos) lista os documentos com miniatura e abre a grade de páginas; tocar numa
+  página leva até ela.
 - **Exportar PDF anotado**: menu ⋮ gera um PDF com as mesmas páginas, no tamanho original,
   com tudo o que foi escrito por cima.
 - **Importar do Samsung Notes** (`SamsungNotesImporter.kt`): lê o arquivo `.sdocx`

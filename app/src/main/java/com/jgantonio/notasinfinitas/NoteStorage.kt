@@ -88,10 +88,11 @@ class NoteData(
  * Versão 6: ângulo da tela (rotação da visão) logo depois do zoom.
  * Versão 7: preenchimentos do balde (tipo 6).
  * Versão 8: fitas para esconder (tipo 7) e, no fim, marcadores e cartões de estudo.
+ * Versão 9: nome do documento (PDF/PowerPoint) depois do número da página.
  */
 object NoteStorage {
     private const val MAGIC = 0x4E494E46 // "NINF"
-    private const val VERSION = 8
+    private const val VERSION = 9
 
     private const val TYPE_STROKE = 1
     private const val TYPE_TEXT = 2
@@ -167,6 +168,7 @@ object NoteStorage {
                     out.writeFloat(e.borderWidth); out.writeInt(e.borderColor)
                     out.writeBoolean(e.shadow); out.writeBoolean(e.locked)
                     out.writeInt(e.pdfPage)
+                    out.writeUTF(e.doc.take(200))
                 }
                 is FillElement -> {
                     out.writeByte(TYPE_FILL)
@@ -212,6 +214,7 @@ object NoteStorage {
                     5 -> readV2(input, true)
                     6, 7 -> readV2(input, true, hasRotation = true)
                     8 -> readV2(input, true, hasRotation = true, hasStudy = true)
+                    9 -> readV2(input, true, hasRotation = true, hasStudy = true, hasDoc = true)
                     else -> null
                 }
             }
@@ -238,7 +241,7 @@ object NoteStorage {
         return NoteData(elements, state)
     }
 
-    private fun readV2(input: DataInputStream, hasLayout: Boolean, hasRotation: Boolean = false, hasStudy: Boolean = false): NoteData {
+    private fun readV2(input: DataInputStream, hasLayout: Boolean, hasRotation: Boolean = false, hasStudy: Boolean = false, hasDoc: Boolean = false): NoteData {
         val state = ViewState(input.readFloat(), input.readFloat(), input.readFloat(),
             if (hasRotation) input.readFloat() else 0f)
         val style = PageStyle.entries.getOrElse(input.readInt()) { PageStyle.DOTS }
@@ -316,6 +319,7 @@ object NoteStorage {
                         borderWidth = input.readFloat(), borderColor = input.readInt(),
                         shadow = input.readBoolean(), locked = input.readBoolean(),
                         pdfPage = input.readInt(),
+                        doc = if (hasDoc) input.readUTF() else "",
                     ))
                 }
                 else -> throw IllegalStateException("tipo de elemento desconhecido")

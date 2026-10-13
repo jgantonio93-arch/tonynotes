@@ -81,7 +81,7 @@ object PdfImporter {
     }
 
     /** Posiciona as páginas a partir de (x0, y0) no arranjo escolhido. */
-    fun layout(pages: List<Page>, layout: Layout, x0: Float, y0: Float): List<ImageElement> {
+    fun layout(pages: List<Page>, layout: Layout, x0: Float, y0: Float, doc: String = ""): List<ImageElement> {
         val out = ArrayList<ImageElement>()
         val cols = when (layout) {
             Layout.VERTICAL -> 1
@@ -99,7 +99,7 @@ object PdfImporter {
             }
             val w = p.widthPt * WORLD_PER_PT
             val h = p.heightPt * WORLD_PER_PT
-            out.add(ImageElement(p.file, RectF(x, y, x + w, y + h), shadow = true, locked = true, pdfPage = i + 1))
+            out.add(ImageElement(p.file, RectF(x, y, x + w, y + h), shadow = true, locked = true, pdfPage = i + 1, doc = doc))
             x += w + GAP
             rowH = max(rowH, h)
         }

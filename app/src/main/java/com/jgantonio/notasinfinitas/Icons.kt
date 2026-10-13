@@ -19,7 +19,7 @@ enum class Icon {
     ROTATE, LOCK, UNLOCK, CROP, FLIP_H, FLIP_V, ADJUST, TO_FRONT, TO_BACK, DOWNLOAD, RESET, ZOOM, SELECT_ALL,
     SEARCH, MARKER, ALIGN_LEFT, ALIGN_CENTER, ALIGN_RIGHT, TEXT_BIGGER, TEXT_SMALLER,
     RECT_SELECT, PARTIAL, STRAIGHT, GRIP, INFINITE, PAGES_V, PAGES_H, DOCK_TOP, DOCK_LEFT, DOCK_RIGHT,
-    SUN, MOON, THEME_AUTO, PAGE_PORTRAIT, PAGE_LANDSCAPE, FULLSCREEN, FULLSCREEN_EXIT, MIC, EYEDROPPER, BUCKET, TAPE, BOOKMARK, CARDS, RULER, SLIDES
+    SUN, MOON, THEME_AUTO, PAGE_PORTRAIT, PAGE_LANDSCAPE, FULLSCREEN, FULLSCREEN_EXIT, MIC, EYEDROPPER, BUCKET, TAPE, BOOKMARK, CARDS, RULER, SLIDES, CONTENTS
 }
 
 /** Rótulo em português para leitores de tela (botões só com ícone). */
@@ -45,7 +45,7 @@ val Icon.label: String
         Icon.TEXT_BIGGER -> "Aumentar"; Icon.TEXT_SMALLER -> "Diminuir"
         Icon.FULLSCREEN -> "Tela cheia"; Icon.FULLSCREEN_EXIT -> "Sair da tela cheia"; Icon.MIC -> "Áudio"
         Icon.EYEDROPPER -> "Conta-gotas"; Icon.BUCKET -> "Balde"
-        Icon.TAPE -> "Fita para esconder"; Icon.BOOKMARK -> "Marcadores"; Icon.CARDS -> "Cartões"; Icon.RULER -> "Régua"; Icon.SLIDES -> "PowerPoint"
+        Icon.TAPE -> "Fita para esconder"; Icon.BOOKMARK -> "Marcadores"; Icon.CARDS -> "Cartões"; Icon.RULER -> "Régua"; Icon.SLIDES -> "PowerPoint"; Icon.CONTENTS -> "Sumário"
     }
 
 class IconDrawable(
@@ -281,6 +281,12 @@ class IconDrawable(
             Icon.RESET -> c.drawPath(path {
                 arcTo(RectF(4f, 4f, 20f, 20f), 200f, -290f, true)
                 moveTo(3.5f, 4.5f); lineTo(4.4f, 9.4f); lineTo(9.2f, 8.4f)
+            }, stroke)
+            Icon.CONTENTS -> c.drawPath(path {
+                moveTo(4f, 4f); lineTo(9f, 4f); lineTo(9f, 10f); lineTo(4f, 10f); close()
+                moveTo(4f, 14f); lineTo(9f, 14f); lineTo(9f, 20f); lineTo(4f, 20f); close()
+                moveTo(12.5f, 5.5f); lineTo(20f, 5.5f); moveTo(12.5f, 8.5f); lineTo(17.5f, 8.5f)
+                moveTo(12.5f, 15.5f); lineTo(20f, 15.5f); moveTo(12.5f, 18.5f); lineTo(17.5f, 18.5f)
             }, stroke)
             Icon.SLIDES -> c.drawPath(path {
                 moveTo(3.5f, 4.5f); lineTo(20.5f, 4.5f); lineTo(20.5f, 16f); lineTo(3.5f, 16f); close()
