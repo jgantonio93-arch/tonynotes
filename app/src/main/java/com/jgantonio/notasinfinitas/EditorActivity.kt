@@ -568,7 +568,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         dockGrip.layoutParams = if (vertical) LinearLayout.LayoutParams(dpi(46f), dpi(24f)) else LinearLayout.LayoutParams(dpi(24f), dpi(46f))
         // Deitada, a barra leva as 3 cores: em tela estreita (celular) os botões encolhem um pouco.
         val narrow = !vertical && resources.displayMetrics.widthPixels / density < 480f
-        val tool = if (narrow) 40f else 46f
+        val tool = if (narrow) 36f else 46f
         val toolLp = { LinearLayout.LayoutParams(dpi(tool), dpi(tool)).apply {
             if (vertical) setMargins(0, dpi(1f), 0, dpi(1f)) else setMargins(dpi(1f), 0, dpi(1f), 0)
         } }
