@@ -90,8 +90,13 @@ class FoldersActivity : Activity() {
                 scaleType = ImageView.ScaleType.CENTER
                 background = ripple(circle(Ui.SURFACE, 0, 0f), circle(Color.WHITE, 0, 0f))
                 Ui.run { softShadow(6f); pressable(0.94f) }
-                contentDescription = "Importar PDF"
-                setOnClickListener { pickPdf() }
+                contentDescription = "Importar PDF ou Samsung Notes"
+                setOnClickListener {
+                    actionSheet("Importar", listOf(
+                        SheetItem(Icon.PDF, "PDF") { pickPdf() },
+                        SheetItem(Icon.NOTE, "Notas do Samsung Notes") { samsungImportHelp() },
+                    ))
+                }
             }, LinearLayout.LayoutParams(dpi(52f), dpi(52f)).apply { marginEnd = dpi(12f) })
             fabs.addView(ImageView(this).apply {
                 setImageDrawable(icon(Icon.FOLDER_PLUS, Ui.INK))
@@ -121,6 +126,10 @@ class FoldersActivity : Activity() {
         setContentView(root)
         // Na tela inicial, confere se há versão nova no GitHub (só avisa se houver).
         if (folderId == null) Updates.check(this)
+        // Notas compartilhadas pelo Samsung Notes (ou abertas pelo app de arquivos).
+        if (savedInstanceState == null && folderId == null) {
+            sharedUris(intent).takeIf { it.isNotEmpty() }?.let { uris -> root.post { importSamsung(uris) } }
+        }
     }
 
     override fun onResume() {
@@ -183,6 +192,7 @@ class FoldersActivity : Activity() {
                 setCompoundDrawablesRelativeWithIntrinsicBounds(LogoDrawable(dpi(22f)), null, null, null)
                 compoundDrawablePadding = dpi(8f)
             }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            brand.addView(iconButton(Icon.DOWNLOAD, Ui.MUTED, 40f, "Importar do Samsung Notes") { samsungImportHelp() })
             brand.addView(iconButton(Icon.EXPORT, Ui.MUTED, 40f, "Backup no Google Drive") { backupMenu() })
             brand.addView(iconButton(if (Ui.isDark) Icon.MOON else Icon.SUN, Ui.MUTED, 40f, "Tema") { Ui.showThemeMenu(this) })
             head.addView(brand)
@@ -539,6 +549,10 @@ class FoldersActivity : Activity() {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode != RESULT_OK) return
+        if (requestCode == REQ_SDOCX) {
+            importSamsung(pickedUris(data))
+            return
+        }
         val uri = data?.data ?: return
         when (requestCode) {
             REQ_COVER -> { coverFor?.let { setCover(it, uri) }; return }
@@ -555,6 +569,141 @@ class FoldersActivity : Activity() {
             .putExtra(EditorActivity.EXTRA_NOTE, n.id)
             .putExtra(EditorActivity.EXTRA_PDF, uri.toString())
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+    }
+
+    // ---- Importar do Samsung Notes ------------------------------------------------------
+
+    private fun samsungImportHelp() {
+        sheet("Importar do Samsung Notes") { box, dialog ->
+            box.addView(label(
+                "A escrita à mão vem editável, com as cores e as folhas na mesma ordem.\n\n" +
+                    "No Samsung Notes, selecione as notas, toque em Compartilhar (ou Salvar como arquivo) e escolha " +
+                    "“Arquivo do Samsung Notes (.sdocx)”. Compartilhe direto com o RosaNotes ou salve e escolha os arquivos aqui.",
+                15f, Ui.MUTED,
+            ).apply { setLineSpacing(0f, 1.15f) })
+            box.addView(buttonRow(
+                secondaryButton("Cancelar") { dialog.dismiss() },
+                primaryButton("Escolher arquivos") { dialog.dismiss(); pickSdocx() },
+            ))
+        }
+    }
+
+    private fun pickSdocx() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            type = "*/*"
+            addCategory(Intent.CATEGORY_OPENABLE)
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        }
+        @Suppress("DEPRECATION")
+        startActivityForResult(intent, REQ_SDOCX)
+    }
+
+    private fun pickedUris(data: Intent?): List<android.net.Uri> {
+        val clip = data?.clipData
+        if (clip != null) return (0 until clip.itemCount).mapNotNull { clip.getItemAt(it).uri }
+        return listOfNotNull(data?.data)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun sharedUris(i: Intent?): List<android.net.Uri> = when (i?.action) {
+        Intent.ACTION_SEND -> listOfNotNull(i.getParcelableExtra(Intent.EXTRA_STREAM) as? android.net.Uri)
+        Intent.ACTION_SEND_MULTIPLE -> i.getParcelableArrayListExtra<android.net.Uri>(Intent.EXTRA_STREAM)?.toList().orEmpty()
+        Intent.ACTION_VIEW -> listOfNotNull(i.data)
+        else -> emptyList()
+    }
+
+    /** Pasta "Samsung Notes" na tela inicial (criada na primeira importação). */
+    private fun samsungFolder(): Folder =
+        Library.folders.firstOrNull { it.parent == null && it.name == SAMSUNG_FOLDER }
+            ?: Library.createFolder(SAMSUNG_FOLDER, Library.folderColors[Library.folders.size % Library.folderColors.size], null)
+
+    /** Cada arquivo .sdocx vira uma nota nova, com a escrita editável. */
+    private fun importSamsung(uris: List<android.net.Uri>) {
+        if (uris.isEmpty()) return
+        val target = folderId ?: samsungFolder().id
+        var cancelled = false
+        lateinit var status: TextView
+        lateinit var bar: android.widget.ProgressBar
+        val dialog = sheet("Importando do Samsung Notes") { box, d ->
+            status = label("Preparando…", 15f, Ui.INK)
+            box.addView(status)
+            bar = android.widget.ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+                isIndeterminate = false
+                max = 100
+                progressTintList = android.content.res.ColorStateList.valueOf(Ui.ACCENT)
+            }
+            box.addView(bar, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpi(24f)).apply { topMargin = dpi(8f) })
+            box.addView(buttonRow(secondaryButton("Parar") { cancelled = true; d.dismiss() }))
+        }
+        dialog.setCancelable(false)
+        val sheetWidth = 400f * resources.displayMetrics.density
+        val textSize = 22f * resources.displayMetrics.density
+        Thread {
+            val imported = ArrayList<NoteInfo>()
+            val failed = ArrayList<String>()
+            var partial = 0
+            uris.forEachIndexed { i, uri ->
+                if (cancelled) return@forEachIndexed
+                val fileName = PdfImporter.displayName(this, uri) ?: "Nota"
+                runOnUiThread {
+                    status.text = if (uris.size == 1) fileName else "Nota ${i + 1} de ${uris.size}: $fileName"
+                    bar.progress = i * 100 / uris.size
+                }
+                var created: NoteInfo? = null
+                try {
+                    val sn = contentResolver.openInputStream(uri)?.use { SamsungNotesImporter.read(it) }
+                        ?: throw SamsungNotesImporter.UnsupportedFile("não foi possível abrir o arquivo.")
+                    val title = sn.title ?: fileName.substringBeforeLast('.').substringBeforeLast('_').ifBlank { "Nota do Samsung Notes" }
+                    val latch = java.util.concurrent.CountDownLatch(1)
+                    runOnUiThread { created = Library.createNote(target, title); latch.countDown() }
+                    latch.await()
+                    val n = created!!
+                    val data = SamsungNotesImporter.toNoteData(sn, Library.assetsDir(n.id), sheetWidth, textSize)
+                    NoteStorage.save(Library.noteFile(n.id), data)
+                    SamsungNotesImporter.thumbnail(data)?.let { bmp ->
+                        val tf = Library.thumbFile(n.id)
+                        tf.parentFile?.mkdirs()
+                        java.io.FileOutputStream(tf).use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 90, it) }
+                        bmp.recycle()
+                    }
+                    imported.add(n)
+                    if (sn.skipped > 0) partial++
+                } catch (e: Exception) {
+                    created?.let { n -> runOnUiThread { Library.deleteNote(n.id) } }
+                    val why = (e as? SamsungNotesImporter.UnsupportedFile)?.message
+                    failed.add(if (why != null) "$fileName: $why" else fileName)
+                }
+            }
+            runOnUiThread {
+                if (dialog.isShowing) dialog.dismiss()
+                if (isFinishing) return@runOnUiThread
+                render()
+                if (imported.size == 1 && failed.isEmpty() && partial == 0) {
+                    toast("Nota importada do Samsung Notes")
+                    openNote(imported[0])
+                    return@runOnUiThread
+                }
+                importSummary(imported.size, failed, partial)
+            }
+        }.start()
+    }
+
+    private fun importSummary(ok: Int, failed: List<String>, partial: Int) {
+        sheet(if (ok > 0) "Importação concluída" else "Nada foi importado") { box, dialog ->
+            val msg = StringBuilder(when (ok) {
+                0 -> "Nenhuma nota pôde ser lida."
+                1 -> "1 nota importada."
+                else -> "$ok notas importadas."
+            })
+            if (partial > 0) msg.append("\n\nAlguns elementos (como formas, tabelas ou áudios) não foram trazidos.")
+            if (failed.isNotEmpty()) {
+                msg.append("\n\nNão deu para ler:\n").append(failed.take(6).joinToString("\n") { "• $it" })
+                if (failed.size > 6) msg.append("\n• e mais ${failed.size - 6}")
+                msg.append("\n\nSe precisar, exporte essas notas como PDF no Samsung Notes e use “Importar PDF”.")
+            }
+            box.addView(label(msg.toString(), 15f, Ui.MUTED).apply { setLineSpacing(0f, 1.15f) })
+            box.addView(buttonRow(primaryButton("OK") { dialog.dismiss() }))
+        }
     }
 
     private fun openNote(n: NoteInfo) {
@@ -869,6 +1018,8 @@ class FoldersActivity : Activity() {
         private const val REQ_BACKUP_NOW = 53
         private const val REQ_BACKUP_AUTO = 54
         private const val REQ_RESTORE = 55
+        private const val REQ_SDOCX = 56
+        private const val SAMSUNG_FOLDER = "Samsung Notes"
         private const val COVER_MAX = 900
     }
 }

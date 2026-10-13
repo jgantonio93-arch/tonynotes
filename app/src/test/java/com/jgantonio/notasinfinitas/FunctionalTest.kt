@@ -708,4 +708,59 @@ class FunctionalTest {
         assertTrue("build local nunca avisa", !Updates.isNewer(124, 0))
         assertTrue("sem resposta não avisa", !Updates.isNewer(null, 123))
     }
+
+    @Test
+    fun importa_nota_do_samsung_notes_com_escrita_editavel() {
+        val sn = javaClass.classLoader!!.getResourceAsStream("sdocx/eg-walker.sdocx")!!.use { SamsungNotesImporter.read(it) }
+        assertEquals("Eg walker O(n^2) case", sn.title)
+        assertEquals(1, sn.pages.size)
+        assertEquals(0, sn.skipped)
+        val page = sn.pages[0]
+        assertEquals(1440f, page.w, 0.01f)
+        assertEquals(47, page.strokes.size)
+        // Primeiro traço: caixa gravada no arquivo (498, 403)-(603, 605), caneta-tinteiro azul.
+        val first = page.strokes[0]
+        assertEquals(498f, first.xs.minOrNull()!!, 1f)
+        assertEquals(403f, first.ys.minOrNull()!!, 1f)
+        assertEquals(603f, first.xs.maxOrNull()!!, 1f)
+        assertEquals(605f, first.ys.maxOrNull()!!, 1f)
+        assertEquals(0xFF335FFF.toInt(), first.color)
+        assertEquals(BrushType.FOUNTAIN, SamsungNotesImporter.brushFor(first.pen, first.color))
+        for (st in page.strokes) {
+            assertTrue("traço dentro da página", st.xs.all { it in 0f..page.w } && st.ys.all { it in 0f..page.h })
+        }
+
+        // Vira nota do app: abre no editor com os 47 traços, e salva/recarrega igual.
+        val data = SamsungNotesImporter.toNoteData(sn, Library.assetsDir(note.id), 400f * app.resources.displayMetrics.density, 60f)
+        controller.pause().stop().destroy()
+        Library.io.submit {}.get()
+        NoteStorage.save(Library.noteFile(note.id), data)
+        openEditor()
+        assertEquals(47, strokes().size)
+        assertTrue(strokes().all { it.type == BrushType.FOUNTAIN })
+        System.getProperty("shots.dir")?.let { dir ->
+            canvas.renderToBitmap(1080, 1080)?.let { b ->
+                File(dir, "importado-samsung-notes.png").outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            }
+        }
+        assertNotNull(SamsungNotesImporter.thumbnail(data))
+
+        // Segundo arquivo: título lido do note.note e três traços longos.
+        val t = javaClass.classLoader!!.getResourceAsStream("sdocx/titulo.sdocx")!!.use { SamsungNotesImporter.read(it) }
+        assertEquals("ThisIsTheTitle", t.title)
+        assertEquals(3, t.pages[0].strokes.size)
+    }
+
+    @Test
+    fun arquivo_que_nao_e_do_samsung_notes_avisa() {
+        val bytes = java.io.ByteArrayOutputStream().also { out ->
+            java.util.zip.ZipOutputStream(out).use { z -> z.putNextEntry(java.util.zip.ZipEntry("qualquer.txt")); z.write(1) }
+        }.toByteArray()
+        try {
+            SamsungNotesImporter.read(bytes.inputStream())
+            throw AssertionError("deveria recusar")
+        } catch (e: SamsungNotesImporter.UnsupportedFile) {
+            assertTrue(e.message!!.contains("Samsung Notes"))
+        }
+    }
 }

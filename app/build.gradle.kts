@@ -17,7 +17,7 @@ android {
         minSdk = 29
         targetSdk = 35
         versionCode = if (ciBuild > 0) 1000 + ciBuild else 11
-        versionName = "0.11.0"
+        versionName = "0.12.0"
         buildConfigField("int", "BUILD_NUMBER", ciBuild.toString())
 
         // Só celulares ARM 64 bits (todos os Galaxy com S Pen e quase todo Android atual):
