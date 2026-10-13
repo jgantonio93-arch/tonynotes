@@ -121,6 +121,11 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
   fundo. Destrave uma página para mover, girar, recortar ou separar.
 - **Exportar PDF anotado**: menu ⋮ gera um PDF com as mesmas páginas, no tamanho original,
   com tudo o que foi escrito por cima.
+- **Importar do Samsung Notes** (`SamsungNotesImporter.kt`): lê o arquivo `.sdocx`
+  (Compartilhar › Arquivo do Samsung Notes) e traz a escrita à mão **editável**: traços
+  com cor, espessura, pressão e tipo de caneta, título, texto, caixas de texto e imagens.
+  Vários arquivos de uma vez, pelo seletor ou pelo Compartilhar do Samsung Notes.
+  Formato conforme a engenharia reversa de twangodev/sdocx e bxff/samsung-notes-format.
 
 ### Outras ferramentas
 - **Borracha** (toque de novo para opções): **borracha de traço** ou **borracha de área**,
