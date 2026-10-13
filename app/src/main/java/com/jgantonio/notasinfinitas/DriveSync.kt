@@ -324,6 +324,35 @@ class DriveRest(private val token: String) : DriveApi {
 
     override fun download(id: String): ByteArray = open("$api/$id?alt=media", "GET").result()
 
+    /**
+     * Converte uma apresentação do PowerPoint em PDF pelo Google: sobe como Google
+     * Apresentações, exporta em PDF e apaga o arquivo temporário do Drive.
+     */
+    fun convertToPdf(name: String, bytes: ByteArray, mime: String): ByteArray {
+        val boundary = "rosanotes" + System.nanoTime()
+        val meta = JSONObject().put("name", name).put("mimeType", "application/vnd.google-apps.presentation").toString()
+        val c = open("$upload?uploadType=multipart&fields=id", "POST")
+        c.doOutput = true
+        c.readTimeout = 180000
+        c.setRequestProperty("Content-Type", "multipart/related; boundary=$boundary")
+        c.outputStream.use { o ->
+            o.write("--$boundary\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n$meta\r\n--$boundary\r\nContent-Type: $mime\r\n\r\n".toByteArray())
+            o.write(bytes)
+            o.write("\r\n--$boundary--\r\n".toByteArray())
+        }
+        val id = JSONObject(c.result().decodeToString()).getString("id")
+        try {
+            val e = open("$api/$id/export?mimeType=${q("application/pdf")}", "GET")
+            e.readTimeout = 180000
+            return e.result()
+        } finally {
+            try {
+                delete(id)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     override fun delete(id: String) {
         open("$api/$id", "DELETE").result()
     }

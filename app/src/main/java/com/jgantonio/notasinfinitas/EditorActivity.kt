@@ -302,6 +302,10 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             // Espera a tela ter tamanho para enquadrar as páginas.
             canvasView.post { importPdf(Uri.parse(u), PdfImporter.Layout.VERTICAL) }
         }
+        intent.getStringExtra(EXTRA_PPTX)?.let { u ->
+            intent.removeExtra(EXTRA_PPTX)
+            canvasView.post { importPdf(Uri.parse(u), PdfImporter.Layout.VERTICAL, slides = true) }
+        }
     }
 
     /**
@@ -1699,6 +1703,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         actionSheet("Inserir", listOf(
             SheetItem(Icon.IMAGE, "Imagem da galeria") { pickImage(REQ_IMAGE) },
             SheetItem(Icon.PDF, "PDF (todas as páginas)") { pickPdf() },
+            SheetItem(Icon.SLIDES, "PowerPoint (todos os slides)") { pickPptx() },
             SheetItem(Icon.SHAPES, "Forma (retângulo, círculo, seta, tabela…)") { showShapeMenu() },
             SheetItem(Icon.RULER, if (canvasView.rulerOn) "Esconder a régua" else "Régua") { canvasView.rulerOn = !canvasView.rulerOn },
         ))
@@ -1785,6 +1790,17 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         startActivityForResult(intent, REQ_PDF)
     }
 
+    private fun pickPptx() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            type = "*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(PptxImporter.MIME_PPTX, PptxImporter.MIME_PPT,
+                "application/vnd.openxmlformats-officedocument.presentationml.slideshow"))
+            addCategory(Intent.CATEGORY_OPENABLE)
+        }
+        @Suppress("DEPRECATION")
+        startActivityForResult(intent, REQ_PPTX)
+    }
+
     @Deprecated("Activity sem AndroidX")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION")
@@ -1793,6 +1809,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         val uri = data?.data ?: return
         when (requestCode) {
             REQ_PDF -> askPdfLayout(uri)
+            REQ_PPTX -> askPdfLayout(uri, slides = true)
             REQ_IMAGE, REQ_REPLACE -> Library.io.execute {
                 val result = try { importImage(uri) } catch (e: Exception) { null }
                 main.post {
@@ -1810,13 +1827,13 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     // ---- PDF ----------------------------------------------------------------------------
 
     /** Pergunta como organizar as páginas e importa. */
-    private fun askPdfLayout(uri: Uri) {
-        val name = PdfImporter.displayName(this, uri) ?: "PDF"
+    private fun askPdfLayout(uri: Uri, slides: Boolean = false) {
+        val name = PdfImporter.displayName(this, uri) ?: if (slides) "Apresentação" else "PDF"
         var layout = PdfImporter.Layout.VERTICAL
         Ui.run {
-            sheet("Importar PDF") { box, dialog ->
+            sheet(if (slides) "Importar PowerPoint" else "Importar PDF") { box, dialog ->
                 box.addView(label(name, 14f).apply { setPadding(0, 0, 0, dpi(12f)) })
-                box.addView(label("Como organizar as páginas?", 15f, Ui.INK))
+                box.addView(label(if (slides) "Como organizar os slides?" else "Como organizar as páginas?", 15f, Ui.INK))
                 box.addView(segmented(PdfImporter.Layout.entries.map { it.label }, 0) { i ->
                     layout = PdfImporter.Layout.entries[i]
                 }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
@@ -1826,18 +1843,18 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
                     "Toque numa página com a seleção para destravar.", 13f).apply { setPadding(0, dpi(12f), 0, 0) })
                 box.addView(buttonRow(
                     secondaryButton("Cancelar") { dialog.dismiss() },
-                    primaryButton("Importar") { dialog.dismiss(); importPdf(uri, layout) },
+                    primaryButton("Importar") { dialog.dismiss(); importPdf(uri, layout, slides) },
                 ))
             }
         }
     }
 
-    private fun importPdf(uri: Uri, layout: PdfImporter.Layout) {
+    private fun importPdf(uri: Uri, layout: PdfImporter.Layout, slides: Boolean = false) {
         var cancelled = false
         lateinit var status: TextView
         lateinit var bar: android.widget.ProgressBar
         val dialog = Ui.run {
-            sheet("Importando PDF") { box, d ->
+            sheet(if (slides) "Abrindo PowerPoint" else "Importando PDF") { box, d ->
                 status = label("Preparando…", 15f, Ui.INK)
                 box.addView(status)
                 bar = android.widget.ProgressBar(this@EditorActivity, null, android.R.attr.progressBarStyleHorizontal).apply {
@@ -1852,26 +1869,45 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         dialog.setCancelable(false)
         val (x0, y0) = canvasView.freeSpotBelow()
         val dir = Library.assetsDir(note.id)
+        val word = if (slides) "Slide" else "Página"
+        var viaGoogle = true
         Thread {
+            val progress = { i: Int, n: Int ->
+                main.post {
+                    status.text = "$word $i de $n"
+                    bar.progress = i * 100 / n
+                }
+                Unit
+            }
             val result = try {
-                PdfImporter.render(this, uri, dir, progress = { i, n ->
-                    main.post {
-                        status.text = "Página $i de $n"
-                        bar.progress = i * 100 / n
-                    }
-                }, cancelled = { cancelled })
+                if (slides) {
+                    val name = PdfImporter.displayName(this, uri) ?: uri.lastPathSegment ?: "apresentacao.pptx"
+                    val token = if (DriveSync.connected(this)) DriveAuth.silentToken(this) else null
+                    if (token != null) main.post { status.text = "Convertendo pelo Google Drive…" }
+                    val r = PptxImporter.importAny(this, uri, name, dir, progress, { cancelled },
+                        token?.let { t -> { n: String, b: ByteArray, m: String -> DriveRest(t).convertToPdf(n, b, m) } })
+                    viaGoogle = r.viaGoogle
+                    r.pages
+                } else PdfImporter.render(this, uri, dir, progress = progress, cancelled = { cancelled })
+            } catch (e: PptxImporter.NotPptx) {
+                main.post {
+                    toast("Não deu para abrir: se for um .ppt antigo, salve como .pptx ou conecte o Google Drive (no botão de backup).")
+                }
+                null
             } catch (e: SecurityException) {
                 main.post { toast("Esse PDF tem senha e não pode ser aberto.") }
                 null
             } catch (e: Exception) {
-                main.post { toast("Não foi possível abrir o PDF.") }
+                main.post { toast(if (slides) "Não foi possível abrir a apresentação." else "Não foi possível abrir o PDF.") }
                 null
             }
             main.post {
                 if (dialog.isShowing) dialog.dismiss()
                 if (!result.isNullOrEmpty()) {
                     canvasView.addPages(PdfImporter.layout(result, layout, x0, y0))
-                    toast(if (result.size == 1) "1 página importada" else "${result.size} páginas importadas")
+                    if (slides) toast((if (result.size == 1) "1 slide importado" else "${result.size} slides importados") +
+                        if (viaGoogle) "" else ". Aberto no modo offline: o visual pode ficar um pouco diferente.")
+                    else toast(if (result.size == 1) "1 página importada" else "${result.size} páginas importadas")
                     refresh()
                 }
             }
@@ -2151,9 +2187,11 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     companion object {
         const val EXTRA_NOTE = "note"
         const val EXTRA_PDF = "pdf"
+        const val EXTRA_PPTX = "pptx"
         private const val REQ_IMAGE = 41
         private const val REQ_REPLACE = 42
         private const val REQ_PDF = 43
+        private const val REQ_PPTX = 49
         private const val REQ_MIC = 44
     }
 }

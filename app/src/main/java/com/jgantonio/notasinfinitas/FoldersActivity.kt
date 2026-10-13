@@ -673,15 +673,21 @@ class FoldersActivity : Activity() {
             contentResolver.getType(u) == "application/pdf" ||
                 (PdfImporter.displayName(this, u) ?: u.lastPathSegment ?: "").lowercase().endsWith(".pdf")
         }
-        val rest = uris - pdfs.toSet()
+        val slides = (uris - pdfs.toSet()).filter { u ->
+            PptxImporter.isPowerPoint(PdfImporter.displayName(this, u) ?: u.lastPathSegment, contentResolver.getType(u))
+        }
+        val rest = uris - pdfs.toSet() - slides.toSet()
         if (rest.isNotEmpty()) importSamsung(rest)
         if (pdfs.isNotEmpty()) importSharedPdf(pdfs.first(), pdfs.size)
+        else if (slides.isNotEmpty()) importSharedPdf(slides.first(), slides.size, slides = true)
     }
 
     /** PDF recebido: copia para o app (o acesso compartilhado expira), pergunta a pasta e abre a nota. */
-    private fun importSharedPdf(uri: android.net.Uri, count: Int) {
-        val name = (PdfImporter.displayName(this, uri) ?: "PDF").removeSuffix(".pdf").removeSuffix(".PDF")
-        val dest = java.io.File(java.io.File(cacheDir, "recebidos").apply { mkdirs() }, "pdf_${System.currentTimeMillis()}.pdf")
+    private fun importSharedPdf(uri: android.net.Uri, count: Int, slides: Boolean = false) {
+        val full = PdfImporter.displayName(this, uri) ?: uri.lastPathSegment ?: if (slides) "Apresentação.pptx" else "PDF"
+        val name = full.substringBeforeLast('.').ifEmpty { full }
+        val ext = if (!slides) "pdf" else if (full.lowercase().endsWith(".ppt")) "ppt" else "pptx"
+        val dest = java.io.File(java.io.File(cacheDir, "recebidos").apply { mkdirs() }, "rec_${System.currentTimeMillis()}.$ext")
         Library.io.execute {
             val ok = try {
                 contentResolver.openInputStream(uri)!!.use { input -> dest.outputStream().use { input.copyTo(it) } }
@@ -691,17 +697,17 @@ class FoldersActivity : Activity() {
             }
             runOnUiThread {
                 if (!ok) {
-                    toast("Não foi possível abrir o PDF.")
+                    toast(if (slides) "Não foi possível abrir a apresentação." else "Não foi possível abrir o PDF.")
                     return@runOnUiThread
                 }
-                if (count > 1) toast("Abrindo o primeiro PDF (um por vez).")
+                if (count > 1) toast(if (slides) "Abrindo a primeira apresentação (uma por vez)." else "Abrindo o primeiro PDF (um por vez).")
                 Pickers.folder(this, "Salvar “$name” em", allowRoot = false, exclude = null, current = null) { fid ->
                     val folder = fid ?: Library.folders.firstOrNull()?.id ?: return@folder
                     val n = Library.createNote(folder, name)
                     render()
                     startActivity(Intent(this, EditorActivity::class.java)
                         .putExtra(EditorActivity.EXTRA_NOTE, n.id)
-                        .putExtra(EditorActivity.EXTRA_PDF, android.net.Uri.fromFile(dest).toString()))
+                        .putExtra(if (slides) EditorActivity.EXTRA_PPTX else EditorActivity.EXTRA_PDF, android.net.Uri.fromFile(dest).toString()))
                 }
             }
         }

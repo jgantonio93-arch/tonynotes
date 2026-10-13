@@ -1253,4 +1253,95 @@ class FunctionalTest {
             }
         }
     }
+
+    // ---- PowerPoint ----------------------------------------------------------------------
+
+    private fun samplePptx(): File {
+        val f = File(app.cacheDir, "aula_${System.nanoTime()}.pptx")
+        javaClass.classLoader!!.getResourceAsStream("pptx/exemplo.pptx")!!.use { i -> f.outputStream().use { i.copyTo(it) } }
+        return f
+    }
+
+    private fun near(c: Int, expected: Int, tol: Int = 18) =
+        abs(Color.red(c) - Color.red(expected)) <= tol && abs(Color.green(c) - Color.green(expected)) <= tol &&
+            abs(Color.blue(c) - Color.blue(expected)) <= tol
+
+    @Test
+    fun powerpoint_offline_desenha_fundo_formas_imagem_texto_e_tabela() {
+        val dir = File(app.cacheDir, "slides").apply { deleteRecursively(); mkdirs() }
+        val pages = PptxImporter.renderFile(samplePptx(), dir, { _, _ -> }, { false })
+        assertEquals(3, pages.size)
+        assertEquals("16:9 do sldSz", 960, pages[0].widthPt)
+        assertEquals(540, pages[0].heightPt)
+        val bmps = pages.map { android.graphics.BitmapFactory.decodeFile(File(dir, it.file).path)!! }
+        val k = bmps[0].width / 12192000f
+        fun px(b: Bitmap, x: Long, y: Long) = b.getPixel((x * k).toInt(), (y * k).toInt())
+
+        // Slide 1: título escuro no alto, fundo branco do tema.
+        val s1 = bmps[0]
+        assertTrue(near(s1.getPixel(5, 5), Color.WHITE))
+        var dark = 0
+        for (y in 0 until s1.height / 3 step 2) for (x in 0 until s1.width step 2) {
+            val c = s1.getPixel(x, y)
+            if (Color.red(c) + Color.green(c) + Color.blue(c) < 200) dark++
+        }
+        assertTrue("título desenhado ($dark)", dark > 200)
+
+        // Slide 2: fundo, retângulo verde, imagem vermelha e elipse com a cor do tema (accent1).
+        val s2 = bmps[1]
+        assertTrue("fundo", near(s2.getPixel(5, 5), 0xFFFFF2CC.toInt()))
+        assertTrue("retângulo", near(px(s2, 914400 + 1524000, 914400 + 914400), 0xFF2E7D32.toInt()))
+        assertTrue("imagem", near(px(s2, 7315200 + 1371600, 914400 + 1371600), 0xFFDC143C.toInt()))
+        assertTrue("elipse do tema", near(px(s2, 4572000 + 914400, 3657600 + 914400), 0xFF4F81BD.toInt()))
+        var textPx = 0
+        for (y in (4572000 * k).toInt() until (5486400 * k).toInt()) for (x in (914400 * k).toInt() until (6000000 * k).toInt()) {
+            val c = s2.getPixel(x, y)
+            if (Color.red(c) + Color.green(c) + Color.blue(c) < 200) textPx++
+        }
+        assertTrue("caixa de texto ($textPx)", textPx > 300)
+
+        // Slide 3: cabeçalho da tabela na cor do tema.
+        assertTrue("cabeçalho da tabela", near(px(bmps[2], 914400 + 1524000, 1828800 + 800000), 0xFF4F81BD.toInt()))
+    }
+
+    @Test
+    fun powerpoint_invalido_ou_ppt_antigo_avisa_sem_travar() {
+        val bad = File(app.cacheDir, "velho.ppt").apply { writeBytes(ByteArray(2048) { (it % 7).toByte() }) }
+        try {
+            PptxImporter.renderFile(bad, File(app.cacheDir, "x"), { _, _ -> }, { false })
+            throw AssertionError("deveria recusar")
+        } catch (e: PptxImporter.NotPptx) {
+        }
+    }
+
+    @Test
+    fun powerpoint_sem_google_cai_no_leitor_offline() {
+        val dir = File(app.cacheDir, "slides2").apply { deleteRecursively(); mkdirs() }
+        var asked = false
+        val r = PptxImporter.importAny(app, android.net.Uri.fromFile(samplePptx()), "aula.pptx", dir, { _, _ -> }, { false }) { _, _, _ ->
+            asked = true
+            throw java.io.IOException("sem internet")
+        }
+        assertTrue(asked)
+        assertTrue(!r.viaGoogle)
+        assertEquals(3, r.pages.size)
+    }
+
+    @Test
+    fun powerpoint_recebido_abre_na_nota_como_paginas_travadas() {
+        val f = samplePptx()
+        controller.pause().stop().destroy()
+        controller = Robolectric.buildActivity(EditorActivity::class.java,
+            Intent(app, EditorActivity::class.java).putExtra(EditorActivity.EXTRA_NOTE, note.id)
+                .putExtra(EditorActivity.EXTRA_PPTX, android.net.Uri.fromFile(f).toString())).setup()
+        editor = controller.get()
+        canvas = editor.canvasForTests
+        layout()
+        val end = System.currentTimeMillis() + 30000
+        while (canvas.lockedPdfPageCount < 3 && System.currentTimeMillis() < end) {
+            ShadowLooper.idleMainLooper()
+            Thread.sleep(30)
+        }
+        assertEquals(3, canvas.lockedPdfPageCount)
+    }
 }

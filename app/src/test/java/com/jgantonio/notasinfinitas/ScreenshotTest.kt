@@ -201,6 +201,19 @@ class ScreenshotTest {
         return base
     }
 
+    /** Slides de exemplo abertos pelo leitor offline de PowerPoint. */
+    @Test
+    fun capturePowerPoint() {
+        val app = ApplicationProvider.getApplicationContext<android.app.Application>()
+        val f = File(app.cacheDir, "exemplo.pptx")
+        javaClass.classLoader!!.getResourceAsStream("pptx/exemplo.pptx")!!.use { i -> f.outputStream().use { i.copyTo(it) } }
+        val dir = File(app.cacheDir, "pptx-shots").apply { mkdirs() }
+        PptxImporter.renderFile(f, dir, { _, _ -> }, { false }).forEachIndexed { i, p ->
+            val b = android.graphics.BitmapFactory.decodeFile(File(dir, p.file).path)
+            save(Bitmap.createScaledBitmap(b, b.width / 2, b.height / 2, true), "powerpoint-slide-${i + 1}")
+        }
+    }
+
     private fun save(b: Bitmap, name: String) {
         FileOutputStream(File(outDir, "$name.png")).use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }
         println("captura: $name.png ${b.width}x${b.height}")

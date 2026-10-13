@@ -21,7 +21,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Notas compartilhadas pelo Samsung Notes (.sdocx) -->
+            <!-- Notas do Samsung Notes (.sdocx), PDFs e apresentações do PowerPoint -->
             <intent-filter android:label="Importar no RosaNotes">
                 <action android:name="android.intent.action.SEND" />
                 <action android:name="android.intent.action.SEND_MULTIPLE" />
@@ -32,6 +32,9 @@
                 <data android:mimeType="application/octet-stream" />
                 <data android:mimeType="application/zip" />
                 <data android:mimeType="application/pdf" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.presentationml.presentation" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.presentationml.slideshow" />
+                <data android:mimeType="application/vnd.ms-powerpoint" />
             </intent-filter>
             <intent-filter android:label="Importar no RosaNotes">
                 <action android:name="android.intent.action.VIEW" />
@@ -41,6 +44,9 @@
                 <data android:mimeType="application/x-sdocx" />
                 <data android:mimeType="application/vnd.samsung.sdocx" />
                 <data android:mimeType="application/pdf" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.presentationml.presentation" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.presentationml.slideshow" />
+                <data android:mimeType="application/vnd.ms-powerpoint" />
             </intent-filter>
         </activity>
 

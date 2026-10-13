@@ -131,6 +131,11 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
 - PDF: importa todas as páginas em coluna, lado a lado ou em grade, travadas como
   fundo. Tocando numa página aparecem as **mesmas ferramentas da imagem** (recortar,
   ajustes, girar, espelhar, salvar...); travada, ela só não sai do lugar ao escrever por cima.
+- **PowerPoint** (`PptxImporter.kt`): Inserir › PowerPoint, ou Compartilhar/Abrir com o
+  RosaNotes, traz cada slide como página travada (igual ao PDF). Com o Google Drive conectado,
+  o Google converte em PDF com visual idêntico (arquivo temporário apagado logo depois);
+  sem Drive ou sem internet, o leitor próprio desenha offline fundo, formas, textos,
+  imagens e tabelas (aproximado). `.ppt` antigo só abre pelo Google.
 - **Exportar PDF anotado**: menu ⋮ gera um PDF com as mesmas páginas, no tamanho original,
   com tudo o que foi escrito por cima.
 - **Importar do Samsung Notes** (`SamsungNotesImporter.kt`): lê o arquivo `.sdocx`
