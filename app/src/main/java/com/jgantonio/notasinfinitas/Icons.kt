@@ -19,7 +19,7 @@ enum class Icon {
     ROTATE, LOCK, UNLOCK, CROP, FLIP_H, FLIP_V, ADJUST, TO_FRONT, TO_BACK, DOWNLOAD, RESET, ZOOM, SELECT_ALL,
     SEARCH, MARKER, ALIGN_LEFT, ALIGN_CENTER, ALIGN_RIGHT, TEXT_BIGGER, TEXT_SMALLER,
     RECT_SELECT, PARTIAL, STRAIGHT, GRIP, INFINITE, PAGES_V, PAGES_H, DOCK_TOP, DOCK_LEFT, DOCK_RIGHT,
-    SUN, MOON, THEME_AUTO, PAGE_PORTRAIT, PAGE_LANDSCAPE
+    SUN, MOON, THEME_AUTO, PAGE_PORTRAIT, PAGE_LANDSCAPE, FULLSCREEN, FULLSCREEN_EXIT
 }
 
 /** Rótulo em português para leitores de tela (botões só com ícone). */
@@ -43,6 +43,7 @@ val Icon.label: String
         Icon.THEME_AUTO -> "Tema do celular"; Icon.PAGE_PORTRAIT -> "Folha vertical"; Icon.PAGE_LANDSCAPE -> "Folha horizontal"
         Icon.ALIGN_CENTER -> "Centralizar texto"; Icon.ALIGN_RIGHT -> "Alinhar à direita"
         Icon.TEXT_BIGGER -> "Aumentar"; Icon.TEXT_SMALLER -> "Diminuir"
+        Icon.FULLSCREEN -> "Tela cheia"; Icon.FULLSCREEN_EXIT -> "Sair da tela cheia"
     }
 
 class IconDrawable(
@@ -278,6 +279,19 @@ class IconDrawable(
             Icon.RESET -> c.drawPath(path {
                 arcTo(RectF(4f, 4f, 20f, 20f), 200f, -290f, true)
                 moveTo(3.5f, 4.5f); lineTo(4.4f, 9.4f); lineTo(9.2f, 8.4f)
+            }, stroke)
+            // Quatro cantos: para fora (entrar na tela cheia) ou para dentro (sair).
+            Icon.FULLSCREEN -> c.drawPath(path {
+                moveTo(4f, 9f); lineTo(4f, 4f); lineTo(9f, 4f)
+                moveTo(15f, 4f); lineTo(20f, 4f); lineTo(20f, 9f)
+                moveTo(20f, 15f); lineTo(20f, 20f); lineTo(15f, 20f)
+                moveTo(9f, 20f); lineTo(4f, 20f); lineTo(4f, 15f)
+            }, stroke)
+            Icon.FULLSCREEN_EXIT -> c.drawPath(path {
+                moveTo(4f, 9f); lineTo(9f, 9f); lineTo(9f, 4f)
+                moveTo(15f, 4f); lineTo(15f, 9f); lineTo(20f, 9f)
+                moveTo(20f, 15f); lineTo(15f, 15f); lineTo(15f, 20f)
+                moveTo(9f, 20f); lineTo(9f, 15f); lineTo(4f, 15f)
             }, stroke)
             Icon.ZOOM -> {
                 c.drawCircle(10.5f, 10.5f, 6.5f, stroke)

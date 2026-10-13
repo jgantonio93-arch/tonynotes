@@ -350,6 +350,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         redoButton = iconButton(Icon.REDO) { finishTyping(); canvasView.redo() }
         bar.addView(undoButton)
         bar.addView(redoButton)
+        bar.addView(iconButton(Icon.FULLSCREEN, desc = "Tela cheia") { finishTyping(); setFullscreen(true) })
         bar.addView(iconButton(Icon.MORE) { finishTyping(); showMoreMenu() })
         return bar
     }
@@ -377,7 +378,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             }
             box.addView(iconButton(Icon.UNDO, Ui.INK, 38f, "Desfazer") { finishTyping(); canvasView.undo() })
             box.addView(iconButton(Icon.REDO, Ui.INK, 38f, "Refazer") { finishTyping(); canvasView.redo() })
-            box.addView(iconButton(Icon.CLOSE, Ui.INK, 38f, "Sair da tela cheia") { setFullscreen(false) })
+            box.addView(iconButton(Icon.FULLSCREEN_EXIT, Ui.INK, 38f, "Sair da tela cheia") { setFullscreen(false) })
             // No canto oposto ao da barra de ferramentas em pé.
             val side = if (prefs.dockMode == "right") Gravity.START else Gravity.END
             stage.addView(box, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP or side).apply {
@@ -1038,7 +1039,6 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             toast(if (it) "Tinta de latência mínima ligada (experimental)." else "Tinta de latência mínima desligada.")
         })
         actionSheet(null, listOf(
-            SheetItem(Icon.ZOOM, "Tela cheia (só a barra de ferramentas)") { setFullscreen(true) },
             SheetItem(Icon.PAGE, "Página (infinita ou folhas)") {
                 Panels.showPage(this, canvasView, prefs) { onStateChanged() }
             },

@@ -133,8 +133,8 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
   Formato conforme a engenharia reversa de twangodev/sdocx e bxff/samsung-notes-format.
 
 ### Outras ferramentas
-- **Tela cheia** (menu ⋮): somem a barra de cima e as do sistema; fica só a barra de
-  ferramentas e, num cantinho, desfazer, refazer e sair (o voltar também sai).
+- **Tela cheia** (botão ⛶ no canto da barra de cima): somem a barra de cima e as do sistema;
+  fica só a barra de ferramentas e, num cantinho, desfazer, refazer e sair (o voltar também sai).
 - **Borracha** (toque de novo para opções): **borracha de traço** ou **borracha de área**,
   tamanho, **apagar somente marca-texto**, apagar tudo.
 - **Seleção** (toque de novo para opções): **laço** ou **retângulo**, e **incluir objetos
