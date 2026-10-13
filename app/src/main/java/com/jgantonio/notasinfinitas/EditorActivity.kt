@@ -1259,6 +1259,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
                 menuTile(Icon.PAGE, "Página", act { Panels.showPage(this, canvasView, prefs) { onStateChanged() } }),
                 menuTile(Icon.PAGES_V, "Folhas", act { showPageManager() }),
                 menuTile(Icon.BOOKMARK, "Marcadores", act { showBookmarks() }),
+                menuTile(Icon.RULER, if (canvasView.rulerOn) "Esconder régua" else "Régua", act { canvasView.rulerOn = !canvasView.rulerOn }),
                 menuTile(Icon.CARDS, if (dueCards() > 0) "Revisar (${dueCards()})" else "Cartões", act { showCards() }),
                 menuTile(if (Ui.isDark) Icon.MOON else Icon.SUN, "Tema", act { Ui.showThemeMenu(this) }),
                 menuTile(Icon.TOUCH, "Laser", act { setEphemeral(InfiniteCanvasView.Ephemeral.LASER) }),
@@ -1697,7 +1698,72 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         actionSheet("Inserir", listOf(
             SheetItem(Icon.IMAGE, "Imagem da galeria") { pickImage(REQ_IMAGE) },
             SheetItem(Icon.PDF, "PDF (todas as páginas)") { pickPdf() },
+            SheetItem(Icon.SHAPES, "Forma (retângulo, círculo, seta, tabela…)") { showShapeMenu() },
+            SheetItem(Icon.RULER, if (canvasView.rulerOn) "Esconder a régua" else "Régua") { canvasView.rulerOn = !canvasView.rulerOn },
         ))
+    }
+
+    // ---- Formas prontas -------------------------------------------------------------------
+
+    private fun showShapeMenu() {
+        sheet("Inserir forma") { box, dialog ->
+            box.addView(label("Usa a cor e a espessura da caneta atual. Depois é só arrastar e redimensionar.", 13f).apply {
+                setPadding(0, 0, 0, dpi(8f))
+            })
+            val icons = mapOf(
+                Shapes.Kind.RECT to Icon.RECT_SELECT, Shapes.Kind.SQUARE to Icon.RECT_SELECT,
+                Shapes.Kind.ELLIPSE to Icon.SHAPES, Shapes.Kind.CIRCLE to Icon.SHAPES,
+                Shapes.Kind.TRIANGLE to Icon.SHAPES, Shapes.Kind.LINE to Icon.STRAIGHT,
+                Shapes.Kind.ARROW to Icon.CHEVRON_RIGHT, Shapes.Kind.DOUBLE_ARROW to Icon.CHEVRON_RIGHT,
+                Shapes.Kind.TABLE to Icon.PAGE,
+            )
+            val tiles: MutableList<View> = Shapes.Kind.entries.map { k ->
+                menuTile(icons[k] ?: Icon.SHAPES, k.label) {
+                    dialog.dismiss()
+                    if (k == Shapes.Kind.TABLE) askTableSize() else insertShape(k)
+                }
+            }.toMutableList()
+            while (tiles.size % 3 != 0) tiles.add(View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(0, 1, 1f).apply { setMargins(dpi(4f), dpi(4f), dpi(4f), dpi(4f)) }
+            })
+            box.addView(wrapRow(tiles, 3))
+        }
+    }
+
+    private fun askTableSize() {
+        var rows = 3
+        var cols = 3
+        sheet("Tabela") { box, dialog ->
+            fun stepper(title: String, get: () -> Int, set: (Int) -> Unit): View {
+                val row = horizontal().apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dpi(6f), 0, dpi(6f)) }
+                row.addView(label(title, 15f, Ui.INK), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                val value = label("${get()}", 17f, Ui.INK, bold = true).apply { gravity = Gravity.CENTER }
+                row.addView(secondaryButton("−") { set((get() - 1).coerceIn(1, 10)); value.text = "${get()}" })
+                row.addView(value, LinearLayout.LayoutParams(dpi(44f), ViewGroup.LayoutParams.WRAP_CONTENT))
+                row.addView(secondaryButton("+") { set((get() + 1).coerceIn(1, 10)); value.text = "${get()}" })
+                return row
+            }
+            box.addView(stepper("Linhas", { rows }) { rows = it })
+            box.addView(stepper("Colunas", { cols }) { cols = it })
+            box.addView(buttonRow(
+                secondaryButton("Cancelar") { dialog.dismiss() },
+                primaryButton("Inserir") { dialog.dismiss(); insertShape(Shapes.Kind.TABLE, rows, cols) },
+            ))
+        }
+    }
+
+    /** Cria a forma como traços comuns (editáveis), no centro da tela e já selecionada. */
+    internal fun insertShape(kind: Shapes.Kind, rows: Int = 3, cols: Int = 3) {
+        val pen = canvasView.pen
+        val type = if (pen.type == BrushType.HIGHLIGHTER) BrushType.PEN else pen.type
+        val width = pen.size * canvasView.unit
+        val w = canvasView.width * 0.4f / canvasView.zoom
+        val lines = Shapes.build(kind, w, rows, cols)
+        val strokes = lines.map { l ->
+            StrokeElement(type, pen.color, if (pen.type == BrushType.HIGHLIGHTER) 255 else pen.alpha, l.xs, l.ys, FloatArray(l.xs.size) { width })
+        }
+        canvasView.pasteElements(strokes)
+        refresh()
     }
 
     private fun pickImage(request: Int) {

@@ -19,7 +19,7 @@ enum class Icon {
     ROTATE, LOCK, UNLOCK, CROP, FLIP_H, FLIP_V, ADJUST, TO_FRONT, TO_BACK, DOWNLOAD, RESET, ZOOM, SELECT_ALL,
     SEARCH, MARKER, ALIGN_LEFT, ALIGN_CENTER, ALIGN_RIGHT, TEXT_BIGGER, TEXT_SMALLER,
     RECT_SELECT, PARTIAL, STRAIGHT, GRIP, INFINITE, PAGES_V, PAGES_H, DOCK_TOP, DOCK_LEFT, DOCK_RIGHT,
-    SUN, MOON, THEME_AUTO, PAGE_PORTRAIT, PAGE_LANDSCAPE, FULLSCREEN, FULLSCREEN_EXIT, MIC, EYEDROPPER, BUCKET, TAPE, BOOKMARK, CARDS
+    SUN, MOON, THEME_AUTO, PAGE_PORTRAIT, PAGE_LANDSCAPE, FULLSCREEN, FULLSCREEN_EXIT, MIC, EYEDROPPER, BUCKET, TAPE, BOOKMARK, CARDS, RULER
 }
 
 /** Rótulo em português para leitores de tela (botões só com ícone). */
@@ -45,7 +45,7 @@ val Icon.label: String
         Icon.TEXT_BIGGER -> "Aumentar"; Icon.TEXT_SMALLER -> "Diminuir"
         Icon.FULLSCREEN -> "Tela cheia"; Icon.FULLSCREEN_EXIT -> "Sair da tela cheia"; Icon.MIC -> "Áudio"
         Icon.EYEDROPPER -> "Conta-gotas"; Icon.BUCKET -> "Balde"
-        Icon.TAPE -> "Fita para esconder"; Icon.BOOKMARK -> "Marcadores"; Icon.CARDS -> "Cartões"
+        Icon.TAPE -> "Fita para esconder"; Icon.BOOKMARK -> "Marcadores"; Icon.CARDS -> "Cartões"; Icon.RULER -> "Régua"
     }
 
 class IconDrawable(
@@ -281,6 +281,12 @@ class IconDrawable(
             Icon.RESET -> c.drawPath(path {
                 arcTo(RectF(4f, 4f, 20f, 20f), 200f, -290f, true)
                 moveTo(3.5f, 4.5f); lineTo(4.4f, 9.4f); lineTo(9.2f, 8.4f)
+            }, stroke)
+            Icon.RULER -> c.drawPath(path {
+                moveTo(3f, 16f); lineTo(16f, 3f); lineTo(21f, 8f); lineTo(8f, 21f); close()
+                moveTo(7f, 12f); lineTo(9f, 14f)
+                moveTo(10f, 9f); lineTo(13f, 12f)
+                moveTo(13f, 6f); lineTo(15f, 8f)
             }, stroke)
             Icon.TAPE -> c.drawPath(path {
                 moveTo(3.5f, 15f); lineTo(15f, 3.5f); lineTo(20.5f, 9f); lineTo(9f, 20.5f); close()

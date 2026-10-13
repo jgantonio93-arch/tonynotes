@@ -133,6 +133,11 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
   Formato conforme a engenharia reversa de twangodev/sdocx e bxff/samsung-notes-format.
 
 ### Outras ferramentas
+- **Formas prontas** (Inserir › Forma): retângulo, quadrado, elipse, círculo, triângulo, linha,
+  seta, seta dupla e tabela (linhas × colunas), com a cor e a espessura da caneta; viram traços
+  comuns, editáveis.
+- **Régua** (Inserir › Régua ou menu ⋮): um dedo arrasta, dois giram (ímã a cada 15°); o traço
+  de caneta que começa perto da borda corre reto colado nela. Marcas em mm/cm pelo tamanho real da tela.
 - **Fita para esconder** (botão na barra): arraste para cobrir respostas e termos; toque na fita
   (com qualquer ferramenta) para revelar e esconder. O menu ⋮ mostra/esconde todas. Fitas
   reveladas não saem nas exportações.

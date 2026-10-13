@@ -1129,4 +1129,36 @@ class FunctionalTest {
         canvas.setPageLayout(true, false, false, false, 2)
         assertTrue(canvas.elementsOnPage(0).isNotEmpty() || canvas.elementsOnPage(1).isNotEmpty())
     }
+
+    @Test
+    fun formas_prontas_viram_tracos_editaveis() {
+        assertEquals(5, Shapes.rect(100f, 50f).single().xs.size)
+        assertEquals("moldura + 2 + 3", 1 + 2 + 3, Shapes.table(3, 4, 400f, 300f).size)
+        assertEquals(2, Shapes.arrow(200f, double = false).size)
+        assertEquals(3, Shapes.arrow(200f, double = true).size)
+        editor.insertShape(Shapes.Kind.TABLE, 2, 2)
+        assertEquals(3, strokes().size)
+        assertEquals("já vem selecionada", 3, canvas.selectedItems.size)
+        assertTrue(strokes().all { it.uniform })
+    }
+
+    @Test
+    fun regua_deixa_o_traco_reto_na_borda() {
+        val d = app.resources.displayMetrics.density
+        canvas.setRulerForTests(540f, 1000f, 0f)
+        // Começa logo abaixo da borda de baixo (meia largura = 32dp) e ondula.
+        val y0 = 1000f + 32f * d + 8f * d
+        drag((0..30).map { 200f + it * 20f to y0 + (if (it % 2 == 0) 9f else -9f) })
+        val s = strokes().single()
+        val ys = s.ys
+        assertTrue("reto na régua: ${ys.minOrNull()}..${ys.maxOrNull()}", ys.maxOrNull()!! - ys.minOrNull()!! < 0.5f)
+        // Longe da régua, o traço fica como foi feito.
+        drag((0..30).map { 200f + it * 20f to 1700f + (if (it % 2 == 0) 9f else -9f) })
+        val free = strokes()[1]
+        assertTrue(free.ys.maxOrNull()!! - free.ys.minOrNull()!! > 3f)
+        // Um dedo na régua move a régua, não a nota.
+        val before = canvas.viewForTests.toList()
+        drag(line(540f, 1000f, 640f, 1100f), MotionEvent.TOOL_TYPE_FINGER)
+        assertEquals(before, canvas.viewForTests.toList())
+    }
 }

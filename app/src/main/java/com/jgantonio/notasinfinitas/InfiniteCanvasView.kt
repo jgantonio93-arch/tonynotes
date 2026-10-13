@@ -535,6 +535,192 @@ class InfiniteCanvasView(context: Context) : View(context) {
         return bmp
     }
 
+    // ---- Régua ------------------------------------------------------------------------
+    //
+    // Fica na tela (não na nota). Um dedo arrasta, dois dedos giram (ímã a cada 15°).
+    // Um traço de caneta que começa perto de uma borda corre colado nela, reto.
+
+    var rulerOn = false
+        set(v) {
+            field = v
+            if (v && rulerCx < 0f) { rulerCx = width / 2f; rulerCy = height / 2f }
+            invalidate()
+            listener?.onStateChanged()
+        }
+    var rulerAngle = 0f
+        private set
+    private var rulerCx = -1f
+    private var rulerCy = -1f
+    private val rulerW get() = 64f * density
+    private val rulerL get() = max(width, height) * 0.85f
+    private var rulerDrag = 0 // 0 = não; 1 = arrastando/girando; 2 = tocou no ×
+    private var rulerLastX = 0f
+    private var rulerLastY = 0f
+    private var rulerA0 = 0f
+    private var rulerStartAngle = 0f
+    /** Borda em que o traço atual está colado: +1 (de baixo), -1 (de cima) ou 0. */
+    private var rulerEdge = 0
+    private val rulerFill = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val rulerTick = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    internal fun setRulerForTests(cx: Float, cy: Float, angle: Float) {
+        rulerCx = cx; rulerCy = cy; rulerAngle = angle
+        rulerOn = true
+    }
+
+    /** Coordenadas locais da régua: (ao longo, perpendicular). */
+    private fun rulerLocal(x: Float, y: Float): Pair<Float, Float> {
+        val a = Math.toRadians(rulerAngle.toDouble())
+        val c = kotlin.math.cos(a).toFloat()
+        val s = kotlin.math.sin(a).toFloat()
+        val dx = x - rulerCx
+        val dy = y - rulerCy
+        return (dx * c + dy * s) to (-dx * s + dy * c)
+    }
+
+    private fun insideRuler(x: Float, y: Float): Boolean {
+        val (u, v) = rulerLocal(x, y)
+        return abs(u) <= rulerL / 2f && abs(v) <= rulerW / 2f
+    }
+
+    private fun onRulerClose(x: Float, y: Float): Boolean {
+        val (u, v) = rulerLocal(x, y)
+        return hypot(u - 70f * density, v) <= 18f * density
+    }
+
+    private fun handleRulerTouch(e: MotionEvent): Boolean {
+        when (e.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                if (isPen(e, 0)) return false
+                val x = e.x
+                val y = e.y
+                rulerDrag = when {
+                    onRulerClose(x, y) -> 2
+                    insideRuler(x, y) -> 1
+                    else -> 0
+                }
+                rulerLastX = x; rulerLastY = y
+                return rulerDrag != 0
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                if (rulerDrag == 0) return false
+                rulerDrag = 1
+                if (e.pointerCount >= 2) {
+                    rulerA0 = Math.toDegrees(atan2((e.getY(1) - e.getY(0)).toDouble(), (e.getX(1) - e.getX(0)).toDouble())).toFloat()
+                    rulerStartAngle = rulerAngle
+                    rulerLastX = (e.getX(0) + e.getX(1)) / 2f
+                    rulerLastY = (e.getY(0) + e.getY(1)) / 2f
+                }
+                return true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (rulerDrag == 0) return false
+                if (rulerDrag == 2) return true
+                if (e.pointerCount >= 2) {
+                    val a = Math.toDegrees(atan2((e.getY(1) - e.getY(0)).toDouble(), (e.getX(1) - e.getX(0)).toDouble())).toFloat()
+                    var ang = rulerStartAngle + (a - rulerA0)
+                    val snapped = (ang / 15f).roundToInt() * 15f
+                    if (abs(ang - snapped) < 3f) ang = snapped
+                    rulerAngle = ImageElement.normalizeAngle(ang)
+                    val mx = (e.getX(0) + e.getX(1)) / 2f
+                    val my = (e.getY(0) + e.getY(1)) / 2f
+                    rulerCx += mx - rulerLastX; rulerCy += my - rulerLastY
+                    rulerLastX = mx; rulerLastY = my
+                } else {
+                    rulerCx += e.x - rulerLastX; rulerCy += e.y - rulerLastY
+                    rulerLastX = e.x; rulerLastY = e.y
+                }
+                invalidate()
+                return true
+            }
+            MotionEvent.ACTION_POINTER_UP -> {
+                if (rulerDrag == 0) return false
+                val keep = if (e.actionIndex == 0) 1 else 0
+                rulerLastX = e.getX(keep); rulerLastY = e.getY(keep)
+                return true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (rulerDrag == 0) return false
+                if (rulerDrag == 2 && e.actionMasked == MotionEvent.ACTION_UP && onRulerClose(e.x, e.y)) rulerOn = false
+                rulerDrag = 0
+                return true
+            }
+        }
+        return false
+    }
+
+    /** O traço que começa em (x, y) da tela fica colado em alguma borda da régua? */
+    private fun rulerEdgeNear(x: Float, y: Float): Int {
+        if (!rulerOn) return 0
+        val (u, v) = rulerLocal(x, y)
+        if (abs(u) > rulerL / 2f) return 0
+        val inner = rulerW / 2f - 6f * density
+        val outer = rulerW / 2f + 28f * density
+        return when {
+            v in inner..outer -> 1
+            v in -outer..-inner -> -1
+            else -> 0
+        }
+    }
+
+    /** Leva o ponto (tela) para a borda da régua, à distância de meia espessura da caneta. */
+    private fun rulerSnap(x: Float, y: Float): Pair<Float, Float> {
+        if (rulerEdge == 0) return x to y
+        val (_, v) = rulerLocal(x, y)
+        val target = rulerEdge * (rulerW / 2f + pen.size * unit * scale / 2f)
+        val a = Math.toRadians(rulerAngle.toDouble())
+        val nx = -kotlin.math.sin(a).toFloat()
+        val ny = kotlin.math.cos(a).toFloat()
+        return (x + nx * (target - v)) to (y + ny * (target - v))
+    }
+
+    private fun drawRuler(canvas: Canvas) {
+        val l = rulerL
+        val w = rulerW
+        canvas.save()
+        canvas.translate(rulerCx, rulerCy)
+        canvas.rotate(rulerAngle)
+        rulerFill.style = Paint.Style.FILL
+        rulerFill.color = if (Ui.isDark) Color.argb(205, 44, 42, 38) else Color.argb(215, 255, 255, 255)
+        canvas.drawRoundRect(-l / 2f, -w / 2f, l / 2f, w / 2f, 8f * density, 8f * density, rulerFill)
+        rulerFill.style = Paint.Style.STROKE
+        rulerFill.strokeWidth = 1f * density
+        rulerFill.color = Ui.MUTED
+        canvas.drawRoundRect(-l / 2f, -w / 2f, l / 2f, w / 2f, 8f * density, 8f * density, rulerFill)
+        // Marcas de milímetro (tamanho real da tela), centímetros mais longos e numerados.
+        val mm = resources.displayMetrics.xdpi / 25.4f
+        rulerTick.color = Ui.INK
+        rulerTick.strokeWidth = 1f * density
+        rulerTick.textSize = 9f * density
+        rulerTick.textAlign = Paint.Align.CENTER
+        val count = (l / mm).toInt()
+        for (k in 0..count) {
+            val x = -l / 2f + k * mm
+            val len = when {
+                k % 10 == 0 -> 14f
+                k % 5 == 0 -> 10f
+                else -> 6f
+            } * density
+            canvas.drawLine(x, -w / 2f, x, -w / 2f + len, rulerTick)
+            canvas.drawLine(x, w / 2f, x, w / 2f - len, rulerTick)
+            if (k % 10 == 0 && k > 0) canvas.drawText("${k / 10}", x, -w / 2f + 26f * density, rulerTick)
+        }
+        rulerTick.textSize = 13f * density
+        rulerTick.color = Ui.ACCENT
+        canvas.drawText("${ImageElement.normalizeAngle(rulerAngle).roundToInt()}°", 0f, 5f * density, rulerTick)
+        // ×: fechar
+        val cx = 70f * density
+        rulerFill.style = Paint.Style.FILL
+        rulerFill.color = Ui.FIELD
+        canvas.drawCircle(cx, 0f, 13f * density, rulerFill)
+        rulerTick.color = Ui.INK
+        rulerTick.strokeWidth = 1.8f * density
+        val d = 5f * density
+        canvas.drawLine(cx - d, -d, cx + d, d, rulerTick)
+        canvas.drawLine(cx - d, d, cx + d, -d, rulerTick)
+        canvas.restore()
+    }
+
     // ---- Conta-gotas e balde ----------------------------------------------------------
 
     enum class PickMode { EYEDROPPER, BUCKET }
@@ -1574,6 +1760,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
     }
 
     private fun handleTouch(e: MotionEvent): Boolean {
+        if (rulerOn && handleRulerTouch(e)) return true
         // Um toque fora do texto em edição só termina a edição (não risca a nota).
         if (e.actionMasked == MotionEvent.ACTION_DOWN && touchInterceptor?.invoke() == true) {
             swallowing = true
@@ -1659,8 +1846,10 @@ class InfiniteCanvasView(context: Context) : View(context) {
                 wetSent = 0
                 predN = 0
                 usePrediction = !wetActive && predictionAvailable(e)
+                rulerEdge = rulerEdgeNear(x, y)
                 builder = StrokeBuilder(p, unit).also {
-                    it.add(wx(x), wy(y), pressureOf(e, 0), minPointDist())
+                    val (sx, sy) = rulerSnap(x, y)
+                    it.add(wx(sx), wy(sy), pressureOf(e, 0), minPointDist())
                 }
                 restartHold(x, y)
                 inkUpdated(e)
@@ -1820,9 +2009,11 @@ class InfiniteCanvasView(context: Context) : View(context) {
                 val b = builder ?: return
                 val md = minPointDist()
                 for (h in 0 until e.historySize) {
-                    b.add(wx(e.getHistoricalX(idx, h)), wy(e.getHistoricalY(idx, h)), historicalPressureOf(e, idx, h), md)
+                    val (hx, hy) = rulerSnap(e.getHistoricalX(idx, h), e.getHistoricalY(idx, h))
+                    b.add(wx(hx), wy(hy), historicalPressureOf(e, idx, h), md)
                 }
-                b.add(wx(x), wy(y), pressureOf(e, idx), md)
+                val (rx, ry) = rulerSnap(x, y)
+                b.add(wx(rx), wy(ry), pressureOf(e, idx), md)
                 if (!b.isStraight && hypot(x - holdX, y - holdY) > 5f * density) restartHold(x, y)
                 inkUpdated(e)
             }
@@ -2261,6 +2452,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
         if (eraserX >= 0f) {
             canvas.drawCircle(eraserX, eraserY, eraserSize * density, eraserPaint)
         }
+        if (rulerOn) drawRuler(canvas)
         canvas.restore()
     }
 
