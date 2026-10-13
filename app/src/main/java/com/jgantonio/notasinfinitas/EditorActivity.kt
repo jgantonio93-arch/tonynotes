@@ -257,6 +257,11 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             setMargins(0, 0, dpi(14f), dpi(14f))
         })
         canvasView.onStrokeAdded = { s -> audioNotes?.markStroke(s) }
+        canvasView.onColorPicked = { col ->
+            prefs.addCustomColor(col)
+            setPen(canvasView.pen.copy(color = col))
+            toast("Cor escolhida.")
+        }
 
         selectionBar = buildSelectionBar()
         selectionBar.visibility = View.GONE
@@ -830,7 +835,11 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
                 canvasView.pen = p
                 applyPrefs()
                 refresh()
-            }, onFavoritesChanged = { refresh() }, widthPx = width)
+            }, onFavoritesChanged = { refresh() }, widthPx = width, onPick = { mode ->
+                closeTray()
+                canvasView.pickMode = mode
+                toast(if (mode == InfiniteCanvasView.PickMode.EYEDROPPER) "Toque na cor que quer pegar." else "Toque dentro de uma forma fechada para pintar.")
+            })
             "dock" -> DockTray(this, prefs.dockMode) { mode ->
                 prefs.dockMode = mode
                 closeTray()
@@ -1210,6 +1219,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             // Atalhos em cartões
             val tiles = mutableListOf(
                 menuTile(Icon.PAGE, "Página", act { Panels.showPage(this, canvasView, prefs) { onStateChanged() } }),
+                menuTile(Icon.PAGES_V, "Folhas", act { showPageManager() }),
                 menuTile(if (Ui.isDark) Icon.MOON else Icon.SUN, "Tema", act { Ui.showThemeMenu(this) }),
                 menuTile(Icon.TOUCH, "Laser", act { setEphemeral(InfiniteCanvasView.Ephemeral.LASER) }),
                 menuTile(Icon.EDIT, "Tinta que some", act { setEphemeral(InfiniteCanvasView.Ephemeral.VANISH) }),
@@ -1291,6 +1301,78 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         addView(ImageView(this@EditorActivity).apply { setImageDrawable(icon(ic, Ui.INK, 22f)) },
             LinearLayout.LayoutParams(dpi(24f), dpi(24f)).apply { marginEnd = dpi(16f) })
         addView(label(text, 15.5f, Ui.INK))
+    }
+
+    // ---- Folhas em miniatura ------------------------------------------------------------
+
+    private fun showPageManager() {
+        if (!canvasView.pageLayout.hasPages) {
+            sheet("Folhas") { box, dialog ->
+                box.addView(label("Esta nota é uma tela infinita. Para ver e organizar as folhas em miniatura, mude para folhas.", 15f, Ui.MUTED))
+                box.addView(buttonRow(
+                    secondaryButton("Agora não") { dialog.dismiss() },
+                    primaryButton("Usar folhas") { dialog.dismiss(); Panels.showPage(this, canvasView, prefs) { onStateChanged() } },
+                ))
+            }
+            return
+        }
+        val n = canvasView.pageCount
+        sheet("Folhas ($n)") { box, dialog ->
+            box.addView(label("Toque para ir até a folha; use ⋯ para mover, duplicar, inserir ou excluir.", 13f).apply {
+                setPadding(0, 0, 0, dpi(8f))
+            })
+            val cells = ArrayList<View>()
+            for (i in 0 until n) {
+                val cell = vertical().apply {
+                    gravity = Gravity.CENTER_HORIZONTAL
+                    setPadding(dpi(4f), dpi(6f), dpi(4f), dpi(4f))
+                    background = ripple(rounded(Ui.FIELD, 14f), rounded(Color.WHITE, 14f))
+                    setOnClickListener { dialog.dismiss(); canvasView.fitToPage(i) }
+                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                        setMargins(dpi(4f), dpi(4f), dpi(4f), dpi(4f))
+                    }
+                }
+                val thumb = ImageView(this).apply {
+                    adjustViewBounds = true
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    Ui.run { softShadow(2f) }
+                }
+                cell.addView(thumb, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+                thumb.post { canvasView.renderPage(i, dpi(110f))?.let { thumb.setImageBitmap(it) } }
+                val foot = horizontal().apply { gravity = Gravity.CENTER_VERTICAL }
+                foot.addView(label("${i + 1}", 13f, Ui.INK, bold = true), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    marginStart = dpi(6f)
+                })
+                foot.addView(iconButton(Icon.MORE, Ui.MUTED, 34f, "Opções da folha ${i + 1}") {
+                    dialog.dismiss()
+                    pageOptions(i, n)
+                })
+                cell.addView(foot)
+                cells.add(cell)
+            }
+            while (cells.size % 3 != 0) cells.add(View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(0, 1, 1f).apply { setMargins(dpi(4f), dpi(4f), dpi(4f), dpi(4f)) }
+            })
+            box.addView(wrapRow(cells, 3))
+        }
+    }
+
+    private fun pageOptions(i: Int, n: Int) {
+        fun again() { refresh(); showPageManager() }
+        actionSheet("Folha ${i + 1}", listOfNotNull(
+            if (i > 0) SheetItem(Icon.TO_FRONT, "Mover para cima") { canvasView.swapPages(i, i - 1); again() } else null,
+            if (i < n - 1) SheetItem(Icon.TO_BACK, "Mover para baixo") { canvasView.swapPages(i, i + 1); again() } else null,
+            SheetItem(Icon.COPY, "Duplicar") { canvasView.duplicatePage(i); again() },
+            SheetItem(Icon.PLUS, "Inserir folha em branco depois") { canvasView.insertBlankPageAfter(i); again() },
+            if (n > 1) SheetItem(Icon.TRASH, "Excluir folha", danger = true) {
+                Ui.run {
+                    confirm("Excluir a folha ${i + 1}?", "Tudo o que está nela será apagado (dá para desfazer).", "Excluir") {
+                        canvasView.deletePage(i)
+                        again()
+                    }
+                }
+            } else null,
+        ))
     }
 
     // ---- Girar a tela -------------------------------------------------------------------

@@ -945,4 +945,79 @@ class FunctionalTest {
         val text = app.contentResolver.openInputStream(uri)!!.use { it.readBytes().decodeToString() }
         assertEquals("%PDF-teste", text)
     }
+
+    @Test
+    fun lixeira_guarda_restaura_e_limpa_depois_de_30_dias() {
+        val folder = Library.folder(note.folder)!!
+        Library.trashNote(note.id)
+        assertTrue(Library.notes.none { it.id == note.id })
+        assertEquals(1, Library.trash.size)
+        // Sobrevive a reabrir o app.
+        Library.init(app, reload = true)
+        assertEquals(1, Library.trash.size)
+        val back = Library.restore(Library.trash.single())
+        assertEquals(folder.id, back.folder)
+        assertTrue(Library.notes.any { it.id == note.id })
+
+        // Pasta apagada: as notas vão para a lixeira e voltam numa pasta com o mesmo nome.
+        Library.deleteFolder(folder.id)
+        assertTrue(Library.trash.any { it.note.id == note.id })
+        val again = Library.restore(Library.trash.first { it.note.id == note.id })
+        assertEquals(folder.name, Library.folder(again.folder)!!.name)
+
+        Library.trashNote(note.id)
+        Library.purgeOldTrash(System.currentTimeMillis() + 31L * 24 * 60 * 60 * 1000)
+        assertTrue(Library.trash.isEmpty())
+    }
+
+    @Test
+    fun folhas_reordenar_inserir_duplicar_e_excluir() {
+        canvas.setPageLayout(true, false, false, false, 3)
+        val l = canvas.pageLayout
+        fun mark(i: Int, t: String) = canvas.addText(TextElement(t, l.pageRect(i).centerX(), l.pageRect(i).centerY(), 30f, Color.BLACK))
+        mark(0, "A"); mark(1, "B"); mark(2, "C")
+        fun pageOfText(t: String): Int {
+            val e = items().filterIsInstance<TextElement>().first { it.text == t }
+            return l.indexAt(e.bounds.centerX(), e.bounds.centerY())
+        }
+        canvas.swapPages(0, 1)
+        assertEquals(1, pageOfText("A"))
+        assertEquals(0, pageOfText("B"))
+        canvas.insertBlankPageAfter(0)
+        assertEquals(4, canvas.pageCount)
+        assertEquals(2, pageOfText("A"))
+        assertEquals(3, pageOfText("C"))
+        canvas.duplicatePage(2)
+        assertEquals(5, canvas.pageCount)
+        assertEquals(2, items().filterIsInstance<TextElement>().count { it.text == "A" })
+        canvas.deletePage(1)
+        assertEquals(4, canvas.pageCount)
+        assertEquals(1, items().filterIsInstance<TextElement>().map { it.text }.count { it == "B" })
+        assertNotNull(canvas.renderPage(0, 120))
+    }
+
+    @Test
+    fun balde_pinta_forma_fechada_e_conta_gotas_pega_a_cor() {
+        canvas.pen = PenSettings.default(BrushType.PEN, Color.BLACK)
+        val circle = (0..60).map {
+            val a = 2 * Math.PI * it / 60
+            (500 + 180 * Math.cos(a)).toFloat() to (1000 + 180 * Math.sin(a)).toFloat()
+        }
+        drag(circle)
+        val v = canvas.viewForTests
+        fun wx(x: Float) = (x - v[0]) / v[2]
+        fun wy(y: Float) = (y - v[1]) / v[2]
+        assertTrue(!canvas.fillAt(wx(900f), wy(1500f), Color.RED, 255))
+        assertTrue(canvas.fillAt(wx(500f), wy(1000f), Color.RED, 255))
+        assertEquals(1, items().filterIsInstance<FillElement>().size)
+        // O preenchimento fica por baixo e aparece na tela: o conta-gotas pega o vermelho.
+        layout()
+        val c = canvas.colorAt(500f, 1000f)
+        assertTrue("vermelho: ${Integer.toHexString(c)}", Color.red(c) > 200 && Color.green(c) < 60 && Color.blue(c) < 60)
+        // Salva e recarrega o preenchimento (formato v7).
+        controller.pause().stop().destroy()
+        Library.io.submit {}.get()
+        openEditor()
+        assertEquals(1, items().filterIsInstance<FillElement>().size)
+    }
 }

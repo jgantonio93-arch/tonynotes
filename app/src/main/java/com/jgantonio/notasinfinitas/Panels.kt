@@ -65,6 +65,8 @@ class PenTray(
     private val onFavoritesChanged: () -> Unit,
     /** Largura da bandeja (px), para as cores caberem quando a barra fica de lado. */
     private val widthPx: Int = 0,
+    /** Conta-gotas ou balde escolhido (o próximo toque na nota). */
+    private val onPick: ((InfiniteCanvasView.PickMode) -> Unit)? = null,
 ) : LinearLayout(context) {
 
     private val card = context.trayCard()
@@ -122,6 +124,15 @@ class PenTray(
         val avail = if (widthPx > 0) widthPx else resources.displayMetrics.widthPixels.coerceAtMost(c.dpi(440f))
         val perRow = maxOf(5, (avail - c.dpi(36f)) / c.dpi(42f))
         card.addView(c.wrapRow(dots, perRow))
+        if (onPick != null) {
+            val tools = c.horizontal().apply { setPadding(0, c.dpi(8f), 0, 0) }
+            tools.addView(Ui.run { c.pillButton(Icon.EYEDROPPER, "Conta-gotas") { onPick.invoke(InfiniteCanvasView.PickMode.EYEDROPPER) } })
+            if (current.type != BrushType.HIGHLIGHTER) {
+                tools.addView(Ui.run { c.pillButton(Icon.BUCKET, "Balde") { onPick.invoke(InfiniteCanvasView.PickMode.BUCKET) } },
+                    LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { marginStart = c.dpi(8f) })
+            }
+            card.addView(tools)
+        }
 
         // Ações
         val actions = c.horizontal().apply { setPadding(0, c.dpi(12f), 0, 0) }

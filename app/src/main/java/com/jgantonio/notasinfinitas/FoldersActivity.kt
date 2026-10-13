@@ -28,6 +28,7 @@ import com.jgantonio.notasinfinitas.Ui.icon
 import com.jgantonio.notasinfinitas.Ui.iconButton
 import com.jgantonio.notasinfinitas.Ui.label
 import com.jgantonio.notasinfinitas.Ui.pill
+import com.jgantonio.notasinfinitas.Ui.pillButton
 import com.jgantonio.notasinfinitas.Ui.primaryButton
 import com.jgantonio.notasinfinitas.Ui.promptText
 import com.jgantonio.notasinfinitas.Ui.ripple
@@ -328,6 +329,60 @@ class FoldersActivity : Activity() {
         } else {
             content.addView(sectionLabel("Pastas").apply { setPadding(dpi(6f), dpi(14f), 0, dpi(4f)) })
             addGrid(folders.map { folderCard(it) })
+        }
+        if (Library.trash.isNotEmpty()) {
+            content.addView(horizontal().apply {
+                setPadding(dpi(10f), dpi(12f), dpi(10f), dpi(12f))
+                background = ripple(null, rounded(Color.WHITE, 14f))
+                setOnClickListener { showTrash() }
+                addView(ImageView(this@FoldersActivity).apply { setImageDrawable(icon(Icon.TRASH, Ui.MUTED, 22f)) },
+                    LinearLayout.LayoutParams(dpi(24f), dpi(24f)).apply { marginEnd = dpi(14f) })
+                addView(label("Lixeira (${Library.trash.size})", 15f, Ui.INK))
+            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dpi(16f) })
+        }
+    }
+
+    /** Lixeira: restaurar ou apagar de vez (some sozinha depois de 30 dias). */
+    private fun showTrash() {
+        sheet("Lixeira") { box, dialog ->
+            box.addView(label("As notas ficam aqui por ${Library.TRASH_DAYS} dias e depois são apagadas de vez.", 13f).apply {
+                setPadding(0, 0, 0, dpi(8f))
+            })
+            val now = System.currentTimeMillis()
+            for (t in Library.trash.sortedByDescending { it.trashedAt }) {
+                val left = Library.TRASH_DAYS - ((now - t.trashedAt) / (24L * 60 * 60 * 1000)).toInt()
+                val row = horizontal().apply { setPadding(0, dpi(8f), 0, dpi(8f)) }
+                val texts = vertical()
+                texts.addView(label(t.note.title, 15f, Ui.INK, bold = true).apply { isSingleLine = true; ellipsize = android.text.TextUtils.TruncateAt.END })
+                texts.addView(label((if (t.folderName.isNotBlank()) t.folderName + " · " else "") +
+                    (if (left <= 1) "some amanhã" else "some em $left dias"), 12.5f))
+                row.addView(texts, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                row.addView(pillButton(Icon.RESET, "Restaurar") {
+                    Library.restore(t)
+                    dialog.dismiss()
+                    render()
+                    if (Library.trash.isNotEmpty()) showTrash()
+                })
+                row.addView(iconButton(Icon.TRASH, Ui.DANGER, 40f, "Apagar de vez") {
+                    confirm("Apagar de vez?", "“${t.note.title}” não poderá mais ser recuperada.", "Apagar") {
+                        Library.deleteForever(t)
+                        dialog.dismiss()
+                        render()
+                        if (Library.trash.isNotEmpty()) showTrash()
+                    }
+                })
+                box.addView(row)
+            }
+            box.addView(buttonRow(
+                secondaryButton("Fechar") { dialog.dismiss() },
+                primaryButton("Esvaziar lixeira", Ui.DANGER) {
+                    confirm("Esvaziar lixeira?", "As ${Library.trash.size} notas da lixeira serão apagadas para sempre.", "Esvaziar") {
+                        Library.emptyTrash()
+                        dialog.dismiss()
+                        render()
+                    }
+                },
+            ))
         }
     }
 
@@ -807,7 +862,7 @@ class FoldersActivity : Activity() {
                 }
             },
             SheetItem(Icon.TRASH, "Excluir pasta", danger = true) {
-                confirm("Excluir pasta?", "“${f.name}” e tudo dentro dela ($count ${if (count == 1) "item" else "itens"}) serão apagados para sempre.", "Excluir") {
+                confirm("Excluir pasta?", "“${f.name}” será apagada e as notas dela ($count ${if (count == 1) "item" else "itens"}) vão para a lixeira, onde ficam ${Library.TRASH_DAYS} dias.", "Excluir") {
                     Library.deleteFolder(f.id)
                     if (f.id == folderId) finish() else render()
                 }
@@ -844,9 +899,9 @@ class FoldersActivity : Activity() {
                 Library.duplicateNote(n)
                 render()
             },
-            SheetItem(Icon.TRASH, "Excluir nota", danger = true) {
-                confirm("Excluir nota?", "“${n.title}” será apagada para sempre.", "Excluir") {
-                    Library.deleteNote(n.id)
+            SheetItem(Icon.TRASH, "Mover para a lixeira", danger = true) {
+                confirm("Mover para a lixeira?", "“${n.title}” fica ${Library.TRASH_DAYS} dias na lixeira e pode ser recuperada.", "Mover") {
+                    Library.trashNote(n.id)
                     render()
                 }
             },

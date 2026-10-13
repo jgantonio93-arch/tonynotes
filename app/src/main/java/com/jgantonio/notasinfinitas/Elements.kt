@@ -510,6 +510,48 @@ class ImageElement(
 }
 
 /** Polígono do laço de seleção, em coordenadas do mundo. */
+/**
+ * Preenchimento (balde): o interior de uma forma fechada, desenhado por baixo da escrita.
+ * [xs]/[ys] é o contorno (o mesmo do traço que foi preenchido).
+ */
+class FillElement(
+    val xs: FloatArray,
+    val ys: FloatArray,
+    val color: Int,
+    val alpha: Int,
+) : Element() {
+    val n get() = xs.size
+
+    override val bounds: RectF = RectF(
+        xs.minOrNull() ?: 0f, ys.minOrNull() ?: 0f, xs.maxOrNull() ?: 0f, ys.maxOrNull() ?: 0f,
+    )
+
+    private var cachedPath: android.graphics.Path? = null
+    val path: android.graphics.Path
+        get() = cachedPath ?: android.graphics.Path().apply {
+            if (n > 0) {
+                moveTo(xs[0], ys[0])
+                for (i in 1 until n) lineTo(xs[i], ys[i])
+                close()
+            }
+        }.also { cachedPath = it }
+
+    fun withColor(c: Int) = FillElement(xs, ys, c, alpha)
+
+    fun contains(px: Float, py: Float) = Lasso(xs, ys).contains(px, py)
+
+    override fun transformed(t: Transform) = FillElement(
+        FloatArray(n) { t.x(xs[it], ys[it]) },
+        FloatArray(n) { t.y(xs[it], ys[it]) },
+        color, alpha,
+    )
+
+    override fun insideLasso(lasso: Lasso) = lasso.contains(bounds.centerX(), bounds.centerY())
+
+    override fun touchesLasso(lasso: Lasso) =
+        insideLasso(lasso) || lasso.crosses(xs, ys, n, closed = true) || (0 until n).any { lasso.contains(xs[it], ys[it]) }
+}
+
 class Lasso(private val xs: FloatArray, private val ys: FloatArray) {
     companion object {
         /** Retângulo de seleção entre dois cantos. */

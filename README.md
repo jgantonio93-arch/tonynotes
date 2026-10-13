@@ -133,6 +133,12 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
   Formato conforme a engenharia reversa de twangodev/sdocx e bxff/samsung-notes-format.
 
 ### Outras ferramentas
+- **Folhas em miniatura** (menu ⋮ › Folhas): grade com as folhas da nota; toque para ir até
+  uma, e ⋯ para mover para cima/baixo, duplicar, inserir folha em branco ou excluir.
+- **Lixeira**: notas excluídas (e as de pastas excluídas) ficam 30 dias na lixeira da tela
+  inicial, com Restaurar, Apagar de vez e Esvaziar.
+- **Conta-gotas e balde** (na bandeja das canetas): pegar a cor de qualquer coisa da nota e
+  pintar o interior de uma forma fechada feita com um traço (o preenchimento fica por baixo).
 - **Copiar e colar**: selecione e toque em **Copiar** (ou Recortar); a pílula **Colar** ao lado do
   zoom cola no centro da tela, na mesma nota ou em outra (vale para traços, textos, imagens e PDF).
 - **Print da área**: desenhe um laço ou retângulo com a seleção (mesmo sobre um PDF travado) e

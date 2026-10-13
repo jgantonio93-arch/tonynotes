@@ -19,7 +19,7 @@ enum class Icon {
     ROTATE, LOCK, UNLOCK, CROP, FLIP_H, FLIP_V, ADJUST, TO_FRONT, TO_BACK, DOWNLOAD, RESET, ZOOM, SELECT_ALL,
     SEARCH, MARKER, ALIGN_LEFT, ALIGN_CENTER, ALIGN_RIGHT, TEXT_BIGGER, TEXT_SMALLER,
     RECT_SELECT, PARTIAL, STRAIGHT, GRIP, INFINITE, PAGES_V, PAGES_H, DOCK_TOP, DOCK_LEFT, DOCK_RIGHT,
-    SUN, MOON, THEME_AUTO, PAGE_PORTRAIT, PAGE_LANDSCAPE, FULLSCREEN, FULLSCREEN_EXIT, MIC
+    SUN, MOON, THEME_AUTO, PAGE_PORTRAIT, PAGE_LANDSCAPE, FULLSCREEN, FULLSCREEN_EXIT, MIC, EYEDROPPER, BUCKET
 }
 
 /** Rótulo em português para leitores de tela (botões só com ícone). */
@@ -44,6 +44,7 @@ val Icon.label: String
         Icon.ALIGN_CENTER -> "Centralizar texto"; Icon.ALIGN_RIGHT -> "Alinhar à direita"
         Icon.TEXT_BIGGER -> "Aumentar"; Icon.TEXT_SMALLER -> "Diminuir"
         Icon.FULLSCREEN -> "Tela cheia"; Icon.FULLSCREEN_EXIT -> "Sair da tela cheia"; Icon.MIC -> "Áudio"
+        Icon.EYEDROPPER -> "Conta-gotas"; Icon.BUCKET -> "Balde"
     }
 
 class IconDrawable(
@@ -280,6 +281,19 @@ class IconDrawable(
                 arcTo(RectF(4f, 4f, 20f, 20f), 200f, -290f, true)
                 moveTo(3.5f, 4.5f); lineTo(4.4f, 9.4f); lineTo(9.2f, 8.4f)
             }, stroke)
+            Icon.EYEDROPPER -> c.drawPath(path {
+                moveTo(14.5f, 5.5f); lineTo(18.5f, 9.5f)
+                moveTo(16.5f, 7.5f); lineTo(7f, 17f); lineTo(4.5f, 19.5f)
+                moveTo(13f, 7f); lineTo(17f, 11f)
+                moveTo(15.2f, 4.8f); quadTo(17.5f, 2.5f, 19.5f, 4.5f); quadTo(21.5f, 6.5f, 19.2f, 8.8f)
+            }, stroke)
+            Icon.BUCKET -> {
+                c.drawPath(path {
+                    moveTo(5f, 11f); lineTo(11f, 5f); lineTo(18f, 12f); lineTo(12f, 18f); close()
+                    moveTo(9f, 7f); lineTo(6.5f, 4.5f)
+                }, stroke)
+                c.drawPath(path { moveTo(19.5f, 15f); quadTo(21.5f, 18f, 19.5f, 19.5f); quadTo(17.5f, 18f, 19.5f, 15f); close() }, fill)
+            }
             Icon.MIC -> c.drawPath(path {
                 rrect(9f, 3f, 15f, 14.5f, 3f)
                 moveTo(5.5f, 11f); quadTo(5.5f, 17.5f, 12f, 17.5f); quadTo(18.5f, 17.5f, 18.5f, 11f)

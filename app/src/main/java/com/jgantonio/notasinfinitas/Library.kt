@@ -18,6 +18,9 @@ class NoteInfo(
     var tags: List<String> = emptyList(),
 )
 
+/** Nota na lixeira: guarda o nome da pasta de origem (para recriar se ela não existir mais). */
+class TrashedNote(val note: NoteInfo, val folderName: String, val trashedAt: Long)
+
 /**
  * Biblioteca de pastas e notas. O índice fica em library.json; cada nota tem
  * seu arquivo em notes/<id>.ninf, suas imagens em notes/<id>/ e a miniatura
@@ -35,6 +38,9 @@ object Library {
 
     val folders = ArrayList<Folder>()
     val notes = ArrayList<NoteInfo>()
+    /** Lixeira: notas excluídas ficam aqui por [TRASH_DAYS] dias, com os arquivos intactos. */
+    val trash = ArrayList<TrashedNote>()
+    const val TRASH_DAYS = 30
 
     private lateinit var dir: File
     private var loaded = false
@@ -44,9 +50,11 @@ object Library {
         if (loaded && dir == d && !reload) return
         folders.clear()
         notes.clear()
+        trash.clear()
         dir = d
         load()
         loaded = true
+        purgeOldTrash()
         migrateFirstPrototype()
         if (folders.isEmpty()) {
             createFolder("Geral", folderColors[5], null)
@@ -137,9 +145,12 @@ object Library {
         save()
     }
 
+    /** Apaga a pasta (e subpastas); as notas dela vão para a lixeira. */
     fun deleteFolder(id: String) {
         for (child in folders.filter { it.parent == id }) deleteFolder(child.id)
-        for (n in notes.filter { it.folder == id }) deleteNoteFiles(n.id)
+        val name = folder(id)?.name ?: ""
+        val now = System.currentTimeMillis()
+        for (n in notes.filter { it.folder == id }) trash.add(TrashedNote(n, name, now))
         notes.removeAll { it.folder == id }
         folders.removeAll { it.id == id }
         io.execute { coverFile(id).delete() }
@@ -161,6 +172,52 @@ object Library {
         save()
     }
 
+    // ---- Lixeira -------------------------------------------------------------------
+
+    fun trashNote(id: String) {
+        val n = notes.firstOrNull { it.id == id } ?: return
+        trash.add(TrashedNote(n, folder(n.folder)?.name ?: "", System.currentTimeMillis()))
+        notes.remove(n)
+        save()
+    }
+
+    /** Volta a nota para a pasta de origem; se ela sumiu, para uma pasta com o mesmo nome (criada se preciso). */
+    fun restore(t: TrashedNote): NoteInfo {
+        val n = t.note
+        if (folder(n.folder) == null) {
+            val name = t.folderName.ifBlank { "Recuperadas" }
+            n.folder = (folders.firstOrNull { it.parent == null && it.name == name }
+                ?: createFolder(name, folderColors[folders.size % folderColors.size], null)).id
+        }
+        trash.remove(t)
+        notes.add(n)
+        save()
+        return n
+    }
+
+    fun deleteForever(t: TrashedNote) {
+        trash.remove(t)
+        deleteNoteFiles(t.note.id)
+        save()
+    }
+
+    fun emptyTrash() {
+        for (t in trash) deleteNoteFiles(t.note.id)
+        trash.clear()
+        save()
+    }
+
+    /** Some de vez o que está na lixeira há mais de [TRASH_DAYS] dias. */
+    internal fun purgeOldTrash(now: Long = System.currentTimeMillis()) {
+        val limit = now - TRASH_DAYS * 24L * 60 * 60 * 1000
+        val old = trash.filter { it.trashedAt < limit }
+        if (old.isEmpty()) return
+        for (t in old) deleteNoteFiles(t.note.id)
+        trash.removeAll(old.toSet())
+        save()
+    }
+
+    /** Apaga de vez (sem lixeira). */
     fun deleteNote(id: String) {
         deleteNoteFiles(id)
         notes.removeAll { it.id == id }
@@ -208,15 +265,11 @@ object Library {
                 ))
             }
             val na = json.optJSONArray("notes") ?: JSONArray()
-            for (i in 0 until na.length()) {
-                val o = na.getJSONObject(i)
-                val tags = o.optJSONArray("tags")
-                notes.add(NoteInfo(
-                    o.getString("id"), o.getString("title"), o.getString("folder"),
-                    o.optLong("created"), o.optLong("modified"),
-                    pinned = o.optBoolean("pinned"), favorite = o.optBoolean("favorite"),
-                    tags = if (tags == null) emptyList() else (0 until tags.length()).map { tags.getString(it) },
-                ))
+            for (i in 0 until na.length()) notes.add(noteFrom(na.getJSONObject(i)))
+            val ta = json.optJSONArray("trash") ?: JSONArray()
+            for (i in 0 until ta.length()) {
+                val o = ta.getJSONObject(i)
+                trash.add(TrashedNote(noteFrom(o), o.optString("trashFolderName"), o.optLong("trashedAt")))
             }
             // Notas cuja pasta sumiu vão para a primeira pasta existente.
             val ids = folders.map { it.id }.toSet()
@@ -227,7 +280,26 @@ object Library {
             f.renameTo(File(dir, "library.json.bak"))
             folders.clear()
             notes.clear()
+            trash.clear()
         }
+    }
+
+    private fun noteFrom(o: JSONObject): NoteInfo {
+        val tags = o.optJSONArray("tags")
+        return NoteInfo(
+            o.getString("id"), o.getString("title"), o.getString("folder"),
+            o.optLong("created"), o.optLong("modified"),
+            pinned = o.optBoolean("pinned"), favorite = o.optBoolean("favorite"),
+            tags = if (tags == null) emptyList() else (0 until tags.length()).map { tags.getString(it) },
+        )
+    }
+
+    private fun noteJson(n: NoteInfo) = JSONObject().apply {
+        put("id", n.id); put("title", n.title); put("folder", n.folder)
+        put("created", n.created); put("modified", n.modified)
+        if (n.pinned) put("pinned", true)
+        if (n.favorite) put("favorite", true)
+        if (n.tags.isNotEmpty()) put("tags", JSONArray(n.tags))
     }
 
     fun save() {
@@ -239,14 +311,9 @@ object Library {
                 put("parent", f.parent ?: JSONObject.NULL); put("created", f.created)
             })
         })
-        json.put("notes", JSONArray().apply {
-            for (n in notes) put(JSONObject().apply {
-                put("id", n.id); put("title", n.title); put("folder", n.folder)
-                put("created", n.created); put("modified", n.modified)
-                if (n.pinned) put("pinned", true)
-                if (n.favorite) put("favorite", true)
-                if (n.tags.isNotEmpty()) put("tags", JSONArray(n.tags))
-            })
+        json.put("notes", JSONArray().apply { for (n in notes) put(noteJson(n)) })
+        json.put("trash", JSONArray().apply {
+            for (t in trash) put(noteJson(t.note).apply { put("trashFolderName", t.folderName); put("trashedAt", t.trashedAt) })
         })
         val tmp = File(dir, "library.json.tmp")
         tmp.writeText(json.toString())

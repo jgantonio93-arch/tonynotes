@@ -84,16 +84,18 @@ class NoteData(
  * Versão 4: textos com rotação, espelhamento, fonte, alinhamento e estilos por trecho (tipo 5).
  * Versão 5: modo de página (infinita ou folhas) logo depois da cor do papel.
  * Versão 6: ângulo da tela (rotação da visão) logo depois do zoom.
+ * Versão 7: preenchimentos do balde (tipo 6).
  */
 object NoteStorage {
     private const val MAGIC = 0x4E494E46 // "NINF"
-    private const val VERSION = 6
+    private const val VERSION = 7
 
     private const val TYPE_STROKE = 1
     private const val TYPE_TEXT = 2
     private const val TYPE_IMAGE = 3
     private const val TYPE_IMAGE_V3 = 4
     private const val TYPE_TEXT_V4 = 5
+    private const val TYPE_FILL = 6
 
     fun save(file: File, data: NoteData) {
         file.parentFile?.mkdirs()
@@ -162,6 +164,13 @@ object NoteStorage {
                     out.writeBoolean(e.shadow); out.writeBoolean(e.locked)
                     out.writeInt(e.pdfPage)
                 }
+                is FillElement -> {
+                    out.writeByte(TYPE_FILL)
+                    out.writeInt(e.color)
+                    out.writeInt(e.alpha)
+                    out.writeInt(e.n)
+                    for (i in 0 until e.n) { out.writeFloat(e.xs[i]); out.writeFloat(e.ys[i]) }
+                }
             }
         }
         if (!tmp.renameTo(file)) {
@@ -179,7 +188,7 @@ object NoteStorage {
                     1 -> readV1(input)
                     2, 3, 4 -> readV2(input, false)
                     5 -> readV2(input, true)
-                    6 -> readV2(input, true, hasRotation = true)
+                    6, 7 -> readV2(input, true, hasRotation = true)
                     else -> null
                 }
             }
@@ -240,6 +249,14 @@ object NoteStorage {
                     input.readUTF(),
                     RectF(input.readFloat(), input.readFloat(), input.readFloat(), input.readFloat()),
                 ))
+                TYPE_FILL -> {
+                    val color = input.readInt()
+                    val alpha = input.readInt()
+                    val n = input.readInt()
+                    val xs = FloatArray(n); val ys = FloatArray(n)
+                    for (i in 0 until n) { xs[i] = input.readFloat(); ys[i] = input.readFloat() }
+                    if (n >= 3) elements.add(FillElement(xs, ys, color, alpha))
+                }
                 TYPE_TEXT_V4 -> {
                     val text = ByteArray(input.readInt()).also { input.readFully(it) }.toString(Charsets.UTF_8)
                     val x = input.readFloat(); val y = input.readFloat(); val size = input.readFloat()

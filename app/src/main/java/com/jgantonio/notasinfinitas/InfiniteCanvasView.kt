@@ -439,6 +439,159 @@ class InfiniteCanvasView(context: Context) : View(context) {
 
     // ---- Seleção -----------------------------------------------------------
 
+    // ---- Conta-gotas e balde ----------------------------------------------------------
+
+    enum class PickMode { EYEDROPPER, BUCKET }
+
+    /** Próximo toque pega uma cor (conta-gotas) ou pinta uma forma fechada (balde). */
+    var pickMode: PickMode? = null
+        set(v) { field = v; listener?.onStateChanged() }
+    var onColorPicked: ((Int) -> Unit)? = null
+
+    /** Cor do que aparece na tela no ponto (x, y) da tela. */
+    internal fun colorAt(sx: Float, sy: Float): Int {
+        val bmp = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        c.translate(-sx, -sy)
+        draw(c)
+        val color = bmp.getPixel(0, 0)
+        bmp.recycle()
+        return color or (0xFF shl 24)
+    }
+
+    /**
+     * Balde: pinta o interior da menor forma fechada (um traço só, com as pontas perto)
+     * que contém o ponto do mundo. Devolve false se não achar nenhuma.
+     */
+    fun fillAt(px: Float, py: Float, color: Int, alpha: Int): Boolean {
+        var best: StrokeElement? = null
+        var bestArea = Float.MAX_VALUE
+        for (e in elements) {
+            if (e !is StrokeElement || e.type == BrushType.HIGHLIGHTER || e.n < 6) continue
+            val b = e.bounds
+            if (!b.contains(px, py)) continue
+            var len = 0f
+            for (k in 1 until e.n) len += hypot(e.xs[k] - e.xs[k - 1], e.ys[k] - e.ys[k - 1])
+            val gap = hypot(e.xs[e.n - 1] - e.xs[0], e.ys[e.n - 1] - e.ys[0])
+            if (gap > max(0.15f * len, (e.ws.maxOrNull() ?: 0f) * 3f)) continue
+            if (!Lasso(e.xs, e.ys).contains(px, py)) continue
+            val area = b.width() * b.height()
+            if (area < bestArea) { bestArea = area; best = e }
+        }
+        val s = best ?: return false
+        begin()
+        insertAt(elements.size, FillElement(s.xs.copyOf(), s.ys.copyOf(), color, alpha))
+        commit()
+        return true
+    }
+
+    private fun handlePick(sx: Float, sy: Float) {
+        when (pickMode) {
+            PickMode.EYEDROPPER -> onColorPicked?.invoke(colorAt(sx, sy))
+            PickMode.BUCKET -> if (!fillAt(wx(sx), wy(sy), pen.color, min(pen.alpha, 255))) {
+                android.widget.Toast.makeText(context, "Toque dentro de uma forma fechada (um traço só).", android.widget.Toast.LENGTH_SHORT).show()
+            }
+            null -> Unit
+        }
+        pickMode = null
+    }
+
+    // ---- Folhas: reordenar, inserir, duplicar e excluir -------------------------------
+
+    /** Folha (a partir de 0) em que fica o elemento, pelo centro. */
+    private fun pageOf(e: Element): Int {
+        val b = e.bounds
+        return pageLayout.indexAt(b.centerX(), b.centerY())
+    }
+
+    /** Desloca em [delta] folhas os elementos das folhas que satisfazem [which] (uma ação de desfazer já aberta). */
+    private fun shiftPages(delta: Int, which: (Int) -> Boolean) {
+        val l = pageLayout
+        val t = Transform.translate(l.stepX * delta, l.stepY * delta)
+        for (i in elements.indices) {
+            val e = elements[i]
+            if (which(pageOf(e))) {
+                removeAt(i)
+                insertAt(i, e.transformed(t))
+            }
+        }
+    }
+
+    private fun setPageCount(n: Int) {
+        if (!pageLayout.endless) pageLayout = pageLayout.copy(count = n.coerceIn(1, MAX_PAGES))
+        pageCountCache = -1
+    }
+
+    fun swapPages(a: Int, b: Int) {
+        if (!pageLayout.hasPages || a == b || a < 0 || b < 0) return
+        clearSelection()
+        val onA = elements.filter { pageOf(it) == a }.toSet()
+        val onB = elements.filter { pageOf(it) == b }.toSet()
+        val ta = Transform.translate(pageLayout.stepX * (b - a), pageLayout.stepY * (b - a))
+        val tb = Transform.translate(pageLayout.stepX * (a - b), pageLayout.stepY * (a - b))
+        begin()
+        for (i in elements.indices) {
+            val e = elements[i]
+            val moved = when (e) { in onA -> e.transformed(ta); in onB -> e.transformed(tb); else -> null } ?: continue
+            removeAt(i)
+            insertAt(i, moved)
+        }
+        commit()
+    }
+
+    fun insertBlankPageAfter(index: Int) {
+        if (!pageLayout.hasPages) return
+        clearSelection()
+        val count = pageCount
+        begin()
+        shiftPages(1) { it > index }
+        commit()
+        setPageCount(count + 1)
+        invalidate()
+    }
+
+    fun duplicatePage(index: Int) {
+        if (!pageLayout.hasPages) return
+        clearSelection()
+        val count = pageCount
+        val l = pageLayout
+        val copies = elements.filter { pageOf(it) == index }.map { it.transformed(Transform.translate(l.stepX, l.stepY)) }
+        begin()
+        shiftPages(1) { it > index }
+        for (c in copies) insertAt(elements.size, if (c is ImageElement && c.locked) c else c)
+        commit()
+        setPageCount(count + 1)
+        invalidate()
+    }
+
+    fun deletePage(index: Int) {
+        if (!pageLayout.hasPages) return
+        clearSelection()
+        val count = pageCount
+        begin()
+        for (i in elements.indices.reversed()) if (pageOf(elements[i]) == index) removeAt(i)
+        shiftPages(-1) { it > index }
+        commit()
+        setPageCount(count - 1)
+        invalidate()
+    }
+
+    /** Miniatura da folha [index] (papel, modelo e conteúdo). */
+    fun renderPage(index: Int, widthPx: Int): Bitmap? {
+        val l = pageLayout
+        if (!l.hasPages) return null
+        val r = l.pageRect(index)
+        val k = widthPx / r.width()
+        val bmp = Bitmap.createBitmap(widthPx, max(1, (r.height() * k).toInt()), Bitmap.Config.ARGB_8888)
+        val c = Canvas(bmp)
+        c.drawColor(paperColor)
+        c.scale(k, k)
+        c.translate(-r.left, -r.top)
+        drawTemplateForExport(c, r)
+        drawContent(c, r, k)
+        return bmp
+    }
+
     // ---- Área marcada (print da área) ------------------------------------------------
 
     /** Última área do laço/retângulo, mesmo sem itens dentro (para o "print da área"). */
@@ -560,6 +713,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
                 is StrokeElement -> it.withColor(color)
                 is TextElement -> it.withColor(color)
                 is ImageElement -> it.with(borderColor = color, borderWidth = if (it.borderWidth > 0f) it.borderWidth else 6f)
+                is FillElement -> it.withColor(color)
             }
         }
         replaceAll(pairs)
@@ -1205,6 +1359,11 @@ class InfiniteCanvasView(context: Context) : View(context) {
         var start = 0
         for (i in 0..size) {
             if (i < size && list[i] !is ImageElement) continue
+            // Preenchimentos do balde ficam no fundo, depois o marca-texto, depois a escrita.
+            for (j in start until i) {
+                val e = list[j]
+                if (e is FillElement) action(e)
+            }
             for (j in start until i) {
                 val e = list[j]
                 if (e is StrokeElement && e.type == BrushType.HIGHLIGHTER) action(e)
@@ -1212,7 +1371,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
             if (i == size) beforeInk()
             for (j in start until i) {
                 val e = list[j]
-                if (!(e is StrokeElement && e.type == BrushType.HIGHLIGHTER)) action(e)
+                if (!(e is StrokeElement && e.type == BrushType.HIGHLIGHTER) && e !is FillElement) action(e)
             }
             if (i < size) action(list[i])
             start = i + 1
@@ -1299,6 +1458,13 @@ class InfiniteCanvasView(context: Context) : View(context) {
         if (pen && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             // Entrega os pontos da caneta sem esperar o próximo frame: menos atraso.
             try { requestUnbufferedDispatch(e) } catch (_: Exception) { }
+        }
+        // Conta-gotas / balde: o toque só escolhe o ponto.
+        if (pickMode != null) {
+            gesture = Gesture.NONE
+            swallowing = true
+            handlePick(x, y)
+            return
         }
         // No recorte, caneta e dedo ajustam o recorte (dois dedos ainda movem a tela).
         if (cropTarget != null) {
@@ -1661,6 +1827,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
                 is ImageElement -> e.contains(px, py)
                 is TextElement -> e.contains(px, py)
                 is StrokeElement -> e.hits(px, py, r)
+                is FillElement -> e.contains(px, py)
             }
             if (hit) return e
         }
@@ -1759,6 +1926,13 @@ class InfiniteCanvasView(context: Context) : View(context) {
     private fun eraseWorld(px: Float, py: Float, r: Float) {
         var i = elements.size - 1
         while (i >= 0) {
+            val f = elements[i] as? FillElement
+            if (f != null && !eraserHighlighterOnly && f.contains(px, py)) {
+                removeAt(i)
+                dirty = true
+                i--
+                continue
+            }
             val s = elements[i] as? StrokeElement
             if (s != null && (!eraserHighlighterOnly || s.type == BrushType.HIGHLIGHTER)) {
                 if (eraserArea) {
@@ -2031,10 +2205,17 @@ class InfiniteCanvasView(context: Context) : View(context) {
             is StrokeElement -> StrokeRenderer.drawElement(canvas, e)
             is TextElement -> if (e !== editingText) drawText(canvas, e)
             is ImageElement -> images.draw(canvas, e, renderScale, sync)
+            is FillElement -> {
+                fillPaint.color = e.color or (0xFF shl 24)
+                fillPaint.alpha = e.alpha
+                fillPaint.colorFilter = if (StrokeRenderer.night) Night.filter else null
+                canvas.drawPath(e.path, fillPaint)
+            }
         }
     }
 
     private val textBg = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
 
     private fun drawText(canvas: Canvas, e: TextElement) {
         canvas.save()
