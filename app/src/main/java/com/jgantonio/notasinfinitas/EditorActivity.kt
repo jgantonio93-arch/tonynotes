@@ -1074,7 +1074,10 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
                 else menuTile(Icon.MIC, "Gravar áudio", act { startRecording() }),
             )
             if (audio.recordings.isNotEmpty()) tiles.add(menuTile(Icon.MIC, "Áudios (${audio.recordings.size})", act { showRecordings() }))
-            while (tiles.size % 3 != 0) tiles.add(View(this).apply { layoutParams = LinearLayout.LayoutParams(0, 1, 1f) })
+            // Completa a última fileira com espaços do mesmo tamanho (os cartões não esticam).
+            while (tiles.size % 3 != 0) tiles.add(View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(0, 1, 1f).apply { setMargins(dpi(4f), dpi(4f), dpi(4f), dpi(4f)) }
+            })
             box.addView(wrapRow(tiles, 3))
 
             box.addView(menuSection("Arquivo"))
