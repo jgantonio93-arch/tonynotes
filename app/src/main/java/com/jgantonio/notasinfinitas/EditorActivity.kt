@@ -336,6 +336,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         audioNotes?.let { if (it.isRecording) { it.stop(); updateAudioPill() } }
         if (::canvasView.isInitialized) save()
         Backup.autoBackupIfDue(this)
+        DriveSync.autoIfDue(this)
     }
 
     @Deprecated("Deprecated in Java")

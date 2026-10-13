@@ -35,6 +35,7 @@ import com.jgantonio.notasinfinitas.Ui.ripple
 import com.jgantonio.notasinfinitas.Ui.rounded
 import com.jgantonio.notasinfinitas.Ui.secondaryButton
 import com.jgantonio.notasinfinitas.Ui.sectionLabel
+import com.jgantonio.notasinfinitas.Ui.switchRow
 import com.jgantonio.notasinfinitas.Ui.sheet
 import com.jgantonio.notasinfinitas.Ui.textField
 import com.jgantonio.notasinfinitas.Ui.title
@@ -597,6 +598,11 @@ class FoldersActivity : Activity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_DRIVE) {
+            val token = if (resultCode == RESULT_OK) DriveAuth.tokenFromResult(this, data) else null
+            if (token != null) driveWithToken(token) else { pendingDrive = null; toast("Login no Google cancelado.") }
+            return
+        }
         if (resultCode != RESULT_OK) return
         if (requestCode == REQ_SDOCX) {
             importSamsung(pickedUris(data))
@@ -1008,20 +1014,60 @@ class FoldersActivity : Activity() {
     // ---- Backup no Google Drive --------------------------------------------------------
 
     private fun backupMenu() {
-        val auto = Backup.autoUri(this)
-        val last = Backup.lastBackup(this)
-        val info = when {
-            last == 0L -> "Nenhum backup feito ainda"
-            else -> "Último backup: " + SimpleDateFormat("dd/MM/yyyy 'às' HH:mm", ptBr).format(Date(last))
-        }
-        actionSheet("Backup no Google Drive", listOfNotNull(
-            SheetItem(Icon.EXPORT, "Fazer backup agora") { pickBackupFile(REQ_BACKUP_NOW) },
-            if (auto == null) SheetItem(Icon.CHECK, "Ligar backup automático") { pickBackupFile(REQ_BACKUP_AUTO) }
-            else SheetItem(Icon.CLOSE, "Desligar backup automático") {
+        val fmt = SimpleDateFormat("dd/MM/yyyy 'às' HH:mm", ptBr)
+        val connected = DriveSync.connected(this)
+        val lastDrive = DriveSync.lastBackup(this)
+        sheet("Backup") { box, dialog ->
+            fun act(block: () -> Unit): () -> Unit = { dialog.dismiss(); block() }
+            fun row(ic: Icon, text: String, onClick: () -> Unit) = horizontal().apply {
+                minimumHeight = dpi(50f)
+                setPadding(dpi(8f), 0, dpi(8f), 0)
+                background = ripple(null, rounded(Color.WHITE, 14f))
+                setOnClickListener { onClick() }
+                addView(ImageView(this@FoldersActivity).apply { setImageDrawable(icon(ic, Ui.INK, 22f)) },
+                    LinearLayout.LayoutParams(dpi(24f), dpi(24f)).apply { marginEnd = dpi(16f) })
+                addView(label(text, 15.5f, Ui.INK))
+            }
+            box.addView(sectionLabel("Google Drive (arquivo por arquivo)"))
+            box.addView(label(when {
+                !connected -> "Cada nota, imagem e capa vai como um arquivo na pasta “RosaNotes” do seu Drive. Só sobe o que mudou."
+                lastDrive == 0L -> "Conectado. Nenhum backup feito ainda."
+                else -> "Conectado. Último backup: " + fmt.format(Date(lastDrive))
+            } + (DriveSync.lastError?.let { "\n⚠ $it" } ?: ""), 13f).apply {
+                setPadding(dpi(4f), dpi(2f), 0, dpi(6f))
+                setLineSpacing(0f, 1.1f)
+            })
+            if (!connected) {
+                box.addView(row(Icon.EXPORT, "Conectar ao Google Drive", act { driveRun(DriveTask.CONNECT) }))
+            } else {
+                box.addView(row(Icon.EXPORT, "Fazer backup agora", act { driveRun(DriveTask.BACKUP) }))
+                box.addView(switchRow(Icon.CHECK, "Backup automático no Drive", DriveSync.autoOn(this)) { on ->
+                    DriveSync.setAuto(this, on)
+                })
+                box.addView(row(Icon.DOWNLOAD, "Restaurar do Drive", act {
+                    confirm("Restaurar do Drive?", "As pastas e notas deste aparelho serão trocadas pelas do backup no Drive.", "Restaurar") {
+                        driveRun(DriveTask.RESTORE)
+                    }
+                }))
+                box.addView(row(Icon.CLOSE, "Desconectar do Drive", act {
+                    DriveSync.setConnected(this, false)
+                    toast("Desconectado do Google Drive")
+                }))
+            }
+
+            box.addView(sectionLabel("Arquivo único (.zip)").apply { setPadding(0, dpi(16f), 0, 0) })
+            val auto = Backup.autoUri(this)
+            val last = Backup.lastBackup(this)
+            box.addView(label(if (last == 0L) "Um .zip com tudo, salvo onde você escolher." else "Último .zip: " + fmt.format(Date(last)), 13f).apply {
+                setPadding(dpi(4f), dpi(2f), 0, dpi(6f))
+            })
+            box.addView(row(Icon.EXPORT, "Exportar backup em arquivo (.zip)", act { pickBackupFile(REQ_BACKUP_NOW) }))
+            if (auto == null) box.addView(row(Icon.CHECK, "Ligar .zip automático", act { pickBackupFile(REQ_BACKUP_AUTO) }))
+            else box.addView(row(Icon.CLOSE, "Desligar .zip automático", act {
                 Backup.disableAuto(this)
-                toast("Backup automático desligado")
-            },
-            SheetItem(Icon.DOWNLOAD, "Restaurar de um backup") {
+                toast("Backup automático em .zip desligado")
+            }))
+            box.addView(row(Icon.DOWNLOAD, "Restaurar de um .zip", act {
                 val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                     type = "*/*"
                     putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(Backup.MIME, "application/octet-stream"))
@@ -1029,9 +1075,54 @@ class FoldersActivity : Activity() {
                 }
                 @Suppress("DEPRECATION")
                 startActivityForResult(intent, REQ_RESTORE)
-            },
-        ), header = Panels.headerRow(this, icon(Icon.EXPORT, Ui.MUTED, 28f),
-            if (auto != null) "Backup automático ligado" else "Suas notas no seu Drive", info))
+            }))
+        }
+    }
+
+    private enum class DriveTask { CONNECT, BACKUP, RESTORE }
+    private var pendingDrive: DriveTask? = null
+
+    /** Pega o token (pedindo login se preciso) e roda a tarefa do Drive. */
+    private fun driveRun(task: DriveTask) {
+        toast(if (task == DriveTask.RESTORE) "Baixando do Drive…" else "Conectando ao Google Drive…")
+        pendingDrive = task
+        DriveAuth.connect(this, REQ_DRIVE) { token, error ->
+            if (error != null) {
+                pendingDrive = null
+                sheet("Google Drive") { box, d ->
+                    box.addView(label(error, 15f, Ui.MUTED))
+                    box.addView(buttonRow(primaryButton("OK") { d.dismiss() }))
+                }
+            } else if (token != null) driveWithToken(token)
+        }
+    }
+
+    private fun driveWithToken(token: String) {
+        val task = pendingDrive ?: return
+        pendingDrive = null
+        if (task == DriveTask.CONNECT) {
+            toast("Conectado. Enviando o primeiro backup…")
+        }
+        Library.io.execute {
+            val msg = try {
+                if (task == DriveTask.RESTORE) {
+                    val n = DriveSync.restore(this, DriveRest(token))
+                    "Restaurado do Drive ($n arquivos)"
+                } else {
+                    val r = DriveSync.backup(this, DriveRest(token))
+                    if (task == DriveTask.CONNECT) DriveSync.setAuto(this, true)
+                    if (r.uploaded == 0 && r.deleted == 0) "Backup em dia: nada mudou."
+                    else "Backup no Drive: ${r.uploaded} arquivo(s) enviado(s)" + (if (r.deleted > 0) ", ${r.deleted} removido(s)" else "")
+                }
+            } catch (e: Exception) {
+                "Não deu certo: ${e.message ?: "erro"}"
+            }
+            runOnUiThread {
+                coverCache.clear()
+                toast(msg)
+                if (!isFinishing) render()
+            }
+        }
     }
 
     /** Abre o seletor para criar o arquivo: na lateral dele, escolha "Drive" e a pasta. */
@@ -1083,6 +1174,7 @@ class FoldersActivity : Activity() {
         private const val REQ_BACKUP_AUTO = 54
         private const val REQ_RESTORE = 55
         private const val REQ_SDOCX = 56
+        private const val REQ_DRIVE = 57
         private const val SAMSUNG_FOLDER = "Samsung Notes"
         private const val COVER_MAX = 900
     }

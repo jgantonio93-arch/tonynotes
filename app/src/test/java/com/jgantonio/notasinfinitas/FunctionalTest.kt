@@ -1161,4 +1161,72 @@ class FunctionalTest {
         drag(line(540f, 1000f, 640f, 1100f), MotionEvent.TOOL_TYPE_FINGER)
         assertEquals(before, canvas.viewForTests.toList())
     }
+
+    /** Google Drive falso, em memória. */
+    private class FakeDrive : DriveApi {
+        val files = LinkedHashMap<String, Pair<String, ByteArray>>() // id -> (path, bytes)
+        var creates = 0
+        var updates = 0
+        var deletes = 0
+        private var next = 0
+        override fun folderId() = "pasta"
+        override fun list(folder: String) = files.map { (id, v) -> DriveApi.RemoteFile(id, v.first) }
+        override fun create(folder: String, name: String, path: String, bytes: ByteArray): String {
+            creates++
+            val id = "f${next++}"
+            files[id] = path to bytes
+            return id
+        }
+        override fun update(id: String, bytes: ByteArray) {
+            updates++
+            val f = files[id] ?: throw java.io.IOException("404")
+            files[id] = f.first to bytes
+        }
+        override fun download(id: String) = files.getValue(id).second
+        override fun delete(id: String) {
+            deletes++
+            files.remove(id)
+        }
+    }
+
+    @Test
+    fun backup_no_drive_envia_so_o_que_mudou_e_restaura() {
+        drag(line(200f, 700f, 800f, 700f))
+        controller.pause()
+        Library.io.submit {}.get()
+        val drive = FakeDrive()
+        val r1 = DriveSync.backup(app, drive)
+        assertTrue("primeiro backup envia tudo", r1.uploaded >= 2 && drive.creates == r1.uploaded)
+        assertTrue(drive.files.values.any { it.first == "library.json" })
+        assertTrue(drive.files.values.any { it.first == "notes/${note.id}.ninf" })
+
+        // Nada mudou: nada sobe.
+        assertEquals(0, DriveSync.backup(app, drive).uploaded)
+
+        // Muda só a nota: sobe só ela (atualiza o mesmo arquivo).
+        val nf = Library.noteFile(note.id)
+        nf.appendBytes(byteArrayOf(0))
+        nf.setLastModified(System.currentTimeMillis() + 5000)
+        val r3 = DriveSync.backup(app, drive)
+        assertEquals(1, r3.uploaded)
+        assertEquals(1, drive.updates)
+
+        // Nota apagada de vez: some do Drive.
+        val other = Library.createNote(Library.folders.first().id, "Outra")
+        NoteStorage.save(Library.noteFile(other.id), NoteData(emptyList(), null))
+        DriveSync.backup(app, drive)
+        assertTrue(drive.files.values.any { it.first == "notes/${other.id}.ninf" })
+        Library.deleteNote(other.id)
+        Library.io.submit {}.get()
+        DriveSync.backup(app, drive)
+        assertTrue(drive.files.values.none { it.first == "notes/${other.id}.ninf" })
+
+        // Restaurar num aparelho "limpo" traz a nota de volta.
+        app.filesDir.listFiles()?.forEach { it.deleteRecursively() }
+        Library.init(app, reload = true)
+        DriveSync.restore(app, drive)
+        assertNotNull(Library.note(note.id))
+        assertNotNull(NoteStorage.load(Library.noteFile(note.id)))
+        assertEquals(0, DriveSync.backup(app, drive).uploaded)
+    }
 }

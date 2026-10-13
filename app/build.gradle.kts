@@ -17,7 +17,7 @@ android {
         minSdk = 29
         targetSdk = 35
         versionCode = if (ciBuild > 0) 1000 + ciBuild else 11
-        versionName = "0.18.0"
+        versionName = "0.19.0"
         buildConfigField("int", "BUILD_NUMBER", ciBuild.toString())
     }
 
@@ -74,6 +74,8 @@ android {
 dependencies {
     // Front buffer para tinta com latência mínima
     implementation("androidx.graphics:graphics-core:1.0.0")
+    // Login do Google para o backup no Drive (escopo drive.file)
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("androidx.test:core:1.6.1")

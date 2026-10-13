@@ -25,7 +25,7 @@ object Backup {
     private const val MARK = "rosanotes-backup.txt"
     /** Marca dos backups feitos quando o app ainda se chamava TonyNotes (continuam valendo). */
     private const val OLD_MARK = "tonynotes-backup.txt"
-    private val PARTS = listOf("library.json", "notes", "thumbs", "covers")
+    internal val PARTS = listOf("library.json", "notes", "thumbs", "covers")
     /** Intervalo mínimo entre dois backups automáticos. */
     private const val AUTO_INTERVAL = 10 * 60 * 1000L
 
