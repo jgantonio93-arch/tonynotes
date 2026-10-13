@@ -107,6 +107,11 @@ class PenPrefs(context: Context) {
         get() = sp.getBoolean("low_latency_v2", false)
         set(v) = sp.edit().putBoolean("low_latency_v2", v).apply()
 
+    /** Tela cheia no editor (só a barra de ferramentas fica na tela). */
+    var fullscreen: Boolean
+        get() = sp.getBoolean("fullscreen", false)
+        set(v) = sp.edit().putBoolean("fullscreen", v).apply()
+
     var spenButtonErases: Boolean
         get() = sp.getBoolean("spen_button_erases", true)
         set(v) = sp.edit().putBoolean("spen_button_erases", v).apply()

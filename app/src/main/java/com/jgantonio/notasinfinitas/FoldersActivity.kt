@@ -242,12 +242,6 @@ class FoldersActivity : Activity() {
             if (tag != null) n.tags.any { normalize(it) == tag }
             else normalize(n.title).contains(q) || n.tags.any { normalize(it).contains(q) } || noteText(n.id).contains(q)
         }.sortedByDescending { it.modified }
-        if (tag == null && !Handwriting.enabled(this)) {
-            content.addView(label("Procurar também na escrita à mão", 14f, Ui.ACCENT, bold = true).apply {
-                setPadding(dpi(6f), dpi(10f), 0, dpi(4f))
-                setOnClickListener { enableHandwritingSearch() }
-            })
-        }
         if (folders.isEmpty() && notes.isEmpty()) {
             content.addView(label("Nada encontrado para “$query”.", 15f).apply {
                 gravity = Gravity.CENTER
@@ -867,31 +861,6 @@ class FoldersActivity : Activity() {
         val s = normalize(f.readText())
         textCache[id] = f.lastModified() to s
         return s
-    }
-
-    private fun enableHandwritingSearch() {
-        sheet("Buscar na escrita à mão") { box, dialog ->
-            box.addView(label("O RosaNotes baixa o reconhecimento de português (cerca de 20 MB, uma vez só) e lê a " +
-                "escrita das suas notas. Tudo fica no celular e funciona sem internet depois.", 15f, Ui.MUTED))
-            box.addView(buttonRow(
-                secondaryButton("Agora não") { dialog.dismiss() },
-                primaryButton("Baixar") {
-                    dialog.dismiss()
-                    toast("Baixando o reconhecimento de escrita…")
-                    Handwriting.prepare(this) { ok ->
-                        if (!ok) toast("Não foi possível baixar. Confira a internet.")
-                        else {
-                            toast("Lendo a escrita das notas…")
-                            Handwriting.indexAll(this) {
-                                textCache.clear()
-                                toast("Pronto: a busca já acha a escrita à mão")
-                                if (!isFinishing) render()
-                            }
-                        }
-                    }
-                },
-            ))
-        }
     }
 
     // ---- Capas das pastas ------------------------------------------------------------

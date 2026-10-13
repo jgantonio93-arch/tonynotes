@@ -28,11 +28,9 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
 - A página inicial mostra **Fixadas**, **Favoritas** e as **etiquetas**; tocar numa etiqueta
   filtra as notas (ou busque `#etiqueta`). Dentro da pasta, as fixadas vêm primeiro.
 
-### Busca e escrita à mão
-- A busca acha o **texto digitado** dentro das notas.
-- **Procurar também na escrita à mão**: baixa uma vez o reconhecimento de português
-  (~20 MB, ML Kit) e a busca passa a achar o que foi escrito com a caneta. Funciona offline.
-- Selecione a escrita → **Em texto**: vira texto digitado no mesmo lugar e cor.
+### Busca
+- A busca acha pastas e notas pelo **título**, pelas **etiquetas** e pelo **texto digitado**
+  dentro das notas, sem ligar para acentos.
 
 ### Backup no Google Drive
 - Botão de **backup** no topo da página inicial.
@@ -124,7 +122,8 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
   saturação, opacidade), cantos, moldura, sombra, espelhar, travar, substituir,
   salvar na galeria.
 - PDF: importa todas as páginas em coluna, lado a lado ou em grade, travadas como
-  fundo. Destrave uma página para mover, girar, recortar ou separar.
+  fundo. Tocando numa página aparecem as **mesmas ferramentas da imagem** (recortar,
+  ajustes, girar, espelhar, salvar...); travada, ela só não sai do lugar ao escrever por cima.
 - **Exportar PDF anotado**: menu ⋮ gera um PDF com as mesmas páginas, no tamanho original,
   com tudo o que foi escrito por cima.
 - **Importar do Samsung Notes** (`SamsungNotesImporter.kt`): lê o arquivo `.sdocx`
@@ -134,6 +133,8 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
   Formato conforme a engenharia reversa de twangodev/sdocx e bxff/samsung-notes-format.
 
 ### Outras ferramentas
+- **Tela cheia** (menu ⋮): somem a barra de cima e as do sistema; fica só a barra de
+  ferramentas e, num cantinho, desfazer, refazer e sair (o voltar também sai).
 - **Borracha** (toque de novo para opções): **borracha de traço** ou **borracha de área**,
   tamanho, **apagar somente marca-texto**, apagar tudo.
 - **Seleção** (toque de novo para opções): **laço** ou **retângulo**, e **incluir objetos

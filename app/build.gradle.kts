@@ -17,15 +17,8 @@ android {
         minSdk = 29
         targetSdk = 35
         versionCode = if (ciBuild > 0) 1000 + ciBuild else 11
-        versionName = "0.12.2"
+        versionName = "0.13.0"
         buildConfigField("int", "BUILD_NUMBER", ciBuild.toString())
-
-        // Só celulares ARM 64 bits (todos os Galaxy com S Pen e quase todo Android atual):
-        // o reconhecimento de escrita traz um motor nativo por processador, e levar os
-        // quatro deixava o APK com 50 MB. Na Play Store (AAB) cada aparelho recebe só o seu.
-        ndk {
-            abiFilters += listOf("arm64-v8a")
-        }
     }
 
     signingConfigs {
@@ -81,8 +74,6 @@ android {
 dependencies {
     // Front buffer para tinta com latência mínima
     implementation("androidx.graphics:graphics-core:1.0.0")
-    // Reconhecimento da escrita à mão (modelo baixado sob demanda, funciona offline)
-    implementation("com.google.mlkit:digital-ink-recognition:18.1.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("androidx.test:core:1.6.1")

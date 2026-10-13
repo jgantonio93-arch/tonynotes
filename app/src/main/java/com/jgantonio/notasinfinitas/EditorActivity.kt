@@ -72,6 +72,9 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     private lateinit var titleView: TextView
     private lateinit var subtitleView: TextView
     private lateinit var undoButton: View
+    private lateinit var topBar: View
+    internal val topBarForTests get() = topBar
+    internal val fullscreenBoxForTests get() = fullscreenBox
     private lateinit var redoButton: View
     private lateinit var dock: LinearLayout
     private lateinit var trayLayer: FrameLayout
@@ -142,7 +145,8 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             }
             insets
         }
-        root.addView(buildTopBar())
+        topBar = buildTopBar()
+        root.addView(topBar)
 
         stage = FrameLayout(this)
         stage.addView(canvasView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
@@ -235,6 +239,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             canvasView.setPageLayout(true, l.horizontal, l.landscape, l.endless, 1)
         }
         layoutDock()
+        if (prefs.fullscreen) setFullscreen(true)
         // A barra solta depende do tamanho da área da nota.
         stage.addOnLayoutChangeListener { _, l, t, r, b, ol, ot, or, ob ->
             if ((r - l != or - ol || b - t != ob - ot) && prefs.dockMode == "free") stage.post { layoutDock() }
@@ -285,6 +290,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             textEditor.isActive -> textEditor.finish()
             openTray != null -> closeTray()
             canvasView.hasSelection -> canvasView.clearSelection()
+            isFullscreen -> setFullscreen(false)
             else -> @Suppress("DEPRECATION") super.onBackPressed()
         }
     }
@@ -346,6 +352,64 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         bar.addView(redoButton)
         bar.addView(iconButton(Icon.MORE) { finishTyping(); showMoreMenu() })
         return bar
+    }
+
+    // ---- Tela cheia --------------------------------------------------------------------
+    //
+    // Some a barra de cima e as barras do sistema: fica só a barra de ferramentas e, num
+    // cantinho, desfazer, refazer e sair. O voltar do celular também sai da tela cheia.
+
+    var isFullscreen = false
+        private set
+    private var fullscreenBox: LinearLayout? = null
+
+    internal fun setFullscreen(on: Boolean) {
+        isFullscreen = on
+        prefs.fullscreen = on
+        topBar.visibility = if (on) View.GONE else View.VISIBLE
+        fullscreenBox?.let { stage.removeView(it) }
+        fullscreenBox = null
+        if (on) {
+            val box = horizontal().apply {
+                background = floating(100f)
+                setPadding(dpi(2f), dpi(2f), dpi(2f), dpi(2f))
+                alpha = 0.9f
+            }
+            box.addView(iconButton(Icon.UNDO, Ui.INK, 38f, "Desfazer") { finishTyping(); canvasView.undo() })
+            box.addView(iconButton(Icon.REDO, Ui.INK, 38f, "Refazer") { finishTyping(); canvasView.redo() })
+            box.addView(iconButton(Icon.CLOSE, Ui.INK, 38f, "Sair da tela cheia") { setFullscreen(false) })
+            // No canto oposto ao da barra de ferramentas em pé.
+            val side = if (prefs.dockMode == "right") Gravity.START else Gravity.END
+            stage.addView(box, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP or side).apply {
+                setMargins(dpi(10f), dpi(10f), dpi(10f), 0)
+            })
+            fullscreenBox = box
+        }
+        systemBars(show = !on)
+        stage.post { layoutDock() }
+    }
+
+    private fun systemBars(show: Boolean) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            val c = window.insetsController ?: return
+            if (show) c.show(android.view.WindowInsets.Type.systemBars())
+            else {
+                c.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                c.hide(android.view.WindowInsets.Type.systemBars())
+            }
+        } else if (show) {
+            Ui.styleWindow(this, Ui.SURFACE)
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // Um painel ou diálogo pode trazer as barras de volta: esconde de novo.
+        if (hasFocus && isFullscreen) systemBars(show = false)
     }
 
     private fun finishTyping() {
@@ -809,7 +873,10 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         row.addView(selectionLabel, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             marginEnd = dpi(6f)
         })
-        if (canvasView.selectionLocked) {
+        // Página de PDF (travada ou não) tem as mesmas ferramentas da imagem; travada, ela só
+        // não sai do lugar ao escrever por cima.
+        val pdfPage = img != null && img.pdfPage > 0
+        if (canvasView.selectionLocked && !pdfPage) {
             row.addView(pillButton(Icon.UNLOCK, "Destravar") { canvasView.setLocked(false) })
             if (canvasView.lockedPdfPageCount > 1 && items.any { it is ImageElement && it.pdfPage > 0 }) {
                 row.addView(pillButton(Icon.UNLOCK, "Destravar todas as páginas") { canvasView.setAllPdfPagesLocked(false) })
@@ -841,13 +908,17 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             row.addView(pillButton(Icon.FLIP_V, "Virar") { canvasView.editImages { it.with(flipV = !it.flipV) } })
             row.addView(pillButton(Icon.TO_FRONT, "Frente") { canvasView.reorderSelection(true) })
             row.addView(pillButton(Icon.TO_BACK, "Trás") { canvasView.reorderSelection(false) })
-            row.addView(pillButton(Icon.LOCK, "Travar") { canvasView.setLocked(true) })
+            if (img.locked) row.addView(pillButton(Icon.UNLOCK, "Destravar") { canvasView.setLocked(false) })
+            else row.addView(pillButton(Icon.LOCK, "Travar") { canvasView.setLocked(true) })
+            if (pdfPage && img.locked && canvasView.lockedPdfPageCount > 1) {
+                row.addView(pillButton(Icon.UNLOCK, "Destravar todas as páginas") { canvasView.setAllPdfPagesLocked(false) })
+            }
             row.addView(pillButton(Icon.COPY, "Duplicar") { canvasView.duplicateSelection() })
-            row.addView(pillButton(Icon.IMAGE, "Substituir") { pickImage(REQ_REPLACE) })
+            if (!pdfPage) row.addView(pillButton(Icon.IMAGE, "Substituir") { pickImage(REQ_REPLACE) })
             row.addView(pillButton(Icon.DOWNLOAD, "Salvar") { saveSelectedImage() })
             row.addView(pillButton(Icon.RESET, "Original") {
                 canvasView.editImages {
-                    ImageElement(it.file, RectF(it.rect), locked = false).let { base ->
+                    ImageElement(it.file, RectF(it.rect), locked = it.locked, pdfPage = it.pdfPage).let { base ->
                         // Volta ao arquivo original inteiro, mantendo o centro e a largura atual.
                         val full = it.fullLocalFrame()
                         val w = full.width()
@@ -860,7 +931,6 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         } else {
             row.addView(pillButton(Icon.TRASH, "Excluir") { canvasView.deleteSelection() })
             row.addView(pillButton(Icon.COPY, "Duplicar") { canvasView.duplicateSelection() })
-            if (items.any { it is StrokeElement }) row.addView(pillButton(Icon.TEXT, "Em texto") { convertSelectionToText() })
             audio.markFor(items.filterIsInstance<StrokeElement>())?.let { (rec, t) ->
                 row.addView(pillButton(Icon.TOUCH, "Ouvir daqui") { playAudio(rec, t - 2000L) }, 1)
             }
@@ -968,6 +1038,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             toast(if (it) "Tinta de latência mínima ligada (experimental)." else "Tinta de latência mínima desligada.")
         })
         actionSheet(null, listOf(
+            SheetItem(Icon.ZOOM, "Tela cheia (só a barra de ferramentas)") { setFullscreen(true) },
             SheetItem(Icon.PAGE, "Página (infinita ou folhas)") {
                 Panels.showPage(this, canvasView, prefs) { onStateChanged() }
             },
@@ -1286,53 +1357,10 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         super.onDestroy()
     }
 
-    /** Guarda o texto da nota para a busca: o digitado e, se ligado, o da escrita à mão. */
+    /** Guarda o texto digitado da nota para a busca. */
     private fun indexText(id: String, data: NoteData) {
         val typed = data.elements.filterIsInstance<TextElement>().joinToString("\n") { it.text }
-        val strokes = data.elements.filterIsInstance<StrokeElement>()
-        val write = { hw: String? -> Library.textFile(id).writeText(listOfNotNull(typed, hw).joinToString("\n")) }
-        // Já estamos na fila de disco: o texto digitado é gravado na hora; o da escrita
-        // à mão volta depois do reconhecimento e entra de novo na fila.
-        if (!Handwriting.enabled(this) || strokes.isEmpty() || strokes.size > MAX_INDEX_STROKES) write(null)
-        else main.post { Handwriting.recognize(strokes) { hw -> Library.io.execute { write(hw) } } }
-    }
-
-    /** Converte a escrita selecionada em texto digitado (no mesmo lugar e cor). */
-    private fun convertSelectionToText() {
-        val strokes = canvasView.selectedItems.filterIsInstance<StrokeElement>()
-        if (strokes.isEmpty()) return
-        val run = {
-            toast("Reconhecendo a escrita…")
-            Handwriting.recognize(strokes) { text ->
-                if (text.isNullOrBlank()) toast("Não deu para reconhecer essa escrita.")
-                else {
-                    val lines = Handwriting.lines(strokes)
-                    val h = lines.map { l -> l.maxOf { it.bounds.bottom } - l.minOf { it.bounds.top } }.sorted()
-                    val size = (h[h.size / 2] * 0.62f).coerceAtLeast(8f)
-                    val left = strokes.minOf { it.bounds.left }
-                    val top = strokes.minOf { it.bounds.top }
-                    canvasView.replaceSelection(TextElement(text, left, top, size, strokes.first().color))
-                    refresh()
-                }
-            }
-        }
-        if (Handwriting.enabled(this)) run() else askHandwritingDownload { run() }
-    }
-
-    /** Pede para baixar o reconhecimento de escrita (uma vez, ~20 MB). */
-    internal fun askHandwritingDownload(onReady: () -> Unit) {
-        sheet("Reconhecer escrita à mão") { box, dialog ->
-            box.addView(label("Para transformar a escrita em texto e achar notas manuscritas na busca, o RosaNotes " +
-                "baixa o reconhecimento de português (cerca de 20 MB, uma vez só). Depois funciona sem internet.", 15f, Ui.MUTED))
-            box.addView(buttonRow(
-                secondaryButton("Agora não") { dialog.dismiss() },
-                primaryButton("Baixar") {
-                    dialog.dismiss()
-                    toast("Baixando o reconhecimento de escrita…")
-                    Handwriting.prepare(this) { ok -> if (ok) onReady() else toast("Não foi possível baixar. Confira a internet.") }
-                },
-            ))
-        }
+        Library.textFile(id).writeText(typed)
     }
 
     private fun exportPng() {
@@ -1483,7 +1511,6 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         private const val REQ_IMAGE = 41
         private const val REQ_REPLACE = 42
         private const val REQ_PDF = 43
-        private const val MAX_INDEX_STROKES = 4000
         private const val REQ_MIC = 44
     }
 }

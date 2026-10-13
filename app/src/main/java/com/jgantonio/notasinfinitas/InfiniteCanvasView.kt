@@ -683,7 +683,8 @@ class InfiniteCanvasView(context: Context) : View(context) {
 
     fun startCrop() {
         val img = selectedImage ?: return
-        if (img.locked) return
+        // Página de PDF travada também pode ser recortada (só não se move ao escrever).
+        if (img.locked && img.pdfPage == 0) return
         cropTarget = img
         cropRect.set(img.crop)
         cropFree.clear()

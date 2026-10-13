@@ -550,17 +550,7 @@ class FunctionalTest {
     }
 
     @Test
-    fun escrita_separada_em_linhas_e_texto_vai_para_a_busca() {
-        canvas.pen = PenSettings.default(BrushType.PEN, Color.BLACK)
-        for (row in 0 until 2) for (k in 0 until 3) {
-            val x0 = 150f + k * 200f
-            val y0 = 700f + row * 200f
-            drag((0..10).map { x0 + it * 10f to y0 + (if (it % 2 == 0) -30f else 30f) })
-        }
-        val lines = Handwriting.lines(strokes())
-        assertEquals(2, lines.size)
-        assertTrue(lines.all { l -> l.size == 3 && l.zipWithNext().all { (a, b) -> a.bounds.left < b.bounds.left } })
-
+    fun texto_digitado_vai_para_a_busca() {
         canvas.addText(TextElement("Mitocôndria", 100f, 100f, 30f, Color.BLACK))
         controller.pause()
         Library.io.submit {}.get()
@@ -827,5 +817,41 @@ class FunctionalTest {
         }
         stroke(arc, hold = true)
         assertTrue(strokes()[2].n > 2)
+    }
+
+    @Test
+    fun pagina_de_pdf_travada_tem_as_ferramentas_de_imagem() {
+        val page = ImageElement("pdf_teste_p1.jpg", android.graphics.RectF(0f, 0f, 900f, 1270f), shadow = true, locked = true, pdfPage = 1)
+        canvas.addPages(listOf(page))
+        val v = canvas.viewForTests
+        canvas.tool = InfiniteCanvasView.Tool.SELECT
+        tap(450f * v[2] + v[0], 635f * v[2] + v[1])
+        val sel = canvas.selectedImage
+        assertNotNull("toque seleciona a página travada", sel)
+        canvas.startCrop()
+        assertTrue("recortar funciona com a página travada", canvas.inCropMode)
+        canvas.cancelCrop()
+        canvas.rotateSelection(90f)
+        val rotated = canvas.selectedImage!!
+        assertEquals(90f, rotated.rotation, 0.01f)
+        assertTrue("continua travada", rotated.locked)
+        assertEquals(1, rotated.pdfPage)
+    }
+
+    @Test
+    fun tela_cheia_deixa_so_a_barra_de_ferramentas() {
+        editor.setFullscreen(true)
+        layout()
+        assertEquals(View.GONE, editor.topBarForTests.visibility)
+        assertNotNull(editor.fullscreenBoxForTests)
+        assertEquals(View.VISIBLE, editor.dockForTests.visibility)
+        assertTrue(editor.prefsForTests.fullscreen)
+        // O voltar sai da tela cheia, sem fechar a nota.
+        @Suppress("DEPRECATION")
+        editor.onBackPressed()
+        assertEquals(View.VISIBLE, editor.topBarForTests.visibility)
+        assertNull(editor.fullscreenBoxForTests)
+        assertTrue(!editor.isFinishing)
+        assertTrue(!editor.prefsForTests.fullscreen)
     }
 }
