@@ -776,4 +776,56 @@ class FunctionalTest {
         // Saindo de 90°: girar 1° a mais também funciona.
         assertEquals(1f, InfiniteCanvasView.snapRotation(90f, 1f), 0.001f)
     }
+
+    @Test
+    fun marca_texto_fica_por_baixo_da_escrita() {
+        canvas.pen = PenSettings.default(BrushType.PEN, Color.BLACK).copy(size = 12f)
+        drag(line(200f, 700f, 800f, 700f))
+        canvas.pen = PenSettings.default(BrushType.HIGHLIGHTER, Color.YELLOW).copy(size = 30f)
+        drag(line(150f, 700f, 850f, 700f))
+        assertEquals(2, strokes().size)
+        // Desenha a nota como na tela e confere os pixels.
+        val dm = app.resources.displayMetrics
+        val bmp = Bitmap.createBitmap(dm.widthPixels, dm.heightPixels, Bitmap.Config.ARGB_8888)
+        val c = android.graphics.Canvas(bmp)
+        c.drawColor(Color.WHITE)
+        val v = canvas.viewForTests
+        c.translate(v[0], v[1])
+        c.scale(v[2], v[2])
+        canvas.drawContent(c, null)
+        val ink = bmp.getPixel(500, 700)
+        assertTrue("a escrita continua preta sob o marca-texto: ${Integer.toHexString(ink)}",
+            Color.red(ink) < 40 && Color.green(ink) < 40 && Color.blue(ink) < 40)
+        val hl = bmp.getPixel(170, 700)
+        assertTrue("o marca-texto aparece fora da escrita: ${Integer.toHexString(hl)}", Color.red(hl) > 200 && Color.blue(hl) < 200)
+    }
+
+    @Test
+    fun segurar_a_caneta_parada_endireita_a_linha() {
+        val tool = MotionEvent.TOOL_TYPE_STYLUS
+        fun stroke(pts: List<Pair<Float, Float>>, hold: Boolean) {
+            val down = time
+            canvas.dispatchTouchEvent(event(MotionEvent.ACTION_DOWN, listOf(pts.first()), tool, down))
+            for (p in pts.drop(1)) canvas.dispatchTouchEvent(event(MotionEvent.ACTION_MOVE, listOf(p), tool, down))
+            if (hold) ShadowLooper.idleMainLooper(700, java.util.concurrent.TimeUnit.MILLISECONDS)
+            canvas.dispatchTouchEvent(event(MotionEvent.ACTION_UP, listOf(pts.last()), tool, down))
+            ShadowLooper.idleMainLooper()
+        }
+        val wavy = (0..40).map { 150f + it * 18f to 700f + (if (it % 2 == 0) 4f else -4f) }
+        stroke(wavy, hold = false)
+        assertTrue("sem segurar, o traço fica como foi feito", strokes()[0].n > 2)
+
+        stroke(wavy.map { it.first to it.second + 200f }, hold = true)
+        val straight = strokes()[1]
+        assertEquals("segurando, vira reta", 2, straight.n)
+        assertEquals(straight.ys[0], straight.ys[1], 0.01f)
+
+        // Curva (meio círculo) não vira reta mesmo segurando.
+        val arc = (0..40).map {
+            val a = Math.PI * it / 40
+            (500 + 250 * Math.cos(a)).toFloat() to (1300 - 250 * Math.sin(a)).toFloat()
+        }
+        stroke(arc, hold = true)
+        assertTrue(strokes()[2].n > 2)
+    }
 }

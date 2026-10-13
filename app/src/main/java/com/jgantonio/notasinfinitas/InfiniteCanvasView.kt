@@ -1105,14 +1105,39 @@ class InfiniteCanvasView(context: Context) : View(context) {
     }
 
     /** Desenha os elementos num canvas já transformado para o mundo. */
+    /**
+     * Ordem de desenho: o marca-texto fica por baixo da escrita, para a letra continuar nítida.
+     * Entre duas imagens, primeiro vêm os marca-textos e depois canetas e textos (cada grupo na
+     * ordem em que foi feito); as imagens mantêm a posição (marca-texto sobre um PDF aparece).
+     * [beforeInk] roda no último trecho, entre os marca-textos e a escrita.
+     */
+    private inline fun forEachInDrawOrder(beforeInk: () -> Unit, action: (Element) -> Unit) {
+        val list = elements
+        val size = list.size
+        var start = 0
+        for (i in 0..size) {
+            if (i < size && list[i] !is ImageElement) continue
+            for (j in start until i) {
+                val e = list[j]
+                if (e is StrokeElement && e.type == BrushType.HIGHLIGHTER) action(e)
+            }
+            if (i == size) beforeInk()
+            for (j in start until i) {
+                val e = list[j]
+                if (!(e is StrokeElement && e.type == BrushType.HIGHLIGHTER)) action(e)
+            }
+            if (i < size) action(list[i])
+            start = i + 1
+        }
+    }
+
     fun drawContent(canvas: Canvas, clip: RectF?, renderScale: Float = 1f) {
         val wasExporting = exporting
         val night = StrokeRenderer.night
         exporting = true
         StrokeRenderer.night = false
-        for (e in elements) {
-            if (clip != null && !RectF.intersects(e.bounds, clip)) continue
-            drawElement(canvas, e, renderScale, sync = true)
+        forEachInDrawOrder({}) { e ->
+            if (clip == null || RectF.intersects(e.bounds, clip)) drawElement(canvas, e, renderScale, sync = true)
         }
         StrokeRenderer.night = night
         exporting = wasExporting
@@ -1213,6 +1238,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
                 builder = StrokeBuilder(p, unit).also {
                     it.add(wx(x), wy(y), pressureOf(e, 0), minPointDist())
                 }
+                restartHold(x, y)
                 inkUpdated(e)
             }
             Gesture.ERASE -> {
@@ -1263,7 +1289,8 @@ class InfiniteCanvasView(context: Context) : View(context) {
             return
         }
         if (usePrediction && Build.VERSION.SDK_INT >= 34) predict(e)
-        (liveInk ?: this).invalidate()
+        // O marca-texto é desenhado na própria tela, por baixo da escrita.
+        (if (b.pen.type == BrushType.HIGHLIGHTER) this else liveInk ?: this).invalidate()
     }
 
     /** Previsão de movimento (Android 14+): desenha um pedacinho à frente da caneta. */
@@ -1290,7 +1317,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
     /** Desenha a tinta em andamento (chamado pela camada [LiveInkView]). */
     fun drawLiveInk(canvas: Canvas) {
         val b = builder ?: return
-        if (wetActive) return
+        if (wetActive || b.pen.type == BrushType.HIGHLIGHTER) return
         canvas.save()
         canvas.translate(offsetX, offsetY)
         canvas.scale(scale, scale)
@@ -1350,6 +1377,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
                     b.add(wx(e.getHistoricalX(idx, h)), wy(e.getHistoricalY(idx, h)), historicalPressureOf(e, idx, h), md)
                 }
                 b.add(wx(x), wy(y), pressureOf(e, idx), md)
+                if (!b.isStraight && hypot(x - holdX, y - holdY) > 5f * density) restartHold(x, y)
                 inkUpdated(e)
             }
             Gesture.ERASE -> {
@@ -1403,6 +1431,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
     }
 
     private fun onUp(e: MotionEvent) {
+        removeCallbacks(holdToStraighten)
         if (gesture == Gesture.NAVIGATE && tool == Tool.SELECT && maxPointers == 1 &&
             max(maxTravel, hypot(e.x - downX, e.y - downY)) < 10f * density
         ) {
@@ -1515,6 +1544,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
 
     /** Cancela o que a ferramenta estava fazendo (palma detectada, segundo dedo...). */
     private fun abortToolGesture() {
+        removeCallbacks(holdToStraighten)
         when (gesture) {
             Gesture.DRAW -> {
                 builder = null
@@ -1539,6 +1569,40 @@ class InfiniteCanvasView(context: Context) : View(context) {
     }
 
     private fun minPointDist() = 0.6f / scale
+
+    // ---- Segurar a caneta parada: o traço vira reta (como no Samsung Notes) --------------
+
+    private var holdX = 0f
+    private var holdY = 0f
+    private val holdToStraighten = Runnable { straightenHeldStroke() }
+
+    private fun restartHold(x: Float, y: Float) {
+        holdX = x
+        holdY = y
+        removeCallbacks(holdToStraighten)
+        postDelayed(holdToStraighten, HOLD_TO_STRAIGHTEN_MS)
+    }
+
+    private fun straightenHeldStroke() {
+        if (gesture != Gesture.DRAW || ephemeral != null) return
+        val b = builder ?: return
+        if (b.isStraight || b.n < 3) return
+        var length = 0f
+        for (i in 1 until b.n) length += hypot(b.xs[i] - b.xs[i - 1], b.ys[i] - b.ys[i - 1])
+        val chord = hypot(b.xs[b.n - 1] - b.xs[0], b.ys[b.n - 1] - b.ys[0])
+        // Só traços quase retos e não muito curtos (parar no meio de uma letra não endireita).
+        if (chord * scale < 24f * density || chord < 0.8f * length) return
+        if (!b.straighten()) return
+        if (wetActive) {
+            wetInk?.clear()
+            wetActive = false
+        }
+        usePrediction = false
+        predN = 0
+        performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+        liveInk?.invalidate()
+        invalidate()
+    }
 
     private fun pressureOf(e: MotionEvent, idx: Int): Float =
         if (isPen(e, idx)) e.getPressure(idx) else FINGER_PRESSURE
@@ -1683,8 +1747,10 @@ class InfiniteCanvasView(context: Context) : View(context) {
         StrokeRenderer.night = nightInk
         val moving = !selT.isIdentity
         val crop = cropTarget
-        for (e in elements) {
-            if (e === crop) continue
+        // O marca-texto em andamento entra por baixo da escrita, como os já feitos.
+        val liveHighlighter = builder?.takeIf { it.pen.type == BrushType.HIGHLIGHTER }
+        forEachInDrawOrder({ liveHighlighter?.let { StrokeRenderer.drawBuilder(canvas, it, predXs, predYs, predN) } }) { e ->
+            if (e === crop) return@forEachInDrawOrder
             if (moving && e in selectionSet) {
                 canvas.save()
                 selT.applyTo(canvas)
@@ -1695,7 +1761,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
             }
         }
         if (fading.isNotEmpty()) drawFading(canvas)
-        if (liveInk == null && !wetActive) builder?.let { StrokeRenderer.drawBuilder(canvas, it, predXs, predYs, predN) }
+        if (liveInk == null && !wetActive && liveHighlighter == null) builder?.let { StrokeRenderer.drawBuilder(canvas, it, predXs, predYs, predN) }
         if (crop != null) drawCrop(canvas, crop)
         canvas.restore()
 
@@ -1947,6 +2013,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
         private const val MAX_PAGES = 9999
         /** Lado menor de uma folha nova (dp): perto da largura de um celular a 100%. */
         private const val PAGE_SHORT_DP = 400f
+        private const val HOLD_TO_STRAIGHTEN_MS = 550L
 
         /**
          * "Ímã" nos ângulos retos ao girar a seleção: perto de 0°, 90°, 180° ou 270° o giro

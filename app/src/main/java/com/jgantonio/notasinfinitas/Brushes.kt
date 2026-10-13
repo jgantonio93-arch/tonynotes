@@ -92,7 +92,12 @@ class StrokeBuilder(val pen: PenSettings, unit: Float) {
     var n = 0; private set
     private var smoothed = -1f
     private val highlighter = pen.type == BrushType.HIGHLIGHTER
-    private val straight = highlighter && pen.straight
+    private var straight = highlighter && pen.straight
+    // Espessura da reta quando o traço foi endireitado (canetas; o marca-texto usa a ponta chanfrada).
+    private var lineWidth = -1f
+
+    /** O traço virou reta (chave do marca-texto ou caneta parada no fim). */
+    val isStraight get() = straight
     private val tipRatio = pen.tip.coerceIn(10, 100) / 100f
     // Direção suavizada (só o marca-texto usa: a ponta chanfrada muda a largura conforme a direção).
     private var dirX = 1f
@@ -161,15 +166,33 @@ class StrokeBuilder(val pen: PenSettings, unit: Float) {
         return base * (abs(dx / len) + tipRatio * abs(dy / len))
     }
 
-    /** Linha reta do primeiro ponto até a caneta; quase na horizontal, fica perfeitamente reta. */
+    /** Linha reta do primeiro ponto até a caneta; quase na horizontal ou vertical, fica perfeitamente reta. */
     private fun addStraight(x: Float, y: Float) {
+        var tx = x
         var ty = y
         val dx = x - xs[0]
-        if (abs(ty - ys[0]) < abs(dx) * 0.105f) ty = ys[0] // ~6°
-        val w = chisel(dx, ty - ys[0])
-        xs[1] = x; ys[1] = ty
+        val dy = y - ys[0]
+        if (abs(dy) < abs(dx) * 0.105f) ty = ys[0] // ~6°
+        else if (!highlighter && abs(dx) < abs(dy) * 0.105f) tx = xs[0]
+        val w = if (lineWidth > 0f) lineWidth else chisel(tx - xs[0], ty - ys[0])
+        xs[1] = tx; ys[1] = ty
         ws[0] = w; ws[1] = w
         n = 2
+    }
+
+    /**
+     * Caneta parada no fim do traço (como no Samsung Notes): vira uma reta do primeiro ponto
+     * até a caneta. Depois disso, mover a caneta só ajusta a ponta final.
+     */
+    fun straighten(): Boolean {
+        if (n < 2 || straight) return false
+        if (!highlighter) lineWidth = ws.copyOf(n).sorted()[n / 2]
+        val x = xs[n - 1]
+        val y = ys[n - 1]
+        straight = true
+        n = 1
+        addStraight(x, y)
+        return true
     }
 
     fun build(): StrokeElement {

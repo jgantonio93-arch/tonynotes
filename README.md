@@ -81,6 +81,10 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
 - Cada pincel lembra sua **espessura**, **opacidade** e **cor**.
 - **Marca-texto** com ponta chanfrada: **tamanho**, **transparência**, **espessura da ponta**
   e **endireitar linhas** (o traço vira uma reta, perfeitamente horizontal quando quase).
+  O marca-texto fica sempre **por baixo da escrita** (a letra continua nítida), inclusive
+  enquanto se passa; sobre um PDF ou uma imagem ele continua visível.
+- **Segurar para endireitar**: com qualquer caneta, faça um traço e segure a caneta parada
+  no fim (~0,5 s): ele vira uma reta, e mover a caneta ajusta a ponta antes de soltar.
 - Paleta de cores + **cor personalizada** (espectro, matiz, **tons da cor escolhida** do
   mais claro ao mais escuro e código hex); as cores personalizadas ficam salvas.
 - **Formas automáticas**: linha reta, círculo/elipse, triângulo, retângulo, pentágono.
