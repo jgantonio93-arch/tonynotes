@@ -47,7 +47,9 @@ class FunctionalTest {
     fun setUp() {
         app = ApplicationProvider.getApplicationContext()
         app.filesDir.listFiles()?.forEach { it.deleteRecursively() }
-        app.getSharedPreferences("canetas", 0).edit().clear().commit()
+        // Os testes antigos simulam toques de dedo logo depois da caneta: rejeição de palma
+        // desligada aqui; os testes dela ligam explicitamente.
+        app.getSharedPreferences("canetas", 0).edit().clear().putBoolean("palm_reject", false).commit()
         Library.init(app, reload = true)
         val folder = Library.folders.first()
         note = Library.createNote(folder.id, "Teste")
@@ -1626,5 +1628,103 @@ class FunctionalTest {
             Thread.sleep(30)
         }
         assertEquals(before + 2, Library.notes.size)
+    }
+
+    // ---- Rejeição de palma -------------------------------------------------------------------
+
+    private class P(val id: Int, val x: Float, val y: Float, val tool: Int, val major: Float = 0f)
+
+    private fun mev(action: Int, pts: List<P>, down: Long, gap: Long = 16): MotionEvent {
+        val props = Array(pts.size) { i -> MotionEvent.PointerProperties().apply { id = pts[i].id; toolType = pts[i].tool } }
+        val coords = Array(pts.size) { i ->
+            MotionEvent.PointerCoords().apply { x = pts[i].x; y = pts[i].y; pressure = 0.8f; size = 0.1f; touchMajor = pts[i].major; touchMinor = pts[i].major }
+        }
+        time += gap
+        return MotionEvent.obtain(down, time, action, pts.size, props, coords, 0, 0, 1f, 1f, 0, 0, 0, 0)
+    }
+
+    private fun idx(action: Int, i: Int) = action or (i shl MotionEvent.ACTION_POINTER_INDEX_SHIFT)
+
+    private val F = MotionEvent.TOOL_TYPE_FINGER
+    private val S = MotionEvent.TOOL_TYPE_STYLUS
+
+    private fun palmOn(fingerDraws: Boolean) {
+        canvas.palmReject = true
+        canvas.fingerDraws = fingerDraws
+    }
+
+    @Test
+    fun palma_antes_da_caneta_ativa_nao_mexe_e_a_caneta_escreve() {
+        palmOn(fingerDraws = false)
+        val v0 = canvas.viewForTests.copyOf()
+        val down = time
+        val palm = P(0, 800f, 1600f, F)
+        canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_DOWN, listOf(palm), down))
+        canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_MOVE, listOf(P(0, 790f, 1580f, F)), down))
+        val line = line(300f, 700f, 600f, 720f, 12)
+        canvas.dispatchTouchEvent(mev(idx(MotionEvent.ACTION_POINTER_DOWN, 1), listOf(P(0, 790f, 1580f, F), P(1, line[0].first, line[0].second, S)), down))
+        for ((k, p) in line.withIndex()) canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_MOVE, listOf(P(0, 790f - k * 3, 1580f, F), P(1, p.first, p.second, S)), down))
+        canvas.dispatchTouchEvent(mev(idx(MotionEvent.ACTION_POINTER_UP, 1), listOf(P(0, 760f, 1580f, F), P(1, 600f, 720f, S)), down))
+        canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_UP, listOf(P(0, 760f, 1580f, F)), down))
+        ShadowLooper.idleMainLooper()
+        assertEquals("a caneta escreveu", 1, strokes().size)
+        assertTrue(strokes()[0].bounds.width() > 100f)
+        // A palma é ignorada logo depois da caneta: a tela não se move.
+        drag(line(500f, 1200f, 500f, 900f), F)
+        val v1 = canvas.viewForTests
+        assertEquals(v0[0], v1[0], 0.5f)
+        assertEquals(v0[1], v1[1], 0.5f)
+        // Passado um tempo, dois dedos voltam a dar zoom.
+        time += 1500
+        val z = canvas.zoomPercent
+        pinch(540f, 1000f, 100f, 300f)
+        assertTrue("zoom com dois dedos", canvas.zoomPercent > z)
+    }
+
+    @Test
+    fun escrevendo_com_o_dedo_a_palma_e_ignorada() {
+        palmOn(fingerDraws = true)
+        val down = time
+        // Palma encosta embaixo à direita e mexe um pouco...
+        canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_DOWN, listOf(P(0, 850f, 1600f, F)), down))
+        canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_MOVE, listOf(P(0, 845f, 1598f, F)), down))
+        // ...e depois a caneta capacitiva, acima e à esquerda, escreve.
+        val line = line(300f, 700f, 650f, 700f, 12)
+        canvas.dispatchTouchEvent(mev(idx(MotionEvent.ACTION_POINTER_DOWN, 1), listOf(P(0, 845f, 1598f, F), P(1, line[0].first, line[0].second, F)), down, gap = 250))
+        for (p in line) canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_MOVE, listOf(P(0, 845f, 1598f, F), P(1, p.first, p.second, F)), down))
+        canvas.dispatchTouchEvent(mev(idx(MotionEvent.ACTION_POINTER_UP, 1), listOf(P(0, 845f, 1598f, F), P(1, 650f, 700f, F)), down))
+        canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_UP, listOf(P(0, 845f, 1598f, F)), down))
+        ShadowLooper.idleMainLooper()
+        assertEquals("só o traço da caneta", 1, strokes().size)
+        val b = strokes()[0].bounds
+        val v = canvas.viewForTests
+        assertEquals("na altura da caneta", 700f, b.centerY() * v[2] + v[1], 30f)
+
+        // Toque grande demais (lado da mão) não risca.
+        val d2 = time
+        canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_DOWN, listOf(P(0, 400f, 1200f, F, major = 200f * app.resources.displayMetrics.density)), d2))
+        canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_MOVE, listOf(P(0, 500f, 1250f, F, major = 200f * app.resources.displayMetrics.density)), d2))
+        canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_UP, listOf(P(0, 500f, 1250f, F, major = 200f * app.resources.displayMetrics.density)), d2))
+        assertEquals(1, strokes().size)
+
+        // Dois dedos juntos: zoom, sem riscar.
+        val z = canvas.zoomPercent
+        pinch(540f, 1000f, 100f, 300f)
+        assertTrue(canvas.zoomPercent > z)
+        assertEquals(1, strokes().size)
+    }
+
+    @Test
+    fun protetor_de_mao_ignora_a_mao_mas_nao_a_caneta() {
+        canvas.palmReject = false
+        canvas.fingerDraws = true
+        canvas.palmGuardTop = canvas.height * 0.7f
+        val y = canvas.height * 0.85f
+        drag(line(200f, y, 600f, y), F)
+        assertEquals("mão no protetor não risca", 0, strokes().size)
+        drag(line(200f, y, 600f, y), S)
+        assertEquals("caneta ativa escreve por cima", 1, strokes().size)
+        drag(line(200f, 600f, 600f, 600f), F)
+        assertEquals("fora do protetor o dedo escreve", 2, strokes().size)
     }
 }

@@ -103,6 +103,24 @@ class PenPrefs(context: Context) {
         get() = sp.getBoolean("finger_draws", false)
         set(v) = sp.edit().putBoolean("finger_draws", v).apply()
 
+    /** Rejeição de palma do próprio app. */
+    var palmReject: Boolean
+        get() = sp.getBoolean("palm_reject", true)
+        set(v) = sp.edit().putBoolean("palm_reject", v).apply()
+
+    var leftHanded: Boolean
+        get() = sp.getBoolean("left_handed", false)
+        set(v) = sp.edit().putBoolean("left_handed", v).apply()
+
+    /** Protetor de mão ligado e a altura dele (fração da tela, a partir de baixo). */
+    var palmGuard: Boolean
+        get() = sp.getBoolean("palm_guard", false)
+        set(v) = sp.edit().putBoolean("palm_guard", v).apply()
+
+    var palmGuardFrac: Float
+        get() = sp.getFloat("palm_guard_frac", 0.28f)
+        set(v) = sp.edit().putFloat("palm_guard_frac", v).apply()
+
     var autoShapes: Boolean
         get() = sp.getBoolean("auto_shapes", false)
         set(v) = sp.edit().putBoolean("auto_shapes", v).apply()

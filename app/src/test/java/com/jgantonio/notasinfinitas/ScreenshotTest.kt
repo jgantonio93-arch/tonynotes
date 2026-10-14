@@ -262,6 +262,20 @@ class ScreenshotTest {
         editor.stopRecordingForTests()
     }
 
+    /** Protetor de mão ligado. */
+    @Test
+    fun capturePalmGuard() {
+        val app = ApplicationProvider.getApplicationContext<android.app.Application>()
+        Library.init(app, reload = true)
+        val (_, nota) = seed(app)
+        app.getSharedPreferences("canetas", 0).edit().putBoolean("palm_guard", true).commit()
+        val editor = Robolectric.buildActivity(EditorActivity::class.java,
+            Intent(app, EditorActivity::class.java).putExtra(EditorActivity.EXTRA_NOTE, nota.id)).setup().get()
+        snap(editor)
+        save(snap(editor), "29-protetor-de-mao")
+        app.getSharedPreferences("canetas", 0).edit().putBoolean("palm_guard", false).commit()
+    }
+
     /** Slides de exemplo abertos pelo leitor offline de PowerPoint. */
     @Test
     fun capturePowerPoint() {

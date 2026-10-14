@@ -389,8 +389,28 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         }
     }
 
+    /** Protetor de mão: a altura fica salva como fração da tela (vale para qualquer orientação). */
+    private fun applyPalmGuard() {
+        if (!prefs.palmGuard) {
+            canvasView.palmGuardTop = null
+            return
+        }
+        canvasView.onPalmGuardChanged = { top ->
+            if (top == null) {
+                prefs.palmGuard = false
+                toast("Protetor de mão desligado")
+            } else if (canvasView.height > 0) prefs.palmGuardFrac = ((canvasView.height - top) / canvasView.height).coerceIn(0.05f, 0.7f)
+        }
+        val h = canvasView.height
+        if (h > 0) canvasView.palmGuardTop = h * (1f - prefs.palmGuardFrac)
+        else canvasView.post { if (prefs.palmGuard) canvasView.palmGuardTop = canvasView.height * (1f - prefs.palmGuardFrac) }
+    }
+
     private fun applyPrefs() {
         canvasView.fingerDraws = prefs.fingerDraws
+        canvasView.palmReject = prefs.palmReject
+        canvasView.leftHanded = prefs.leftHanded
+        applyPalmGuard()
         canvasView.autoShapes = prefs.autoShapes
         canvasView.spenButtonErases = prefs.spenButtonErases
         canvasView.eraserArea = prefs.eraserArea
@@ -1348,6 +1368,18 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             box.addView(menuSection("Ajustes"))
             box.addView(switchRow(Icon.TOUCH, "Escrever com o dedo", prefs.fingerDraws) {
                 prefs.fingerDraws = it
+                applyPrefs()
+            })
+            box.addView(switchRow(Icon.TOUCH, "Rejeição de palma (ignorar a mão)", prefs.palmReject) {
+                prefs.palmReject = it
+                applyPrefs()
+            })
+            box.addView(switchRow(Icon.TOUCH, "Escrevo com a mão esquerda", prefs.leftHanded) {
+                prefs.leftHanded = it
+                applyPrefs()
+            })
+            box.addView(switchRow(Icon.PAGE, "Protetor de mão (apoiar a mão embaixo)", prefs.palmGuard) {
+                prefs.palmGuard = it
                 applyPrefs()
             })
             box.addView(switchRow(Icon.EDIT, "Tinta de latência mínima (experimental)", prefs.lowLatency) {

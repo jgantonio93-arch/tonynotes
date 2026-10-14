@@ -1756,6 +1756,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
+        palmGuardTop?.let { top -> if (oldh > 0) palmGuardTop = h - (oldh - top) * h / oldh }
         updateRotation()
         if (!hasInitialPosition && w > 0) {
             // Começa abaixo do dock de ferramentas, que flutua no topo.
@@ -1768,6 +1769,9 @@ class InfiniteCanvasView(context: Context) : View(context) {
     private var swallowing = false
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
+        // Protetor de mão: em coordenadas da tela (antes de desgirar).
+        if (handleGuardDrag(e)) return true
+        markGuardTouches(e)
         if (viewRotation == 0f) return handleTouch(e)
         // Tela girada: desgira o toque (todos os dedos e o histórico) e segue normalmente.
         val ev = MotionEvent.obtain(e)
@@ -1790,6 +1794,11 @@ class InfiniteCanvasView(context: Context) : View(context) {
             if (e.actionMasked == MotionEvent.ACTION_UP || e.actionMasked == MotionEvent.ACTION_CANCEL) swallowing = false
             return true
         }
+        if (palmReject || palmGuardTop != null) palmFilter(e) else dispatchTouch(e)
+        return true
+    }
+
+    private fun dispatchTouch(e: MotionEvent) {
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> onDown(e)
             MotionEvent.ACTION_POINTER_DOWN -> onPointerDown(e)
@@ -1798,7 +1807,225 @@ class InfiniteCanvasView(context: Context) : View(context) {
             MotionEvent.ACTION_UP -> onUp(e)
             MotionEvent.ACTION_CANCEL -> cancelGesture()
         }
-        return true
+    }
+
+    // ---- Rejeição de palma ---------------------------------------------------------------
+    //
+    // Fica entre o toque e os gestos: decide quais dedos "valem" e entrega aos gestos um
+    // evento só com eles (com o histórico, para o traço continuar suave).
+
+    /** Ignorar a mão: caneta ganha da palma, toques grandes e a posição da mão contam. */
+    var palmReject = true
+    /** Mão que escreve (para saber de que lado fica a palma). */
+    var leftHanded = false
+    /** Borda de cima do protetor de mão, em px da tela (null: sem protetor). */
+    var palmGuardTop: Float? = null
+        set(v) { field = v; invalidate() }
+    var onPalmGuardChanged: ((Float?) -> Unit)? = null
+
+    private val accepted = ArrayList<Int>()
+    private val ignored = HashSet<Int>()
+    private var lastPenTime = Long.MIN_VALUE / 2
+    private var penHovering = false
+    private var acceptedDownTime = 0L
+    private var guardDrag = false
+
+    override fun onHoverEvent(e: MotionEvent): Boolean {
+        if (e.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS || e.getToolType(0) == MotionEvent.TOOL_TYPE_ERASER) {
+            when (e.actionMasked) {
+                MotionEvent.ACTION_HOVER_ENTER, MotionEvent.ACTION_HOVER_MOVE -> penHovering = true
+                MotionEvent.ACTION_HOVER_EXIT -> {
+                    penHovering = false
+                    lastPenTime = e.eventTime
+                }
+            }
+        }
+        return super.onHoverEvent(e)
+    }
+
+    private fun penRecent(t: Long) = penHovering || t - lastPenTime < PEN_PALM_MS
+
+    /** Contato grande demais para ponta de caneta ou de dedo. */
+    private fun palmSized(e: MotionEvent, i: Int) = e.getTouchMajor(i) / density > PALM_SIZE_DP
+
+    private val guardIds = HashSet<Int>()
+
+    private fun markGuardTouches(e: MotionEvent) {
+        when (e.actionMasked) {
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                if (e.actionMasked == MotionEvent.ACTION_DOWN) guardIds.clear()
+                val i = e.actionIndex
+                val top = palmGuardTop
+                if (top != null && !isPen(e, i) && e.getY(i) >= top) guardIds.add(e.getPointerId(i))
+            }
+        }
+    }
+
+    private fun inGuard(e: MotionEvent, i: Int) = guardIds.contains(e.getPointerId(i))
+
+    /** Quanto mais alto e mais longe do lado da mão, mais "caneta" (e menos palma). */
+    private fun penScore(x: Float, y: Float) = -y + (if (leftHanded) x else -x) * 0.5f
+
+    private fun palmFilter(e: MotionEvent) {
+        val t = e.eventTime
+        for (i in 0 until e.pointerCount) if (isPen(e, i)) lastPenTime = t
+        when (e.actionMasked) {
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                val i = e.actionIndex
+                val id = e.getPointerId(i)
+                if (e.actionMasked == MotionEvent.ACTION_DOWN) { accepted.clear(); ignored.clear() }
+                if (isPen(e, i)) {
+                    // A caneta ganha: o que a mão estava fazendo é descartado.
+                    if (accepted.isNotEmpty()) {
+                        // A palma chegou antes e arrastou a tela: volta para onde estava.
+                        if (gesture == Gesture.NAVIGATE && t - acceptedDownTime < 1500) acceptSpot?.let { restoreSpot(it) }
+                        cancelGesture()
+                        ignored.addAll(accepted)
+                        accepted.clear()
+                    }
+                    accept(e, id)
+                    return
+                }
+                val pen = accepted.firstOrNull()?.let { a -> e.findPointerIndex(a) }?.takeIf { it >= 0 && isPen(e, it) } != null
+                if (pen || inGuard(e, i) || (palmReject && (penRecent(t) || palmSized(e, i)))) {
+                    ignored.add(id)
+                    return
+                }
+                if (accepted.isEmpty()) {
+                    accept(e, id)
+                    return
+                }
+                if (palmReject && gesture == Gesture.DRAW) {
+                    val old = e.findPointerIndex(accepted[0])
+                    when {
+                        // Dois dedos quase juntos: é para mover/dar zoom.
+                        t - acceptedDownTime < TWO_FINGER_MS -> {
+                            accepted.add(id)
+                            send(e, MotionEvent.ACTION_POINTER_DOWN, id)
+                        }
+                        old >= 0 && penScore(e.getX(i), e.getY(i)) > penScore(e.getX(old), e.getY(old)) &&
+                            (t - acceptedDownTime < SWAP_MS || maxTravel < 14f * density) -> {
+                            // A primeira era a palma: descarta o risco dela e quem escreve é a nova.
+                            cancelGesture()
+                            ignored.addAll(accepted)
+                            accepted.clear()
+                            accept(e, id)
+                        }
+                        else -> ignored.add(id)
+                    }
+                    return
+                }
+                accepted.add(id)
+                send(e, MotionEvent.ACTION_POINTER_DOWN, id)
+            }
+            MotionEvent.ACTION_MOVE -> if (accepted.isNotEmpty()) send(e, MotionEvent.ACTION_MOVE, null)
+            MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_UP -> {
+                val id = e.getPointerId(e.actionIndex)
+                if (ignored.remove(id)) return
+                if (!accepted.contains(id)) return
+                if (accepted.size == 1) {
+                    send(e, MotionEvent.ACTION_UP, id)
+                    accepted.clear()
+                } else {
+                    send(e, MotionEvent.ACTION_POINTER_UP, id)
+                    accepted.remove(id)
+                }
+                if (e.actionMasked == MotionEvent.ACTION_UP) { accepted.clear(); ignored.clear() }
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                if (accepted.isNotEmpty()) cancelGesture()
+                accepted.clear(); ignored.clear()
+            }
+        }
+    }
+
+    private var acceptSpot: ViewSpot? = null
+
+    private fun accept(e: MotionEvent, id: Int) {
+        accepted.clear()
+        accepted.add(id)
+        acceptedDownTime = e.eventTime
+        acceptSpot = currentSpot()
+        send(e, MotionEvent.ACTION_DOWN, id)
+    }
+
+    /** Entrega aos gestos um evento só com os dedos aceitos. */
+    private fun send(e: MotionEvent, action: Int, actionId: Int?) {
+        val ids = accepted.filter { e.findPointerIndex(it) >= 0 }
+        if (ids.isEmpty()) return
+        val idx = ids.map { e.findPointerIndex(it) }
+        val props = Array(ids.size) { k -> MotionEvent.PointerProperties().also { e.getPointerProperties(idx[k], it) } }
+        fun coords(h: Int) = Array(ids.size) { k ->
+            MotionEvent.PointerCoords().also { if (h < 0) e.getPointerCoords(idx[k], it) else e.getHistoricalPointerCoords(idx[k], h, it) }
+        }
+        val full = when (action) {
+            MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_POINTER_UP -> action or (ids.indexOf(actionId).coerceAtLeast(0) shl MotionEvent.ACTION_POINTER_INDEX_SHIFT)
+            else -> action
+        }
+        val n = if (action == MotionEvent.ACTION_MOVE) e.historySize else 0
+        val ev = MotionEvent.obtain(e.downTime, if (n > 0) e.getHistoricalEventTime(0) else e.eventTime, full, ids.size, props,
+            if (n > 0) coords(0) else coords(-1), e.metaState, e.buttonState, 1f, 1f, e.deviceId, 0, e.source, e.flags)
+        for (h in 1 until n) ev.addBatch(e.getHistoricalEventTime(h), coords(h), e.metaState)
+        if (n > 0) ev.addBatch(e.eventTime, coords(-1), e.metaState)
+        try {
+            dispatchTouch(ev)
+        } finally {
+            ev.recycle()
+        }
+    }
+
+    /** Alça do protetor (faixa de 32 dp na borda de cima): arrasta para subir/descer. */
+    private fun handleGuardDrag(e: MotionEvent): Boolean {
+        val top = palmGuardTop ?: return false
+        when (e.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                if (isPen(e, 0)) return false
+                if (abs(e.y - top) <= 16f * density) {
+                    // O "×" no canto desliga o protetor.
+                    if (e.x > width - 48f * density) {
+                        palmGuardTop = null
+                        onPalmGuardChanged?.invoke(null)
+                        swallowing = true
+                        return true
+                    }
+                    guardDrag = true
+                    return true
+                }
+            }
+            MotionEvent.ACTION_MOVE -> if (guardDrag) {
+                palmGuardTop = e.y.coerceIn(height * 0.3f, height - 40f * density)
+                return true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (guardDrag) {
+                guardDrag = false
+                onPalmGuardChanged?.invoke(palmGuardTop)
+                return true
+            }
+        }
+        return guardDrag
+    }
+
+    private val guardFill = Paint().apply { color = 0x1F7A8B99 }
+    private val guardEdge = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x667A8B99; strokeCap = Paint.Cap.ROUND }
+    private val guardText = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xAA5B6670.toInt(); textAlign = Paint.Align.CENTER }
+
+    /** Faixa do protetor de mão (na tela, não na nota). */
+    private fun drawPalmGuard(canvas: Canvas) {
+        val top = palmGuardTop ?: return
+        canvas.drawRect(0f, top, width.toFloat(), height.toFloat(), guardFill)
+        guardEdge.strokeWidth = 2f * density
+        canvas.drawLine(0f, top, width.toFloat(), top, guardEdge)
+        guardEdge.strokeWidth = 5f * density
+        val cx = width / 2f
+        canvas.drawLine(cx - 22f * density, top, cx + 22f * density, top, guardEdge)
+        guardText.textSize = 13f * density
+        canvas.drawText("Protetor de mão: apoie a mão aqui", cx, top + 30f * density, guardText)
+        // "×" para desligar.
+        val xx = width - 26f * density
+        val r = 6f * density
+        guardEdge.strokeWidth = 2f * density
+        canvas.drawLine(xx - r, top - r, xx + r, top + r, guardEdge)
+        canvas.drawLine(xx - r, top + r, xx + r, top - r, guardEdge)
     }
 
     private fun isPen(e: MotionEvent, index: Int): Boolean {
@@ -2475,6 +2702,8 @@ class InfiniteCanvasView(context: Context) : View(context) {
         }
         if (rulerOn) drawRuler(canvas)
         canvas.restore()
+        // O protetor fica preso à tela (não gira com a nota).
+        drawPalmGuard(canvas)
     }
 
     /** Parte do mundo que aparece na tela: com a tela girada, envolve os 4 cantos. */
@@ -2879,6 +3108,14 @@ class InfiniteCanvasView(context: Context) : View(context) {
         private const val LASER_LIFE = 900L
         private const val VANISH_LIFE = 3500L
         private val BATCH = Regex("""^(pdf|pptx)_([^_]+)_""")
+        /** Depois de levantar a caneta, a mão é ignorada por este tempo. */
+        private const val PEN_PALM_MS = 800L
+        /** Contato maior que isso (dp) é palma. */
+        private const val PALM_SIZE_DP = 110f
+        /** Segundo dedo até este tempo depois do primeiro: mover/zoom. */
+        private const val TWO_FINGER_MS = 150L
+        /** Até este tempo a "caneta" ainda pode tomar o lugar da palma que começou a riscar. */
+        private const val SWAP_MS = 350L
         private const val MIN_SCALE = 0.03f
         private const val MAX_SCALE = 8f
         private const val MAX_UNDO = 300
