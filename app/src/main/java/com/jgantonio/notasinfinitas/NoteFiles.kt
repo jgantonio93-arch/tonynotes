@@ -61,10 +61,14 @@ object NoteFiles {
     /** PDF de uma nota salva, sem abrir a tela dela (para o backup). Null se vazia. */
     fun pdfBytes(c: Context, noteId: String): ByteArray? {
         val data = NoteStorage.load(Library.noteFile(noteId)) ?: return null
-        val view = InfiniteCanvasView(c.applicationContext)
+        // A tela da nota é criada na thread principal (por segurança); o desenho do PDF, aqui.
+        val view = onMain {
+            InfiniteCanvasView(c.applicationContext).apply {
+                assetDir = Library.assetsDir(noteId)
+                load(data)
+            }
+        }
         try {
-            view.assetDir = Library.assetsDir(noteId)
-            view.load(data)
             val doc = pdf(view) ?: return null
             return try {
                 ByteArrayOutputStream().also { doc.writeTo(it) }.toByteArray()
@@ -74,6 +78,19 @@ object NoteFiles {
         } finally {
             view.images.close()
         }
+    }
+
+    private fun <T> onMain(block: () -> T): T {
+        val main = android.os.Looper.getMainLooper()
+        if (android.os.Looper.myLooper() == main) return block()
+        var result: Result<T>? = null
+        val done = java.util.concurrent.CountDownLatch(1)
+        android.os.Handler(main).post {
+            result = runCatching(block)
+            done.countDown()
+        }
+        if (!done.await(20, java.util.concurrent.TimeUnit.SECONDS)) throw IllegalStateException("tempo esgotado")
+        return result!!.getOrThrow()
     }
 
     /** Pacote editável da nota. */
