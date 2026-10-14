@@ -2164,7 +2164,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
 
     private fun buildAudioBar(): LinearLayout {
         val bar = vertical().apply {
-            background = floating(22f)
+            background = rounded(Ui.SURFACE, 22f, Ui.LINE)
             Ui.run { softShadow(8f) }
             visibility = View.GONE
         }

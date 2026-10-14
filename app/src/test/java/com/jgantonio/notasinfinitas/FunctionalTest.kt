@@ -1592,7 +1592,7 @@ class FunctionalTest {
         // Minimizar deixa só o tempo e o botão; fica lembrado ao reabrir a nota.
         editor.setAudioBarMiniForTests(true)
         assertTrue(editor.audioBarMiniForTests)
-        assertTrue(findAll(bar).any { it.contentDescription?.toString() == "Expandir o painel de áudio" && it.isShown })
+        assertTrue(findAll(bar).any { it.contentDescription?.toString() == "Expandir o painel de áudio" && (it.parent as View).visibility == View.VISIBLE })
         controller.pause().stop().destroy()
         openEditor()
         assertTrue("minimizado continua", editor.audioBarMiniForTests)
