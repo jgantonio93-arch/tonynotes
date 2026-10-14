@@ -49,6 +49,9 @@ object DriveSync {
 
     class Result(val uploaded: Int, val deleted: Int, val total: Int)
 
+    /** Gera o PDF de uma nota (trocável nos testes, onde o PdfDocument do Android não existe). */
+    internal var pdfMaker: (Context, String) -> ByteArray? = NoteFiles::pdfBytes
+
     private fun sp(c: Context) = c.getSharedPreferences("drive", Context.MODE_PRIVATE)
 
     var lastError: String? = null
@@ -227,7 +230,7 @@ object DriveSync {
 
     private fun uploadNote(c: Context, api: DriveApi, st: State, n: NoteInfo, sig: String, name: String, parent: String, prev: NoteState?) {
         val bundle = NoteFiles.bundle(n)
-        val pdf = try { NoteFiles.pdfBytes(c, n.id) } catch (e: Throwable) { null }
+        val pdf = try { pdfMaker(c, n.id) } catch (e: Throwable) { null }
         val props = mapOf("kind" to "note", "note" to n.id)
         val pdfProps = mapOf("kind" to "pdf", "note" to n.id)
         fun put(id: String?, file: String, mime: String, p: Map<String, String>, bytes: ByteArray): String {

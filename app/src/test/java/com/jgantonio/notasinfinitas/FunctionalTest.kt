@@ -1216,6 +1216,10 @@ class FunctionalTest {
         controller.pause()
         Library.io.submit {}.get()
         val drive = FakeDrive()
+        // No teste não há PdfDocument de verdade: um PDF de mentira, só para notas com conteúdo.
+        DriveSync.pdfMaker = { _, id ->
+            if (NoteStorage.load(Library.noteFile(id))?.elements.isNullOrEmpty()) null else "%PDF-teste $id".toByteArray()
+        }
         // Restos do formato antigo (um arquivo por arquivo do app) são apagados.
         drive.files["velho"] = FakeDrive.F("notes_x.jpg", "raiz", "image/jpeg", mapOf("path" to "notes/x/a.jpg"), ByteArray(3))
         val folderName = Library.folder(note.folder)!!.name
