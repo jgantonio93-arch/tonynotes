@@ -1718,7 +1718,7 @@ class FunctionalTest {
     fun protetor_de_mao_ignora_a_mao_mas_nao_a_caneta() {
         canvas.palmReject = false
         canvas.fingerDraws = true
-        canvas.palmGuardTop = canvas.height * 0.7f
+        canvas.palmGuard = RectF(0f, canvas.height * 0.7f, canvas.width.toFloat(), canvas.height.toFloat())
         val y = canvas.height * 0.85f
         drag(line(200f, y, 600f, y), F)
         assertEquals("mão no protetor não risca", 0, strokes().size)
@@ -1726,5 +1726,51 @@ class FunctionalTest {
         assertEquals("caneta ativa escreve por cima", 1, strokes().size)
         drag(line(200f, 600f, 600f, 600f), F)
         assertEquals("fora do protetor o dedo escreve", 2, strokes().size)
+    }
+
+    @Test
+    fun protetor_ilha_move_redimensiona_e_lateral() {
+        val d = app.resources.displayMetrics.density
+        app.getSharedPreferences("canetas", 0).edit().putString("palm_guard_mode", "free").commit()
+        controller.pause().stop().destroy()
+        openEditor()
+        val g0 = RectF(canvas.palmGuard!!)
+        assertTrue("ilha no meio da tela", g0.left > 0f && g0.right < canvas.width && g0.top > 0f)
+        // Arrasta pela alça do topo: move inteira.
+        val gx = g0.centerX()
+        val gy = g0.top + 14f * d
+        drag(listOf(gx to gy, gx - 100f to gy - 300f, gx - 200f to gy - 600f), F)
+        val g1 = canvas.palmGuard!!
+        assertEquals(g0.left - 200f, g1.left, 1f)
+        assertEquals(g0.top - 600f, g1.top, 1f)
+        assertEquals(g0.width(), g1.width(), 1f)
+        assertEquals("nada riscado ao mover", 0, strokes().size)
+        // Pelo canto de baixo: muda o tamanho.
+        val cx = g1.right - 16f * d
+        val cy = g1.bottom - 16f * d
+        drag(listOf(cx to cy, cx - 50f to cy + 100f, cx - 100f to cy + 200f), F)
+        val g2 = canvas.palmGuard!!
+        assertEquals(g1.width() - 100f, g2.width(), 1f)
+        assertEquals(g1.height() + 200f, g2.height(), 1f)
+        // Fica lembrada ao reabrir a nota.
+        controller.pause().stop().destroy()
+        openEditor()
+        assertEquals(g2.left, canvas.palmGuard!!.left, 2f)
+        assertEquals(g2.bottom, canvas.palmGuard!!.bottom, 2f)
+
+        // Faixa na lateral (destro: à direita, de cima a baixo).
+        app.getSharedPreferences("canetas", 0).edit().putString("palm_guard_mode", "side").commit()
+        controller.pause().stop().destroy()
+        openEditor()
+        val s = canvas.palmGuard!!
+        assertEquals(canvas.width.toFloat(), s.right, 1f)
+        assertEquals(0f, s.top, 1f)
+        assertTrue(s.height() > s.width())
+        // O × fecha.
+        val xx = s.right - 18f * d
+        val xy = s.top + 16f * d
+        tap(xx, xy, F)
+        assertNull(canvas.palmGuard)
+        assertEquals("off", app.getSharedPreferences("canetas", 0).getString("palm_guard_mode", null))
     }
 }

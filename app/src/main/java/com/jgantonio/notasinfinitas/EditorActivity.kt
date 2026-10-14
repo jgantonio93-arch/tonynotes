@@ -389,21 +389,44 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         }
     }
 
-    /** Protetor de mão: a altura fica salva como fração da tela (vale para qualquer orientação). */
+    /** Protetor de mão: posição salva como fração da tela (vale para qualquer orientação). */
     private fun applyPalmGuard() {
-        if (!prefs.palmGuard) {
-            canvasView.palmGuardTop = null
+        val mode = prefs.palmGuardMode
+        if (mode == "off") {
+            canvasView.palmGuard = null
             return
         }
-        canvasView.onPalmGuardChanged = { top ->
-            if (top == null) {
-                prefs.palmGuard = false
+        canvasView.onPalmGuardChanged = { r ->
+            val w = canvasView.width.toFloat()
+            val h = canvasView.height.toFloat()
+            if (r == null) {
+                prefs.palmGuardMode = "off"
                 toast("Protetor de mão desligado")
-            } else if (canvasView.height > 0) prefs.palmGuardFrac = ((canvasView.height - top) / canvasView.height).coerceIn(0.05f, 0.7f)
+            } else if (w > 0 && h > 0) prefs.setPalmGuardRect(prefs.palmGuardMode, floatArrayOf(r.left / w, r.top / h, r.right / w, r.bottom / h))
         }
-        val h = canvasView.height
-        if (h > 0) canvasView.palmGuardTop = h * (1f - prefs.palmGuardFrac)
-        else canvasView.post { if (prefs.palmGuard) canvasView.palmGuardTop = canvasView.height * (1f - prefs.palmGuardFrac) }
+        fun place() {
+            val w = canvasView.width.toFloat()
+            val h = canvasView.height.toFloat()
+            val left = prefs.leftHanded
+            val f = prefs.palmGuardRect(mode) ?: when (mode) {
+                "side" -> if (left) floatArrayOf(0f, 0f, 0.3f, 1f) else floatArrayOf(0.7f, 0f, 1f, 1f)
+                "free" -> if (left) floatArrayOf(0.05f, 0.55f, 0.5f, 0.85f) else floatArrayOf(0.5f, 0.55f, 0.95f, 0.85f)
+                else -> floatArrayOf(0f, 0.72f, 1f, 1f)
+            }
+            canvasView.palmGuard = RectF(f[0] * w, f[1] * h, f[2] * w, f[3] * h)
+        }
+        if (canvasView.height > 0) place() else canvasView.post { if (prefs.palmGuardMode != "off") place() }
+    }
+
+    private fun showPalmGuardMenu() {
+        val cur = prefs.palmGuardMode
+        fun pick(m: String) { prefs.palmGuardMode = m; applyPrefs() }
+        actionSheet("Protetor de mão", listOf(
+            SheetItem(if (cur == "off") Icon.CHECK else Icon.CLOSE, "Desligado") { pick("off") },
+            SheetItem(if (cur == "bottom") Icon.CHECK else Icon.PAGE_PORTRAIT, "Faixa embaixo (horizontal)") { pick("bottom") },
+            SheetItem(if (cur == "side") Icon.CHECK else Icon.PAGE_LANDSCAPE, "Faixa na lateral (vertical, do lado da mão)") { pick("side") },
+            SheetItem(if (cur == "free") Icon.CHECK else Icon.MOVE, "Ilha livre (arraste e mude o tamanho)") { pick("free") },
+        ), header = Ui.run { label("Arraste pela alça de cima para mover e pelo canto de baixo para mudar o tamanho. O × desliga.", 13f).apply { setPadding(0, 0, 0, dpi(8f)) } })
     }
 
     private fun applyPrefs() {
@@ -1378,10 +1401,12 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
                 prefs.leftHanded = it
                 applyPrefs()
             })
-            box.addView(switchRow(Icon.PAGE, "Protetor de mão (apoiar a mão embaixo)", prefs.palmGuard) {
-                prefs.palmGuard = it
-                applyPrefs()
-            })
+            box.addView(menuRow(Icon.PAGE, "Protetor de mão: " + when (prefs.palmGuardMode) {
+                "bottom" -> "faixa embaixo"
+                "side" -> "faixa na lateral"
+                "free" -> "ilha livre"
+                else -> "desligado"
+            }, act { showPalmGuardMenu() }))
             box.addView(switchRow(Icon.EDIT, "Tinta de latência mínima (experimental)", prefs.lowLatency) {
                 prefs.lowLatency = it
                 applyPrefs()

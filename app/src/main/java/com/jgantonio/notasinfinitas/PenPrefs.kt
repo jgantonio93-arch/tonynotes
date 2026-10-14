@@ -112,14 +112,17 @@ class PenPrefs(context: Context) {
         get() = sp.getBoolean("left_handed", false)
         set(v) = sp.edit().putBoolean("left_handed", v).apply()
 
-    /** Protetor de mão ligado e a altura dele (fração da tela, a partir de baixo). */
-    var palmGuard: Boolean
-        get() = sp.getBoolean("palm_guard", false)
-        set(v) = sp.edit().putBoolean("palm_guard", v).apply()
+    /** Protetor de mão: "off", "bottom" (faixa embaixo), "side" (faixa na lateral) ou "free" (ilha). */
+    var palmGuardMode: String
+        get() = sp.getString("palm_guard_mode", null) ?: if (sp.getBoolean("palm_guard", false)) "bottom" else "off"
+        set(v) = sp.edit().putString("palm_guard_mode", v).apply()
 
-    var palmGuardFrac: Float
-        get() = sp.getFloat("palm_guard_frac", 0.28f)
-        set(v) = sp.edit().putFloat("palm_guard_frac", v).apply()
+    /** Onde o protetor ficou (frações da tela: esquerda, topo, direita, base), por modo. */
+    fun palmGuardRect(mode: String): FloatArray? =
+        sp.getString("palm_guard_rect_$mode", null)?.split(',')?.mapNotNull { it.toFloatOrNull() }?.takeIf { it.size == 4 }?.toFloatArray()
+
+    fun setPalmGuardRect(mode: String, r: FloatArray) =
+        sp.edit().putString("palm_guard_rect_$mode", r.joinToString(",")).apply()
 
     var autoShapes: Boolean
         get() = sp.getBoolean("auto_shapes", false)

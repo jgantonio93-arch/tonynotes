@@ -1756,7 +1756,10 @@ class InfiniteCanvasView(context: Context) : View(context) {
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        palmGuardTop?.let { top -> if (oldh > 0) palmGuardTop = h - (oldh - top) * h / oldh }
+        // O protetor acompanha o tamanho da tela (girar o tablet, por exemplo).
+        palmGuard?.let { g ->
+            if (oldw > 0 && oldh > 0) palmGuard = RectF(g.left * w / oldw, g.top * h / oldh, g.right * w / oldw, g.bottom * h / oldh)
+        }
         updateRotation()
         if (!hasInitialPosition && w > 0) {
             // Começa abaixo do dock de ferramentas, que flutua no topo.
@@ -1794,7 +1797,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
             if (e.actionMasked == MotionEvent.ACTION_UP || e.actionMasked == MotionEvent.ACTION_CANCEL) swallowing = false
             return true
         }
-        if (palmReject || palmGuardTop != null) palmFilter(e) else dispatchTouch(e)
+        if (palmReject || palmGuard != null) palmFilter(e) else dispatchTouch(e)
         return true
     }
 
@@ -1818,17 +1821,17 @@ class InfiniteCanvasView(context: Context) : View(context) {
     var palmReject = true
     /** Mão que escreve (para saber de que lado fica a palma). */
     var leftHanded = false
-    /** Borda de cima do protetor de mão, em px da tela (null: sem protetor). */
-    var palmGuardTop: Float? = null
+    /** Protetor de mão: retângulo na tela (faixa embaixo, na lateral ou ilha livre); null: sem. */
+    var palmGuard: RectF? = null
         set(v) { field = v; invalidate() }
-    var onPalmGuardChanged: ((Float?) -> Unit)? = null
+    /** Avisado ao terminar de mover/redimensionar (null: fechado no ×). */
+    var onPalmGuardChanged: ((RectF?) -> Unit)? = null
 
     private val accepted = ArrayList<Int>()
     private val ignored = HashSet<Int>()
     private var lastPenTime = Long.MIN_VALUE / 2
     private var penHovering = false
     private var acceptedDownTime = 0L
-    private var guardDrag = false
 
     override fun onHoverEvent(e: MotionEvent): Boolean {
         if (e.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS || e.getToolType(0) == MotionEvent.TOOL_TYPE_ERASER) {
@@ -1855,8 +1858,8 @@ class InfiniteCanvasView(context: Context) : View(context) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                 if (e.actionMasked == MotionEvent.ACTION_DOWN) guardIds.clear()
                 val i = e.actionIndex
-                val top = palmGuardTop
-                if (top != null && !isPen(e, i) && e.getY(i) >= top) guardIds.add(e.getPointerId(i))
+                val g = palmGuard
+                if (g != null && !isPen(e, i) && g.contains(e.getX(i), e.getY(i))) guardIds.add(e.getPointerId(i))
             }
         }
     }
@@ -1974,58 +1977,95 @@ class InfiniteCanvasView(context: Context) : View(context) {
         }
     }
 
-    /** Alça do protetor (faixa de 32 dp na borda de cima): arrasta para subir/descer. */
+    private var guardMode = 0          // 1 = mover, 2 = redimensionar
+    private var guardLastX = 0f
+    private var guardLastY = 0f
+
+    /** Onde ficam a alça de mover (topo, no meio), a de redimensionar (canto) e o ×. */
+    private fun guardGrip(g: RectF) = floatArrayOf(g.centerX(), g.top + 14f * density)
+    private fun guardCorner(g: RectF) = floatArrayOf(g.right - 16f * density, g.bottom - 16f * density)
+    private fun guardClose(g: RectF) = floatArrayOf(g.right - 18f * density, g.top + 16f * density)
+
+    private fun near(p: FloatArray, x: Float, y: Float, r: Float) = hypot(x - p[0], y - p[1]) <= r
+
+    /** Mover (alça do topo), redimensionar (canto) ou fechar (×) o protetor. */
     private fun handleGuardDrag(e: MotionEvent): Boolean {
-        val top = palmGuardTop ?: return false
+        val g = palmGuard ?: return false
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 if (isPen(e, 0)) return false
-                if (abs(e.y - top) <= 16f * density) {
-                    // O "×" no canto desliga o protetor.
-                    if (e.x > width - 48f * density) {
-                        palmGuardTop = null
+                val x = e.x
+                val y = e.y
+                guardMode = when {
+                    near(guardClose(g), x, y, 20f * density) -> {
+                        palmGuard = null
                         onPalmGuardChanged?.invoke(null)
                         swallowing = true
                         return true
                     }
-                    guardDrag = true
-                    return true
+                    near(guardCorner(g), x, y, 26f * density) -> 2
+                    abs(x - guardGrip(g)[0]) <= 48f * density && abs(y - guardGrip(g)[1]) <= 18f * density -> 1
+                    else -> 0
                 }
+                guardLastX = x; guardLastY = y
+                return guardMode != 0
             }
-            MotionEvent.ACTION_MOVE -> if (guardDrag) {
-                palmGuardTop = e.y.coerceIn(height * 0.3f, height - 40f * density)
+            MotionEvent.ACTION_MOVE -> if (guardMode != 0) {
+                val dx = e.x - guardLastX
+                val dy = e.y - guardLastY
+                guardLastX = e.x; guardLastY = e.y
+                val r = RectF(g)
+                val min = 72f * density
+                if (guardMode == 1) {
+                    r.offset(dx, dy)
+                    // Não sai da tela.
+                    r.offset(max(0f, -r.left) - max(0f, r.right - width), max(0f, -r.top) - max(0f, r.bottom - height))
+                } else {
+                    r.right = (r.right + dx).coerceIn(r.left + min, width.toFloat())
+                    r.bottom = (r.bottom + dy).coerceIn(r.top + min, height.toFloat())
+                }
+                palmGuard = r
                 return true
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (guardDrag) {
-                guardDrag = false
-                onPalmGuardChanged?.invoke(palmGuardTop)
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (guardMode != 0) {
+                guardMode = 0
+                onPalmGuardChanged?.invoke(palmGuard)
                 return true
             }
         }
-        return guardDrag
+        return guardMode != 0
     }
 
-    private val guardFill = Paint().apply { color = 0x1F7A8B99 }
-    private val guardEdge = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x667A8B99; strokeCap = Paint.Cap.ROUND }
+    private val guardFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x267A8B99 }
+    private val guardEdge = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x887A8B99.toInt(); strokeCap = Paint.Cap.ROUND; style = Paint.Style.STROKE }
     private val guardText = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xAA5B6670.toInt(); textAlign = Paint.Align.CENTER }
 
-    /** Faixa do protetor de mão (na tela, não na nota). */
+    /** Protetor de mão (na tela, não na nota): área, alça de mover, canto de redimensionar e ×. */
     private fun drawPalmGuard(canvas: Canvas) {
-        val top = palmGuardTop ?: return
-        canvas.drawRect(0f, top, width.toFloat(), height.toFloat(), guardFill)
-        guardEdge.strokeWidth = 2f * density
-        canvas.drawLine(0f, top, width.toFloat(), top, guardEdge)
+        val g = palmGuard ?: return
+        val rad = 18f * density
+        canvas.drawRoundRect(g, rad, rad, guardFill)
+        guardEdge.strokeWidth = 1.5f * density
+        canvas.drawRoundRect(g, rad, rad, guardEdge)
+        // Alça de mover.
+        val (gx, gy) = guardGrip(g).let { it[0] to it[1] }
         guardEdge.strokeWidth = 5f * density
-        val cx = width / 2f
-        canvas.drawLine(cx - 22f * density, top, cx + 22f * density, top, guardEdge)
-        guardText.textSize = 13f * density
-        canvas.drawText("Protetor de mão: apoie a mão aqui", cx, top + 30f * density, guardText)
-        // "×" para desligar.
-        val xx = width - 26f * density
-        val r = 6f * density
+        canvas.drawLine(gx - 22f * density, gy, gx + 22f * density, gy, guardEdge)
+        // Canto de redimensionar.
+        val (cx, cy) = guardCorner(g).let { it[0] to it[1] }
         guardEdge.strokeWidth = 2f * density
-        canvas.drawLine(xx - r, top - r, xx + r, top + r, guardEdge)
-        canvas.drawLine(xx - r, top + r, xx + r, top - r, guardEdge)
+        val u = 7f * density
+        canvas.drawLine(cx - u, cy + u * 0.6f, cx + u * 0.6f, cy - u, guardEdge)
+        canvas.drawLine(cx - u * 0.1f, cy + u * 0.6f, cx + u * 0.6f, cy - u * 0.1f, guardEdge)
+        // ×
+        val (xx, xy) = guardClose(g).let { it[0] to it[1] }
+        val r = 6f * density
+        canvas.drawLine(xx - r, xy - r, xx + r, xy + r, guardEdge)
+        canvas.drawLine(xx - r, xy + r, xx + r, xy - r, guardEdge)
+        if (g.height() > 70f * density && g.width() > 150f * density) {
+            guardText.textSize = 13f * density
+            canvas.drawText("Protetor de mão", g.centerX(), g.centerY() + 5f * density, guardText)
+        }
     }
 
     private fun isPen(e: MotionEvent, index: Int): Boolean {

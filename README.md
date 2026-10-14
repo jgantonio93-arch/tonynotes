@@ -122,7 +122,9 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
   da mão (a palma que encostou antes não mexe a tela) e a mão é ignorada enquanto a caneta está
   perto ou logo depois; escrevendo com dedo/caneta comum, toques grandes são ignorados e, com
   vários toques, escreve o que fica acima e do lado oposto à mão (opção "mão esquerda").
-  **Protetor de mão** opcional: faixa embaixo (arraste a borda) onde a mão pode encostar.
+  **Protetor de mão** opcional, onde a mão pode encostar: faixa embaixo (horizontal), faixa na
+  lateral (vertical, do lado da mão) ou ilha livre; arraste pela alça para mover e pelo canto
+  para mudar o tamanho (fica lembrado).
 - Selecione a escrita → **Ouvir daqui**: o áudio toca a partir de quando aquilo foi escrito.
 - **Painel de áudio** em cima da nota (dá para escrever ouvindo): tocar/pausar, barra para
   avançar, −10s/+10s e velocidade de 0,5x a 2x. Gravando: pausar/continuar e parar.
