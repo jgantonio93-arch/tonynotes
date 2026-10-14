@@ -1599,4 +1599,32 @@ class FunctionalTest {
         editor.setAudioBarMiniForTests(false)
         assertTrue(!editor.audioBarMiniForTests)
     }
+
+    @Test
+    fun compartilhar_do_samsung_notes_com_tipo_desconhecido_importa() {
+        fun res(name: String, to: String) = File(app.cacheDir, to).also { f ->
+            javaClass.classLoader!!.getResourceAsStream(name)!!.use { i -> f.outputStream().use { i.copyTo(it) } }
+        }
+        // Sem a extensão .sdocx: tem que reconhecer pelo conteúdo (zip).
+        val a = res("sdocx/titulo.sdocx", "compartilhado_1")
+        val b = res("sdocx/eg-walker.sdocx", "compartilhado_2")
+        val foto = File(app.cacheDir, "foto.jpg").apply { writeBytes(byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 1, 2, 3)) }
+        val home = Robolectric.buildActivity(FoldersActivity::class.java).setup().get()
+        val before = Library.notes.size
+
+        home.handleSharedForTests(listOf(android.net.Uri.fromFile(foto)))
+        ShadowLooper.idleMainLooper()
+        assertEquals("foto não vira nota", before, Library.notes.size)
+        val d = org.robolectric.shadows.ShadowDialog.getLatestDialog()!!
+        assertTrue(findAll(d.window!!.decorView).filterIsInstance<android.widget.TextView>().any { it.text.toString().contains("Samsung Notes (.sdocx)") })
+        d.dismiss()
+
+        home.handleSharedForTests(listOf(android.net.Uri.fromFile(a), android.net.Uri.fromFile(b)))
+        val end = System.currentTimeMillis() + 30000
+        while (Library.notes.size < before + 2 && System.currentTimeMillis() < end) {
+            ShadowLooper.idleMainLooper()
+            Thread.sleep(30)
+        }
+        assertEquals(before + 2, Library.notes.size)
+    }
 }

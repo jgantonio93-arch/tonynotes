@@ -632,8 +632,10 @@ class FoldersActivity : Activity() {
         sheet("Importar do Samsung Notes") { box, dialog ->
             box.addView(label(
                 "A escrita à mão vem editável, com as cores e as folhas na mesma ordem.\n\n" +
-                    "No Samsung Notes, selecione as notas, toque em Compartilhar (ou Salvar como arquivo) e escolha " +
-                    "“Arquivo do Samsung Notes (.sdocx)”. Compartilhe direto com o RosaNotes ou salve e escolha os arquivos aqui.",
+                    "Jeito 1: no Samsung Notes, selecione as notas (segure uma e toque em Tudo), toque em Compartilhar › " +
+                    "“Arquivo do Samsung Notes” e escolha o RosaNotes.\n\n" +
+                    "Jeito 2: no Samsung Notes, selecione as notas › Salvar como arquivo › “Arquivo do Samsung Notes” " +
+                    "e salve numa pasta. Depois toque em Escolher arquivos abaixo e marque todos de uma vez.",
                 15f, Ui.MUTED,
             ).apply { setLineSpacing(0f, 1.15f) })
             box.addView(buttonRow(
@@ -680,10 +682,32 @@ class FoldersActivity : Activity() {
             (PdfImporter.displayName(this, u) ?: u.lastPathSegment ?: "").lowercase().endsWith(".${NoteFiles.EXT}")
         }
         val rest = uris - pdfs.toSet() - slides.toSet() - bundles.toSet()
+        // O Samsung Notes manda o .sdocx com um tipo próprio: reconhece pelo nome ou por ser um zip.
+        val samsung = rest.filter { u ->
+            (PdfImporter.displayName(this, u) ?: u.lastPathSegment ?: "").lowercase().let { it.endsWith(".sdocx") || it.endsWith(".sdoc") } ||
+                looksLikeZip(u)
+        }
+        val unknown = rest - samsung.toSet()
         if (bundles.isNotEmpty()) importBundles(bundles)
-        if (rest.isNotEmpty()) importSamsung(rest)
+        if (samsung.isNotEmpty()) importSamsung(samsung)
+        if (unknown.isNotEmpty() && samsung.isEmpty() && pdfs.isEmpty() && slides.isEmpty() && bundles.isEmpty()) {
+            sheet("Arquivo não suportado") { box, d ->
+                box.addView(label("O RosaNotes importa arquivos do Samsung Notes (.sdocx), PDF, PowerPoint e notas .${NoteFiles.EXT}." +
+                    "\n\nNo Samsung Notes, escolha Compartilhar › “Arquivo do Samsung Notes”.", 15f, Ui.MUTED).apply { setLineSpacing(0f, 1.15f) })
+                box.addView(buttonRow(primaryButton("OK") { d.dismiss() }))
+            }
+        }
         if (pdfs.isNotEmpty()) importSharedPdf(pdfs.first(), pdfs.size)
         else if (slides.isNotEmpty()) importSharedPdf(slides.first(), slides.size, slides = true)
+    }
+
+    internal fun handleSharedForTests(uris: List<android.net.Uri>) = handleShared(uris)
+
+    /** Começa com "PK" (zip, como o .sdocx)? */
+    private fun looksLikeZip(u: android.net.Uri): Boolean = try {
+        contentResolver.openInputStream(u)?.use { i -> i.read() == 'P'.code && i.read() == 'K'.code } ?: false
+    } catch (e: Exception) {
+        false
     }
 
     /** Notas .rosanota (do backup no Drive ou compartilhadas): voltam editáveis numa pasta escolhida. */

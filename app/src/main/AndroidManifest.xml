@@ -36,6 +36,24 @@
                 <data android:mimeType="application/vnd.openxmlformats-officedocument.presentationml.slideshow" />
                 <data android:mimeType="application/vnd.ms-powerpoint" />
             </intent-filter>
+            <!-- O Samsung Notes manda o .sdocx com um tipo próprio (não documentado): aceita qualquer
+                 arquivo no Compartilhar e o app separa pelo conteúdo. -->
+            <intent-filter android:label="Importar no RosaNotes">
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter android:label="Importar no RosaNotes">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:host="*" />
+                <data android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.sdocx" />
+                <data android:pathPattern=".*\\..*\\.sdocx" />
+            </intent-filter>
             <intent-filter android:label="Importar no RosaNotes">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
