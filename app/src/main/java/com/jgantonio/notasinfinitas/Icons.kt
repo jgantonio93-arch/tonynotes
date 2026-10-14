@@ -19,7 +19,7 @@ enum class Icon {
     ROTATE, LOCK, UNLOCK, CROP, FLIP_H, FLIP_V, ADJUST, TO_FRONT, TO_BACK, DOWNLOAD, RESET, ZOOM, SELECT_ALL,
     SEARCH, MARKER, ALIGN_LEFT, ALIGN_CENTER, ALIGN_RIGHT, TEXT_BIGGER, TEXT_SMALLER,
     RECT_SELECT, PARTIAL, STRAIGHT, GRIP, INFINITE, PAGES_V, PAGES_H, DOCK_TOP, DOCK_LEFT, DOCK_RIGHT,
-    SUN, MOON, THEME_AUTO, PAGE_PORTRAIT, PAGE_LANDSCAPE, FULLSCREEN, FULLSCREEN_EXIT, MIC, EYEDROPPER, BUCKET, TAPE, BOOKMARK, CARDS, RULER, SLIDES, CONTENTS
+    SUN, MOON, THEME_AUTO, PAGE_PORTRAIT, PAGE_LANDSCAPE, FULLSCREEN, FULLSCREEN_EXIT, MIC, EYEDROPPER, BUCKET, TAPE, BOOKMARK, CARDS, RULER, SLIDES, CONTENTS, PLAY, PAUSE
 }
 
 /** Rótulo em português para leitores de tela (botões só com ícone). */
@@ -45,7 +45,7 @@ val Icon.label: String
         Icon.TEXT_BIGGER -> "Aumentar"; Icon.TEXT_SMALLER -> "Diminuir"
         Icon.FULLSCREEN -> "Tela cheia"; Icon.FULLSCREEN_EXIT -> "Sair da tela cheia"; Icon.MIC -> "Áudio"
         Icon.EYEDROPPER -> "Conta-gotas"; Icon.BUCKET -> "Balde"
-        Icon.TAPE -> "Fita para esconder"; Icon.BOOKMARK -> "Marcadores"; Icon.CARDS -> "Cartões"; Icon.RULER -> "Régua"; Icon.SLIDES -> "PowerPoint"; Icon.CONTENTS -> "Sumário"
+        Icon.TAPE -> "Fita para esconder"; Icon.BOOKMARK -> "Marcadores"; Icon.CARDS -> "Cartões"; Icon.RULER -> "Régua"; Icon.SLIDES -> "PowerPoint"; Icon.CONTENTS -> "Sumário"; Icon.PLAY -> "Tocar"; Icon.PAUSE -> "Pausar"
     }
 
 class IconDrawable(
@@ -282,6 +282,13 @@ class IconDrawable(
                 arcTo(RectF(4f, 4f, 20f, 20f), 200f, -290f, true)
                 moveTo(3.5f, 4.5f); lineTo(4.4f, 9.4f); lineTo(9.2f, 8.4f)
             }, stroke)
+            Icon.PLAY -> c.drawPath(path {
+                moveTo(8f, 5f); lineTo(19f, 12f); lineTo(8f, 19f); close()
+            }, fill)
+            Icon.PAUSE -> c.drawPath(path {
+                rrect(6.5f, 5f, 10f, 19f, 1.2f)
+                rrect(14f, 5f, 17.5f, 19f, 1.2f)
+            }, fill)
             Icon.CONTENTS -> c.drawPath(path {
                 moveTo(4f, 4f); lineTo(9f, 4f); lineTo(9f, 10f); lineTo(4f, 10f); close()
                 moveTo(4f, 14f); lineTo(9f, 14f); lineTo(9f, 20f); lineTo(4f, 20f); close()

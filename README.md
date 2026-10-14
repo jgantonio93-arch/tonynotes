@@ -119,6 +119,13 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
 - Menu ⋮ → **Gravar áudio com a escrita**. Cada traço feito durante a gravação guarda o
   momento do áudio.
 - Selecione a escrita → **Ouvir daqui**: o áudio toca a partir de quando aquilo foi escrito.
+- **Painel de áudio** em cima da nota (dá para escrever ouvindo): tocar/pausar, barra para
+  avançar, −10s/+10s e velocidade de 0,5x a 2x. Gravando: pausar/continuar e parar.
+- **Gravações** (menu ⋮): lista com nome, duração e data; renomear, compartilhar/exportar,
+  salvar em Downloads e apagar.
+- **Gravação à prova de falhas**: o áudio é gravado em AAC contínuo (ADTS) e a lista é salva
+  enquanto grava; se o app fechar ou o celular desligar, o que já foi gravado continua tocando.
+- No backup do Drive, todos os áudios ficam na pasta **RosaNotes/Gravações**, com o nome da nota.
 - Menu ⋮ → **Áudios da nota**: tocar ou apagar as gravações.
 
 ### Apresentar

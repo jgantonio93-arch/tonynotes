@@ -96,13 +96,14 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     /** Onde a tela estava antes de pular pelo sumário. */
     private var backSpot: InfiniteCanvasView.ViewSpot? = null
     private lateinit var ephemeralPill: TextView
-    private lateinit var audioPill: TextView
+    private lateinit var audioBar: LinearLayout
+    internal val audioBarForTests get() = audioBar
     private var audioNotes: AudioNotes? = null
     private val audio: AudioNotes get() = audioNotes ?: AudioNotes(Library.assetsDir(note.id)).also { audioNotes = it }
     private val audioTicker = object : Runnable {
         override fun run() {
             updateAudioPill()
-            if (audioNotes?.isRecording == true || audioNotes?.isPlaying == true) main.postDelayed(this, 500)
+            if (audioNotes?.isRecording == true || audioNotes?.hasPlayer == true) main.postDelayed(this, 250)
         }
     }
 
@@ -275,21 +276,9 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             bottomMargin = dpi(18f)
         })
 
-        audioPill = TextView(this).apply {
-            textSize = 14f
-            typeface = Ui.MEDIUM
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-            minHeight = dpi(40f)
-            setPadding(dpi(16f), 0, dpi(16f), 0)
-            fontFeatureSettings = "tnum"
-            background = ripple(pill(Color.parseColor("#D7263D"), 0), pill(Color.WHITE, 0))
-            Ui.run { softShadow(6f) }
-            visibility = View.GONE
-            setOnClickListener { audio.stop(); audio.stopPlayback(); updateAudioPill() }
-        }
-        stage.addView(audioPill, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.END).apply {
-            setMargins(0, 0, dpi(14f), dpi(14f))
+        audioBar = buildAudioBar()
+        stage.addView(audioBar, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
+            setMargins(dpi(10f), 0, dpi(10f), dpi(58f))
         })
         canvasView.onStrokeAdded = { s -> audioNotes?.markStroke(s) }
         canvasView.onColorPicked = { col ->
@@ -1315,7 +1304,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
                 else menuTile(Icon.MIC, "Gravar áudio", act { startRecording() }),
             )
             if (canvasView.pdfPageCount > 0) tiles.add(3, menuTile(Icon.CONTENTS, "Sumário", act { showContents() }))
-            if (audio.recordings.isNotEmpty()) tiles.add(menuTile(Icon.MIC, "Áudios (${audio.recordings.size})", act { showRecordings() }))
+            if (audio.recordings.isNotEmpty()) tiles.add(menuTile(Icon.PLAY, "Gravações (${audio.recordings.size})", act { showRecordings() }))
             if (canvasView.tapeCount > 0) {
                 val hide = canvasView.hiddenTapeCount == 0
                 tiles.add(menuTile(Icon.TAPE, if (hide) "Esconder fitas" else "Mostrar fitas", act { canvasView.setAllTapes(revealed = !hide); refresh() }))
@@ -2150,37 +2139,244 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         updateAudioPill()
     }
 
-    private fun showRecordings() {
-        val df = SimpleDateFormat("dd/MM HH:mm", Locale("pt", "BR"))
-        actionSheet("Áudios da nota", audio.recordings.mapIndexed { i, r ->
-            SheetItem(Icon.TOUCH, "Gravação ${i + 1} · ${AudioNotes.format(r.durationMs)} · ${df.format(Date(r.created))}") {
-                actionSheet("Gravação ${i + 1}", listOf(
-                    SheetItem(Icon.TOUCH, "Tocar do começo") { playAudio(i, 0L) },
-                    SheetItem(Icon.TRASH, "Apagar gravação", danger = true) {
-                        confirmDelete("Apagar gravação?", "O áudio será apagado; a escrita continua na nota.") {
-                            audio.delete(i)
-                            updateAudioPill()
-                        }
-                    },
-                ))
+    // Painel de áudio: fica em cima da nota (dá para escrever enquanto ouve ou grava).
+    private lateinit var abTitle: TextView
+    private lateinit var abTime: TextView
+    private lateinit var abSeek: android.widget.SeekBar
+    private lateinit var abMain: ImageView
+    private lateinit var abBack: View
+    private lateinit var abFwd: View
+    private lateinit var abSpeed: TextView
+    private lateinit var abStop: TextView
+    private var abSeeking = false
+    private val speeds = floatArrayOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
+
+    private fun speedLabel(x: Float) = (if (x == x.toInt().toFloat()) "${x.toInt()}" else "$x".replace('.', ',')) + "x"
+
+    private fun buildAudioBar(): LinearLayout {
+        val bar = vertical().apply {
+            background = floating(22f)
+            Ui.run { softShadow(8f) }
+            setPadding(dpi(14f), dpi(10f), dpi(8f), dpi(8f))
+            visibility = View.GONE
+            minimumWidth = dpi(300f)
+        }
+        val top = horizontal().apply { gravity = Gravity.CENTER_VERTICAL }
+        abTitle = label("", 14f, Ui.INK, bold = true).apply { isSingleLine = true; ellipsize = android.text.TextUtils.TruncateAt.END }
+        top.addView(abTitle, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        abTime = label("", 13f).apply { fontFeatureSettings = "tnum"; setPadding(dpi(8f), 0, dpi(4f), 0) }
+        top.addView(abTime)
+        top.addView(iconButton(Icon.CONTENTS, Ui.MUTED, 36f, "Lista de gravações") { showRecordings() })
+        top.addView(iconButton(Icon.CLOSE, Ui.MUTED, 36f, "Fechar o tocador") {
+            if (audio.isRecording) audio.stop()
+            audio.stopPlayback()
+            updateAudioPill()
+        })
+        bar.addView(top)
+        abSeek = android.widget.SeekBar(this).apply {
+            max = 1000
+            progressTintList = android.content.res.ColorStateList.valueOf(Ui.ACCENT)
+            thumbTintList = android.content.res.ColorStateList.valueOf(Ui.ACCENT)
+            setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(sb: android.widget.SeekBar, p: Int, fromUser: Boolean) {
+                    if (fromUser) abTime.text = "${AudioNotes.format(audio.playDurationMs * p / 1000)} / ${AudioNotes.format(audio.playDurationMs)}"
+                }
+                override fun onStartTrackingTouch(sb: android.widget.SeekBar) { abSeeking = true }
+                override fun onStopTrackingTouch(sb: android.widget.SeekBar) {
+                    abSeeking = false
+                    audio.seekTo(audio.playDurationMs * sb.progress / 1000)
+                    updateAudioPill()
+                }
+            })
+        }
+        bar.addView(abSeek, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpi(32f)))
+        val controls = horizontal().apply { gravity = Gravity.CENTER_VERTICAL or Gravity.CENTER_HORIZONTAL }
+        abBack = label("−10s", 14f, Ui.INK, bold = true).apply {
+            gravity = Gravity.CENTER
+            minWidth = dpi(52f); minHeight = dpi(40f)
+            background = ripple(null, circle(Color.WHITE, 0, 0f))
+            contentDescription = "Voltar 10 segundos"
+            setOnClickListener { audio.seekTo(audio.positionMs - 10_000); updateAudioPill() }
+        }
+        abMain = ImageView(this).apply {
+            background = ripple(circle(Ui.ACCENT, 0, 0f), circle(Color.WHITE, 0, 0f))
+            setPadding(dpi(12f), dpi(12f), dpi(12f), dpi(12f))
+            contentDescription = "Tocar ou pausar"
+            setOnClickListener { audioMainAction() }
+        }
+        abFwd = label("+10s", 14f, Ui.INK, bold = true).apply {
+            gravity = Gravity.CENTER
+            minWidth = dpi(52f); minHeight = dpi(40f)
+            background = ripple(null, circle(Color.WHITE, 0, 0f))
+            contentDescription = "Avançar 10 segundos"
+            setOnClickListener { audio.seekTo(audio.positionMs + 10_000); updateAudioPill() }
+        }
+        abSpeed = label("1x", 13f, Ui.ACCENT, bold = true).apply {
+            gravity = Gravity.CENTER
+            minWidth = dpi(52f); minHeight = dpi(34f)
+            setPadding(dpi(10f), 0, dpi(10f), 0)
+            background = ripple(pill(Ui.ACCENT_SOFT, 0), pill(Color.WHITE, 0))
+            contentDescription = "Velocidade"
+            setOnClickListener { showSpeedMenu() }
+        }
+        abStop = label("Parar", 14f, Color.WHITE, bold = true).apply {
+            gravity = Gravity.CENTER
+            minHeight = dpi(40f)
+            setPadding(dpi(16f), 0, dpi(16f), 0)
+            background = ripple(pill(Color.parseColor("#D7263D"), 0), pill(Color.WHITE, 0))
+            setOnClickListener {
+                audio.stop()
+                toast("Gravação salva")
+                updateAudioPill()
+            }
+        }
+        fun gap() = View(this).apply { layoutParams = LinearLayout.LayoutParams(dpi(10f), 1) }
+        controls.addView(abSpeed); controls.addView(gap())
+        controls.addView(abBack); controls.addView(gap())
+        controls.addView(abMain, LinearLayout.LayoutParams(dpi(52f), dpi(52f)))
+        controls.addView(gap()); controls.addView(abFwd)
+        controls.addView(gap()); controls.addView(abStop)
+        bar.addView(controls, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dpi(2f) })
+        return bar
+    }
+
+    /** Botão do meio: pausa/continua a gravação ou a reprodução. */
+    private fun audioMainAction() {
+        val a = audio
+        when {
+            a.isRecording -> if (a.recordingPaused) a.resumeRecording() else a.pauseRecording()
+            a.isPlaying -> a.pausePlayback()
+            a.hasPlayer -> a.resumePlayback()
+        }
+        updateAudioPill()
+    }
+
+    private fun showSpeedMenu() {
+        actionSheet("Velocidade", speeds.map { x ->
+            SheetItem(if (x == audio.speed) Icon.CHECK else Icon.PLAY, speedLabel(x) + if (x == 1f) " (normal)" else "") {
+                audio.setSpeed(x)
+                updateAudioPill()
             }
         })
+    }
+
+    internal fun showRecordingsForTests() = showRecordings()
+
+    private fun showRecordings() {
+        val df = SimpleDateFormat("dd/MM/yyyy 'às' HH:mm", Locale("pt", "BR"))
+        sheet("Gravações da nota") { box, dialog ->
+            if (audio.isRecording) {
+                box.addView(label("Gravando agora: pare a gravação para tocar ou exportar.", 13f).apply { setPadding(0, 0, 0, dpi(8f)) })
+            } else {
+                box.addView(primaryButton("●  Gravar nova") { dialog.dismiss(); startRecording() },
+                    LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dpi(10f) })
+            }
+            if (audio.recordings.isEmpty()) {
+                box.addView(label("Nenhuma gravação ainda. Enquanto grava, o que você escrever fica ligado ao áudio: selecione a escrita e toque em “Ouvir daqui”.", 14f))
+            }
+            audio.recordings.forEachIndexed { i, r ->
+                val live = audio.isRecording && i == audio.recordings.size - 1
+                val row = horizontal().apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    minimumHeight = dpi(60f)
+                    setPadding(dpi(6f), dpi(4f), 0, dpi(4f))
+                    background = ripple(if (audio.playing == i) rounded(Ui.ACCENT_SOFT, 14f) else null, rounded(Color.WHITE, 14f))
+                    if (!live) setOnClickListener { dialog.dismiss(); playAudio(i, 0L) }
+                }
+                row.addView(ImageView(this).apply {
+                    setImageDrawable(icon(if (live) Icon.MIC else Icon.PLAY, if (live) Color.parseColor("#D7263D") else Ui.ACCENT, 22f))
+                    background = circle(Ui.ACCENT_SOFT, 0, 0f)
+                    setPadding(dpi(8f), dpi(8f), dpi(8f), dpi(8f))
+                }, LinearLayout.LayoutParams(dpi(40f), dpi(40f)).apply { marginEnd = dpi(12f) })
+                val texts = vertical()
+                texts.addView(label(r.name, 15.5f, Ui.INK).apply { isSingleLine = true; ellipsize = android.text.TextUtils.TruncateAt.END })
+                texts.addView(label(if (live) "Gravando…" else "${AudioNotes.format(r.durationMs)} · ${df.format(Date(r.created))}", 12.5f))
+                row.addView(texts, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                if (!live) row.addView(iconButton(Icon.MORE, Ui.MUTED, 40f, "Opções de ${r.name}") {
+                    dialog.dismiss()
+                    recordingOptions(i)
+                })
+                box.addView(row)
+            }
+            box.addView(buttonRow(secondaryButton("Fechar") { dialog.dismiss() }))
+        }
+    }
+
+    private fun recordingOptions(i: Int) {
+        val r = audio.recordings.getOrNull(i) ?: return
+        actionSheet(r.name, listOf(
+            SheetItem(Icon.PLAY, "Tocar do começo") { playAudio(i, 0L) },
+            SheetItem(Icon.EDIT, "Renomear") {
+                promptText("Renomear gravação", r.name) { t -> audio.rename(i, t); updateAudioPill(); showRecordings() }
+            },
+            SheetItem(Icon.EXPORT, "Compartilhar / exportar") { exportRecording(i, share = true) },
+            SheetItem(Icon.DOWNLOAD, "Salvar em Downloads") { exportRecording(i, share = false) },
+            SheetItem(Icon.TRASH, "Apagar gravação", danger = true) {
+                confirmDelete("Apagar “${r.name}”?", "O áudio será apagado; a escrita continua na nota.") {
+                    audio.delete(i)
+                    updateAudioPill()
+                }
+            },
+        ))
+    }
+
+    private fun exportRecording(i: Int, share: Boolean) {
+        val r = audio.recordings.getOrNull(i) ?: return
+        val src = audio.fileOf(i) ?: run { toast("O arquivo de áudio não foi encontrado."); return }
+        val ext = src.extension
+        val mime = AudioNotes.mimeOf(src.name)
+        val name = "${note.title} - ${r.name}".replace(Regex("[^\\p{L}\\p{N} ._-]"), "_") + ".$ext"
+        Library.io.execute {
+            val ok = try {
+                if (share) {
+                    src.copyTo(File(ShareProvider.dir(this), name), overwrite = true)
+                    true
+                } else writeToMediaStore(MediaStore.Downloads.EXTERNAL_CONTENT_URI, name, mime,
+                    Environment.DIRECTORY_DOWNLOADS + "/RosaNotes") { out -> src.inputStream().use { it.copyTo(out) }; true }
+            } catch (e: Exception) {
+                false
+            }
+            main.post {
+                when {
+                    !ok -> toast("Não foi possível exportar o áudio.")
+                    share -> shareFile(File(ShareProvider.dir(this), name), mime)
+                    else -> toast("Áudio salvo em Downloads/RosaNotes")
+                }
+            }
+        }
     }
 
     private fun confirmDelete(title: String, msg: String, onOk: () -> Unit) = Ui.run { confirm(title, msg, "Apagar", onOk) }
 
     private fun updateAudioPill() {
         val a = audioNotes
-        val text = when {
-            a == null -> null
-            a.isRecording -> "●  Gravando ${AudioNotes.format(a.elapsedMs)}  ·  parar"
-            a.isPlaying -> "▶  ${AudioNotes.format(a.elapsedMs)}  ·  parar"
-            else -> null
-        }
-        audioPill.text = text ?: ""
-        audioPill.visibility = if (text != null) View.VISIBLE else View.GONE
+        val recording = a?.isRecording == true
+        val loaded = a?.hasPlayer == true
+        audioBar.visibility = if (recording || loaded) View.VISIBLE else View.GONE
         main.removeCallbacks(audioTicker)
-        if (text != null) main.postDelayed(audioTicker, 500)
+        if (a == null || (!recording && !loaded)) return
+        if (recording) {
+            abTitle.text = if (a.recordingPaused) "⏸  Gravação pausada" else "●  Gravando"
+            abTitle.setTextColor(if (a.recordingPaused) Ui.INK else Color.parseColor("#D7263D"))
+            abTime.text = AudioNotes.format(a.recordedMs)
+            abMain.setImageDrawable(icon(if (a.recordingPaused) Icon.MIC else Icon.PAUSE, Ui.ON_ACCENT, 26f))
+            abMain.contentDescription = if (a.recordingPaused) "Continuar gravação" else "Pausar gravação"
+        } else {
+            val rec = a.recordings.getOrNull(a.playing)
+            abTitle.text = rec?.name ?: "Gravação"
+            abTitle.setTextColor(Ui.INK)
+            val dur = a.playDurationMs
+            if (!abSeeking) {
+                abTime.text = "${AudioNotes.format(a.positionMs)} / ${AudioNotes.format(dur)}"
+                abSeek.progress = if (dur > 0) (a.positionMs * 1000 / dur).toInt() else 0
+            }
+            abMain.setImageDrawable(icon(if (a.isPlaying) Icon.PAUSE else Icon.PLAY, Ui.ON_ACCENT, 26f))
+            abMain.contentDescription = if (a.isPlaying) "Pausar" else "Tocar"
+            abSpeed.text = speedLabel(a.speed)
+        }
+        for (v in listOf(abSeek, abBack, abFwd, abSpeed)) v.visibility = if (recording) View.GONE else View.VISIBLE
+        abStop.visibility = if (recording) View.VISIBLE else View.GONE
+        main.postDelayed(audioTicker, 250)
     }
 
     override fun onDestroy() {

@@ -114,7 +114,9 @@ object NoteFiles {
                 .toString().toByteArray())
             z.closeEntry()
             put("nota.ninf", Library.noteFile(note.id))
-            Library.assetsDir(note.id).listFiles()?.sortedBy { it.name }?.forEach { put("imagens/${it.name}", it) }
+            // Os áudios vão à parte (pasta "Gravações" no Drive); a lista deles (audio.json) vai junto.
+            Library.assetsDir(note.id).listFiles()?.filter { !AudioNotes.isAudioFile(it.name) }?.sortedBy { it.name }
+                ?.forEach { put("imagens/${it.name}", it) }
             put("miniatura.png", Library.thumbFile(note.id))
         }
         return out.toByteArray()

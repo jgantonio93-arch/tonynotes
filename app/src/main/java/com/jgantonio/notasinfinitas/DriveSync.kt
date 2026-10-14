@@ -71,11 +71,14 @@ object DriveSync {
 
     private class FolderState(val id: String, val name: String, val parent: String)
     private class NoteState(val bundle: String, val pdf: String?, val sig: String, val name: String, val parent: String)
+    private class AudioState(val id: String, val name: String, val size: Long)
     private class State(
         val folders: MutableMap<String, FolderState> = HashMap(),
         val notes: MutableMap<String, NoteState> = HashMap(),
         var index: String? = null,
         var indexSig: String = "",
+        val audio: MutableMap<String, AudioState> = HashMap(),
+        var audioFolder: String? = null,
     )
 
     private fun loadState(c: Context): State {
@@ -91,6 +94,10 @@ object DriveSync {
                     st.notes[k] = NoteState(it.getString(0), it.optString(1).ifEmpty { null }, it.getString(2), it.getString(3), it.getString(4))
                 }
             }
+            o.optJSONObject("audio")?.let { a ->
+                for (k in a.keys()) a.getJSONArray(k).let { st.audio[k] = AudioState(it.getString(0), it.getString(1), it.getLong(2)) }
+            }
+            st.audioFolder = o.optString("audioFolder").ifEmpty { null }
             st.index = o.optString("index").ifEmpty { null }
             st.indexSig = o.optString("indexSig")
         } catch (_: Exception) {
@@ -103,7 +110,10 @@ object DriveSync {
         for ((k, v) in st.folders) f.put(k, JSONArray().put(v.id).put(v.name).put(v.parent))
         val n = JSONObject()
         for ((k, v) in st.notes) n.put(k, JSONArray().put(v.bundle).put(v.pdf ?: "").put(v.sig).put(v.name).put(v.parent))
+        val a = JSONObject()
+        for ((k, v) in st.audio) a.put(k, JSONArray().put(v.id).put(v.name).put(v.size))
         val o = JSONObject().put("folders", f).put("notes", n).put("index", st.index ?: "").put("indexSig", st.indexSig)
+            .put("audio", a).put("audioFolder", st.audioFolder ?: "")
         sp(c).edit().putString("state2", o.toString()).apply()
     }
 
@@ -115,7 +125,7 @@ object DriveSync {
     /** Muda quando a nota, as imagens dela ou o título mudam. */
     private fun noteSig(n: NoteInfo): String {
         val f = Library.noteFile(n.id)
-        val imgs = Library.assetsDir(n.id).listFiles().orEmpty()
+        val imgs = Library.assetsDir(n.id).listFiles().orEmpty().filter { !AudioNotes.isAudioFile(it.name) }
         return "${f.lastModified()}:${f.length()}:${imgs.size}:${imgs.maxOfOrNull { it.lastModified() } ?: 0}"
     }
 
@@ -212,6 +222,9 @@ object DriveSync {
             st.folders.remove(id)
         }
 
+        // Gravações: todas juntas na pasta "Gravações", com o nome da nota.
+        syncAudio(c, api, st, root, notes)
+
         // Índice: pastas, cores, ordem e capas (para o Restaurar).
         val idx = indexFiles(c)
         val idxSig = idx.joinToString("|") { (n, f) -> "$n:${f.lastModified()}:${f.length()}" }
@@ -251,6 +264,62 @@ object DriveSync {
         }
         st.notes[n.id] = NoteState(bundleId, pdfId, sig, name, parent)
         saveState(c, st)
+    }
+
+    private fun syncAudio(c: Context, api: DriveApi, st: State, root: String, notes: List<NoteInfo>) {
+        val seen = HashSet<String>()
+        var folder = st.audioFolder
+        for (n in notes) {
+            val dir = Library.assetsDir(n.id)
+            if (!File(dir, "audio.json").isFile) continue
+            val recs = AudioNotes(dir).recordings
+            for (r in recs) {
+                val f = File(dir, r.file)
+                if (!f.isFile || f.path == AudioNotes.active) continue
+                val key = "${n.id}/${r.file}"
+                seen.add(key)
+                val name = safe("${n.title} – ${r.name}") + "." + f.extension
+                val prev = st.audio[key]
+                if (prev != null && prev.size == f.length()) {
+                    if (prev.name != name) try {
+                        api.move(prev.id, name, folder ?: root, folder ?: root)
+                        st.audio[key] = AudioState(prev.id, name, prev.size)
+                    } catch (_: IOException) {
+                        st.audio.remove(key)
+                    }
+                    if (st.audio.containsKey(key)) continue
+                }
+                val target: String = folder ?: api.createFolder(root, "Gravações", mapOf("kind" to "audiofolder"))
+                folder = target
+                st.audioFolder = target
+                val bytes = f.readBytes()
+                val props = mapOf("kind" to "audio", "note" to n.id, "file" to r.file)
+                var id: String? = st.audio[key]?.let { p ->
+                    try {
+                        api.update(p.id, bytes)
+                        if (p.name != name) api.move(p.id, name, target, target)
+                        p.id
+                    } catch (_: IOException) {
+                        null
+                    }
+                }
+                if (id == null) id = try {
+                    api.create(target, name, AudioNotes.mimeOf(r.file), props, bytes)
+                } catch (e: IOException) {
+                    // A pasta "Gravações" foi apagada por fora: cria de novo.
+                    val again = api.createFolder(root, "Gravações", mapOf("kind" to "audiofolder"))
+                    folder = again
+                    st.audioFolder = again
+                    api.create(again, name, AudioNotes.mimeOf(r.file), props, bytes)
+                }
+                st.audio[key] = AudioState(id!!, name, f.length())
+                saveState(c, st)
+            }
+        }
+        for (key in st.audio.keys - seen) {
+            try { api.delete(st.audio.getValue(key).id) } catch (_: IOException) {}
+            st.audio.remove(key)
+        }
     }
 
     /** Apaga do Drive os arquivos soltos do formato antigo (um por arquivo do app). */
@@ -294,6 +363,17 @@ object DriveSync {
         tmp.deleteRecursively()
         Library.init(c, reload = true)
         for ((id, u) in unpacked) NoteFiles.writeNote(u, id)
+        // Gravações de volta para as notas.
+        val audios = api.find("kind", "audio")
+        for (r in audios) {
+            val id = r.props["note"] ?: continue
+            val file = r.props["file"]?.takeIf { AudioNotes.isAudioFile(it) && !it.contains('/') } ?: continue
+            if (Library.note(id) == null) continue
+            try {
+                File(Library.assetsDir(id).apply { mkdirs() }, file).writeBytes(api.download(r.id))
+            } catch (_: IOException) {
+            }
+        }
 
         // O que veio do Drive já está lá: o próximo backup só envia o que mudar.
         val st = State()
@@ -307,6 +387,13 @@ object DriveSync {
             val n = Library.note(id) ?: continue
             st.notes[id] = NoteState(r.id, pdfs[id]?.id, noteSig(n), "\u0000", "")
         }
+        for (r in audios) {
+            val id = r.props["note"] ?: continue
+            val file = r.props["file"] ?: continue
+            val f = File(Library.assetsDir(id), file)
+            if (f.isFile) st.audio["$id/$file"] = AudioState(r.id, r.name, f.length())
+        }
+        st.audioFolder = api.find("kind", "audiofolder").firstOrNull()?.id
         st.index = index.id
         saveState(c, st)
         sp(c).edit().putBoolean("v2", true).remove("state").apply()

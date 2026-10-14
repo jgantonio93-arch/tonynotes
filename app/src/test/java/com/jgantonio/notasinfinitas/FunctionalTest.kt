@@ -1500,4 +1500,68 @@ class FunctionalTest {
         assertEquals(View.GONE, editor.backPillForTests.visibility)
         assertEquals(there, canvas.currentSpot())
     }
+
+    @Test
+    fun gravacoes_vao_para_a_pasta_gravacoes_no_drive() {
+        drag(line(200f, 700f, 800f, 700f))
+        controller.pause()
+        Library.io.submit {}.get()
+        val dir = Library.assetsDir(note.id).apply { mkdirs() }
+        // Uma gravação "interrompida" (sem duração salva) e uma antiga em .m4a.
+        File(dir, "audio_1.aac").writeBytes(ByteArray(16000) { 1 })
+        File(dir, "audio_2.m4a").writeBytes(ByteArray(800) { 2 })
+        File(dir, "audio.json").writeText("""{"recordings":[{"file":"audio_1.aac","duration":0,"created":1},""" +
+            """{"file":"audio_2.m4a","duration":5000,"created":2,"name":"Aula de sexta"}],"marks":[]}""")
+        val a = AudioNotes(dir)
+        assertEquals("nome padrão", "Gravação 1", a.recordings[0].name)
+        assertTrue("duração recuperada", a.recordings[0].durationMs > 0)
+        assertEquals("Aula de sexta", a.recordings[1].name)
+
+        DriveSync.pdfMaker = { _, _ -> "%PDF-teste".toByteArray() }
+        val drive = FakeDrive()
+        DriveSync.backup(app, drive)
+        assertEquals("Gravações/Teste – Gravação 1.aac", drive.pathOf(drive.named("Teste – Gravação 1.aac").single()))
+        assertEquals(1, drive.named("Teste – Aula de sexta.m4a").size)
+        // O .rosanota não leva os áudios (só a lista deles).
+        val u = NoteFiles.unpack(drive.named("Teste.rosanota").single().bytes.inputStream())!!
+        assertTrue(u.images.keys.none { it.startsWith("audio_") && !it.endsWith(".json") })
+        assertTrue(u.images.containsKey("audio.json"))
+
+        // Renomear a gravação renomeia no Drive sem reenviar.
+        a.rename(1, "Revisão")
+        val creates = drive.creates
+        DriveSync.backup(app, drive)
+        assertEquals(1, drive.named("Teste – Revisão.m4a").size)
+        assertEquals(creates, drive.creates)
+
+        // Restaurar traz os áudios de volta para a nota.
+        app.filesDir.listFiles()?.forEach { it.deleteRecursively() }
+        Library.init(app, reload = true)
+        DriveSync.restore(app, drive)
+        assertEquals(16000L, File(Library.assetsDir(note.id), "audio_1.aac").length())
+        assertEquals(2, AudioNotes(Library.assetsDir(note.id)).recordings.size)
+        assertEquals("sem duplicar", 1, drive.named("Teste – Gravação 1.aac").size)
+        DriveSync.backup(app, drive)
+        assertEquals(1, drive.named("Teste – Gravação 1.aac").size)
+    }
+
+    @Test
+    fun lista_de_gravacoes_abre_com_opcoes() {
+        val dir = Library.assetsDir(note.id).apply { mkdirs() }
+        File(dir, "audio_9.aac").writeBytes(ByteArray(8000))
+        File(dir, "audio.json").writeText("""{"recordings":[{"file":"audio_9.aac","duration":61000,"created":1,"name":"Aula 1"}],"marks":[]}""")
+        controller.pause().stop().destroy()
+        openEditor()
+        assertEquals(View.GONE, editor.audioBarForTests.visibility)
+        editor.showRecordingsForTests()
+        ShadowLooper.idleMainLooper()
+        val d = org.robolectric.shadows.ShadowDialog.getLatestDialog()!!
+        val texts = findAll(d.window!!.decorView).filterIsInstance<android.widget.TextView>().map { it.text.toString() }
+        assertTrue(texts.toString(), texts.contains("Aula 1"))
+        assertTrue(texts.any { it.startsWith("1:01") })
+        clickInDialog("Opções de Aula 1")
+        val opts = findAll(org.robolectric.shadows.ShadowDialog.getLatestDialog()!!.window!!.decorView)
+            .filterIsInstance<android.widget.TextView>().map { it.text.toString() }
+        assertTrue(opts.toString(), opts.containsAll(listOf("Renomear", "Compartilhar / exportar", "Salvar em Downloads", "Apagar gravação")))
+    }
 }
