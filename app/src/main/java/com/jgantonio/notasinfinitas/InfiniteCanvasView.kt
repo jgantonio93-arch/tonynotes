@@ -1882,7 +1882,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
     private var pendingX = 0f
     private var pendingY = 0f
 
-    private fun isPalmTool(e: MotionEvent, i: Int) = e.getToolType(i) == MotionEvent.TOOL_TYPE_PALM
+    private fun isPalmTool(e: MotionEvent, i: Int) = e.getToolType(i) == TOOL_PALM
 
     private fun canceledFlag(e: MotionEvent) = (e.flags and MotionEvent.FLAG_CANCELED) != 0
 
@@ -2036,7 +2036,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
             val kind = when (d.tool) {
                 MotionEvent.TOOL_TYPE_STYLUS -> "caneta"
                 MotionEvent.TOOL_TYPE_ERASER -> "borracha"
-                MotionEvent.TOOL_TYPE_PALM -> "palma"
+                TOOL_PALM -> "palma"
                 else -> "dedo"
             }
             val status = when (d.state) { 1 -> "escreve"; 2 -> "observando"; else -> "ignorado" }
@@ -3255,6 +3255,8 @@ class InfiniteCanvasView(context: Context) : View(context) {
         private const val PEN_PALM_MS = 800L
         /** Contato maior que isso (dp) é palma. */
         private const val PALM_SIZE_DP = 110f
+        /** MotionEvent.TOOL_TYPE_PALM (5): oculto no SDK, mas alguns tablets mandam. */
+        private const val TOOL_PALM = 5
         /** Segundo toque em observação: se não se mexer até aqui, é palma. */
         private const val PENDING_MS = 500L
         /** Quanto a palma parada "anda" (tremido do contato), em dp. */
