@@ -243,6 +243,25 @@ class ScreenshotTest {
         save(snap(editor), "26-voltar-depois-do-sumario")
     }
 
+    /** Painel de áudio gravando: aberto e minimizado. */
+    @Test
+    fun captureAudioPanel() {
+        val app = ApplicationProvider.getApplicationContext<android.app.Application>()
+        Library.init(app, reload = true)
+        val (_, nota) = seed(app)
+        org.robolectric.Shadows.shadowOf(app).grantPermissions(android.Manifest.permission.RECORD_AUDIO)
+        val editor = Robolectric.buildActivity(EditorActivity::class.java,
+            Intent(app, EditorActivity::class.java).putExtra(EditorActivity.EXTRA_NOTE, nota.id)).setup().get()
+        snap(editor)
+        editor.startRecordingForTests()
+        if (editor.audioBarForTests.visibility != View.VISIBLE) return
+        save(snap(editor), "27-painel-de-audio")
+        editor.setAudioBarMiniForTests(true)
+        save(snap(editor), "28-painel-de-audio-minimizado")
+        editor.setAudioBarMiniForTests(false)
+        editor.stopRecordingForTests()
+    }
+
     /** Slides de exemplo abertos pelo leitor offline de PowerPoint. */
     @Test
     fun capturePowerPoint() {

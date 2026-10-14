@@ -1564,4 +1564,39 @@ class FunctionalTest {
             .filterIsInstance<android.widget.TextView>().map { it.text.toString() }
         assertTrue(opts.toString(), opts.containsAll(listOf("Renomear", "Compartilhar / exportar", "Salvar em Downloads", "Apagar gravação")))
     }
+
+    @Test
+    fun painel_de_audio_arrasta_e_minimiza() {
+        val bar = editor.audioBarForTests
+        bar.visibility = View.VISIBLE
+        layout()
+        val grip = findAll(bar).first { it.contentDescription?.toString() == "Arrastar o painel de áudio" }
+        val ev = { action: Int, rx: Float, ry: Float ->
+            val e = MotionEvent.obtain(0, 0, action, rx, ry, 0)
+            grip.dispatchTouchEvent(e)
+            e.recycle()
+        }
+        ev(MotionEvent.ACTION_DOWN, 500f, 1500f)
+        ev(MotionEvent.ACTION_MOVE, 400f, 1000f)
+        ev(MotionEvent.ACTION_UP, 400f, 1000f)
+        assertEquals(-100f, bar.translationX, 1f)
+        assertEquals(-500f, bar.translationY, 1f)
+        // Não sai da tela, por mais que arraste.
+        ev(MotionEvent.ACTION_DOWN, 500f, 1500f)
+        ev(MotionEvent.ACTION_MOVE, -5000f, -9000f)
+        ev(MotionEvent.ACTION_UP, -5000f, -9000f)
+        val stage = bar.parent as View
+        assertTrue("dentro da área: ${bar.left + bar.translationX}", bar.left + bar.translationX >= 0f)
+        assertTrue(bar.top + bar.translationY >= 0f && bar.bottom + bar.translationY <= stage.height)
+
+        // Minimizar deixa só o tempo e o botão; fica lembrado ao reabrir a nota.
+        editor.setAudioBarMiniForTests(true)
+        assertTrue(editor.audioBarMiniForTests)
+        assertTrue(findAll(bar).any { it.contentDescription?.toString() == "Expandir o painel de áudio" && it.isShown })
+        controller.pause().stop().destroy()
+        openEditor()
+        assertTrue("minimizado continua", editor.audioBarMiniForTests)
+        editor.setAudioBarMiniForTests(false)
+        assertTrue(!editor.audioBarMiniForTests)
+    }
 }

@@ -19,7 +19,7 @@ enum class Icon {
     ROTATE, LOCK, UNLOCK, CROP, FLIP_H, FLIP_V, ADJUST, TO_FRONT, TO_BACK, DOWNLOAD, RESET, ZOOM, SELECT_ALL,
     SEARCH, MARKER, ALIGN_LEFT, ALIGN_CENTER, ALIGN_RIGHT, TEXT_BIGGER, TEXT_SMALLER,
     RECT_SELECT, PARTIAL, STRAIGHT, GRIP, INFINITE, PAGES_V, PAGES_H, DOCK_TOP, DOCK_LEFT, DOCK_RIGHT,
-    SUN, MOON, THEME_AUTO, PAGE_PORTRAIT, PAGE_LANDSCAPE, FULLSCREEN, FULLSCREEN_EXIT, MIC, EYEDROPPER, BUCKET, TAPE, BOOKMARK, CARDS, RULER, SLIDES, CONTENTS, PLAY, PAUSE
+    SUN, MOON, THEME_AUTO, PAGE_PORTRAIT, PAGE_LANDSCAPE, FULLSCREEN, FULLSCREEN_EXIT, MIC, EYEDROPPER, BUCKET, TAPE, BOOKMARK, CARDS, RULER, SLIDES, CONTENTS, PLAY, PAUSE, MINIMIZE
 }
 
 /** Rótulo em português para leitores de tela (botões só com ícone). */
@@ -45,7 +45,7 @@ val Icon.label: String
         Icon.TEXT_BIGGER -> "Aumentar"; Icon.TEXT_SMALLER -> "Diminuir"
         Icon.FULLSCREEN -> "Tela cheia"; Icon.FULLSCREEN_EXIT -> "Sair da tela cheia"; Icon.MIC -> "Áudio"
         Icon.EYEDROPPER -> "Conta-gotas"; Icon.BUCKET -> "Balde"
-        Icon.TAPE -> "Fita para esconder"; Icon.BOOKMARK -> "Marcadores"; Icon.CARDS -> "Cartões"; Icon.RULER -> "Régua"; Icon.SLIDES -> "PowerPoint"; Icon.CONTENTS -> "Sumário"; Icon.PLAY -> "Tocar"; Icon.PAUSE -> "Pausar"
+        Icon.TAPE -> "Fita para esconder"; Icon.BOOKMARK -> "Marcadores"; Icon.CARDS -> "Cartões"; Icon.RULER -> "Régua"; Icon.SLIDES -> "PowerPoint"; Icon.CONTENTS -> "Sumário"; Icon.PLAY -> "Tocar"; Icon.PAUSE -> "Pausar"; Icon.MINIMIZE -> "Minimizar"
     }
 
 class IconDrawable(
@@ -282,6 +282,7 @@ class IconDrawable(
                 arcTo(RectF(4f, 4f, 20f, 20f), 200f, -290f, true)
                 moveTo(3.5f, 4.5f); lineTo(4.4f, 9.4f); lineTo(9.2f, 8.4f)
             }, stroke)
+            Icon.MINIMIZE -> c.drawPath(path { moveTo(6f, 9.5f); lineTo(12f, 15.5f); lineTo(18f, 9.5f) }, stroke)
             Icon.PLAY -> c.drawPath(path {
                 moveTo(8f, 5f); lineTo(19f, 12f); lineTo(8f, 19f); close()
             }, fill)

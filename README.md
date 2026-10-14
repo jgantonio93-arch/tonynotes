@@ -121,6 +121,8 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
 - Selecione a escrita → **Ouvir daqui**: o áudio toca a partir de quando aquilo foi escrito.
 - **Painel de áudio** em cima da nota (dá para escrever ouvindo): tocar/pausar, barra para
   avançar, −10s/+10s e velocidade de 0,5x a 2x. Gravando: pausar/continuar e parar.
+  Arraste pela alça (⠿) para qualquer lugar da tela, ou minimize (˅) para uma bolinha só com o
+  tempo e o botão de pausar; o lugar e o modo ficam lembrados.
 - **Gravações** (menu ⋮): lista com nome, duração e data; renomear, compartilhar/exportar,
   salvar em Downloads e apagar.
 - **Gravação à prova de falhas**: o áudio é gravado em AAC contínuo (ADTS) e a lista é salva

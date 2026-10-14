@@ -277,6 +277,15 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         })
 
         audioBar = buildAudioBar()
+        getSharedPreferences("audio_ui", MODE_PRIVATE).let { p ->
+            audioBar.translationX = p.getFloat("x", 0f)
+            audioBar.translationY = p.getFloat("y", 0f)
+            if (p.getBoolean("mini", false)) {
+                audioBarMini = true
+                abFull.visibility = View.GONE
+                abMini.visibility = View.VISIBLE
+            }
+        }
         stage.addView(audioBar, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
             setMargins(dpi(10f), 0, dpi(10f), dpi(58f))
         })
@@ -2157,22 +2166,33 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         val bar = vertical().apply {
             background = floating(22f)
             Ui.run { softShadow(8f) }
-            setPadding(dpi(14f), dpi(10f), dpi(8f), dpi(8f))
             visibility = View.GONE
+        }
+        val full = vertical().apply {
+            setPadding(dpi(6f), dpi(6f), dpi(8f), dpi(8f))
             minimumWidth = dpi(300f)
         }
+        abFull = full
         val top = horizontal().apply { gravity = Gravity.CENTER_VERTICAL }
+        // Alça: arraste para levar o painel para qualquer lugar da tela.
+        top.addView(ImageView(this).apply {
+            setImageDrawable(icon(Icon.GRIP, Ui.MUTED, 18f))
+            contentDescription = "Arrastar o painel de áudio"
+            setPadding(dpi(6f), dpi(9f), dpi(4f), dpi(9f))
+            dragsAudioBar(this, null)
+        }, LinearLayout.LayoutParams(dpi(28f), dpi(36f)))
         abTitle = label("", 14f, Ui.INK, bold = true).apply { isSingleLine = true; ellipsize = android.text.TextUtils.TruncateAt.END }
         top.addView(abTitle, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         abTime = label("", 13f).apply { fontFeatureSettings = "tnum"; setPadding(dpi(8f), 0, dpi(4f), 0) }
         top.addView(abTime)
+        top.addView(iconButton(Icon.MINIMIZE, Ui.MUTED, 36f, "Minimizar o painel de áudio") { setAudioBarMini(true) })
         top.addView(iconButton(Icon.CONTENTS, Ui.MUTED, 36f, "Lista de gravações") { showRecordings() })
         top.addView(iconButton(Icon.CLOSE, Ui.MUTED, 36f, "Fechar o tocador") {
             if (audio.isRecording) audio.stop()
             audio.stopPlayback()
             updateAudioPill()
         })
-        bar.addView(top)
+        full.addView(top)
         abSeek = android.widget.SeekBar(this).apply {
             max = 1000
             progressTintList = android.content.res.ColorStateList.valueOf(Ui.ACCENT)
@@ -2189,7 +2209,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
                 }
             })
         }
-        bar.addView(abSeek, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpi(32f)))
+        full.addView(abSeek, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpi(32f)))
         val controls = horizontal().apply { gravity = Gravity.CENTER_VERTICAL or Gravity.CENTER_HORIZONTAL }
         abBack = label("−10s", 14f, Ui.INK, bold = true).apply {
             gravity = Gravity.CENTER
@@ -2236,8 +2256,90 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         controls.addView(abMain, LinearLayout.LayoutParams(dpi(52f), dpi(52f)))
         controls.addView(gap()); controls.addView(abFwd)
         controls.addView(gap()); controls.addView(abStop)
-        bar.addView(controls, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dpi(2f) })
+        full.addView(controls, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dpi(2f) })
+        bar.addView(full)
+
+        // Versão minimizada: uma bolinha com o tempo, que também dá para arrastar.
+        val mini = horizontal().apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dpi(12f), dpi(4f), dpi(4f), dpi(4f))
+            visibility = View.GONE
+        }
+        abMiniTime = label("", 14f, Ui.INK, bold = true).apply {
+            fontFeatureSettings = "tnum"
+            gravity = Gravity.CENTER_VERTICAL
+            minHeight = dpi(40f)
+            setPadding(0, 0, dpi(8f), 0)
+            contentDescription = "Abrir o painel de áudio"
+            dragsAudioBar(this) { setAudioBarMini(false) }
+        }
+        mini.addView(abMiniTime)
+        abMiniMain = ImageView(this).apply {
+            background = ripple(circle(Ui.ACCENT, 0, 0f), circle(Color.WHITE, 0, 0f))
+            setPadding(dpi(9f), dpi(9f), dpi(9f), dpi(9f))
+            setOnClickListener { audioMainAction() }
+        }
+        mini.addView(abMiniMain, LinearLayout.LayoutParams(dpi(38f), dpi(38f)))
+        mini.addView(iconButton(Icon.FULLSCREEN, Ui.MUTED, 36f, "Expandir o painel de áudio") { setAudioBarMini(false) })
+        abMini = mini
+        bar.addView(mini)
         return bar
+    }
+
+    private lateinit var abFull: View
+    private lateinit var abMini: View
+    private lateinit var abMiniTime: TextView
+    private lateinit var abMiniMain: ImageView
+    private var audioBarMini = false
+    internal fun setAudioBarMiniForTests(on: Boolean) = setAudioBarMini(on)
+    internal val audioBarMiniForTests get() = audioBarMini
+
+    private fun setAudioBarMini(on: Boolean) {
+        audioBarMini = on
+        getSharedPreferences("audio_ui", MODE_PRIVATE).edit().putBoolean("mini", on).apply()
+        abFull.visibility = if (on) View.GONE else View.VISIBLE
+        abMini.visibility = if (on) View.VISIBLE else View.GONE
+        updateAudioPill()
+        // O tamanho muda: mantém o painel dentro da tela.
+        audioBar.post { moveAudioBar(audioBar.translationX, audioBar.translationY) }
+    }
+
+    /** Move o painel (deslocamento a partir do lugar padrão), sem deixar sair da área da nota. */
+    private fun moveAudioBar(tx: Float, ty: Float) {
+        val bar = audioBar
+        if (bar.width == 0 || stage.width == 0) {
+            bar.translationX = tx; bar.translationY = ty
+            return
+        }
+        val m = dp(6f)
+        bar.translationX = tx.coerceIn(m - bar.left, stage.width - m - bar.right)
+        bar.translationY = ty.coerceIn(m - bar.top, stage.height - m - bar.bottom)
+    }
+
+    /** [v] arrasta o painel; um toque sem arrastar chama [onTap]. */
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    private fun dragsAudioBar(v: View, onTap: (() -> Unit)?) {
+        var downX = 0f; var downY = 0f; var startTx = 0f; var startTy = 0f; var moved = false
+        v.setOnTouchListener { _, e ->
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX = e.rawX; downY = e.rawY
+                    startTx = audioBar.translationX; startTy = audioBar.translationY
+                    moved = false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = e.rawX - downX
+                    val dy = e.rawY - downY
+                    if (!moved && kotlin.math.hypot(dx, dy) > dp(6f)) moved = true
+                    if (moved) moveAudioBar(startTx + dx, startTy + dy)
+                }
+                MotionEvent.ACTION_UP -> if (!moved) onTap?.invoke() else {
+                    getSharedPreferences("audio_ui", MODE_PRIVATE).edit()
+                        .putFloat("x", audioBar.translationX).putFloat("y", audioBar.translationY).apply()
+                }
+            }
+            true
+        }
     }
 
     /** Botão do meio: pausa/continua a gravação ou a reprodução. */
@@ -2261,6 +2363,8 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     }
 
     internal fun showRecordingsForTests() = showRecordings()
+    internal fun startRecordingForTests() = startRecording()
+    internal fun stopRecordingForTests() { audioNotes?.stop(); updateAudioPill() }
 
     private fun showRecordings() {
         val df = SimpleDateFormat("dd/MM/yyyy 'às' HH:mm", Locale("pt", "BR"))
@@ -2352,7 +2456,9 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         val a = audioNotes
         val recording = a?.isRecording == true
         val loaded = a?.hasPlayer == true
-        audioBar.visibility = if (recording || loaded) View.VISIBLE else View.GONE
+        val show = recording || loaded
+        if (show && audioBar.visibility != View.VISIBLE) audioBar.post { moveAudioBar(audioBar.translationX, audioBar.translationY) }
+        audioBar.visibility = if (show) View.VISIBLE else View.GONE
         main.removeCallbacks(audioTicker)
         if (a == null || (!recording && !loaded)) return
         if (recording) {
@@ -2376,6 +2482,15 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         }
         for (v in listOf(abSeek, abBack, abFwd, abSpeed)) v.visibility = if (recording) View.GONE else View.VISIBLE
         abStop.visibility = if (recording) View.VISIBLE else View.GONE
+        // Minimizado: só o tempo e o botão de pausar/tocar.
+        abMiniTime.text = (if (recording) (if (a.recordingPaused) "⏸ " else "● ") else "") +
+            (if (recording) AudioNotes.format(a.recordedMs) else AudioNotes.format(a.positionMs))
+        abMiniTime.setTextColor(if (recording && !a.recordingPaused) Color.parseColor("#D7263D") else Ui.INK)
+        abMiniMain.setImageDrawable(icon(when {
+            recording -> if (a.recordingPaused) Icon.MIC else Icon.PAUSE
+            a.isPlaying -> Icon.PAUSE
+            else -> Icon.PLAY
+        }, Ui.ON_ACCENT, 20f))
         main.postDelayed(audioTicker, 250)
     }
 
