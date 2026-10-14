@@ -433,6 +433,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         canvasView.fingerDraws = prefs.fingerDraws
         canvasView.palmReject = prefs.palmReject
         canvasView.leftHanded = prefs.leftHanded
+        canvasView.showTouches = prefs.showTouches
         applyPalmGuard()
         canvasView.autoShapes = prefs.autoShapes
         canvasView.spenButtonErases = prefs.spenButtonErases
@@ -1407,6 +1408,10 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
                 "free" -> "ilha livre"
                 else -> "desligado"
             }, act { showPalmGuardMenu() }))
+            box.addView(switchRow(Icon.TOUCH, "Mostrar toques (diagnóstico da palma)", prefs.showTouches) {
+                prefs.showTouches = it
+                applyPrefs()
+            })
             box.addView(switchRow(Icon.EDIT, "Tinta de latência mínima (experimental)", prefs.lowLatency) {
                 prefs.lowLatency = it
                 applyPrefs()

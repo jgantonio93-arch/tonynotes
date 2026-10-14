@@ -108,6 +108,11 @@ class PenPrefs(context: Context) {
         get() = sp.getBoolean("palm_reject", true)
         set(v) = sp.edit().putBoolean("palm_reject", v).apply()
 
+    /** Diagnóstico: desenhar os toques na tela. */
+    var showTouches: Boolean
+        get() = sp.getBoolean("show_touches", false)
+        set(v) = sp.edit().putBoolean("show_touches", v).apply()
+
     var leftHanded: Boolean
         get() = sp.getBoolean("left_handed", false)
         set(v) = sp.edit().putBoolean("left_handed", v).apply()

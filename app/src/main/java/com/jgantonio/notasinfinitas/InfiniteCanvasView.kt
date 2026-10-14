@@ -1772,6 +1772,14 @@ class InfiniteCanvasView(context: Context) : View(context) {
     private var swallowing = false
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
+        try {
+            return onTouchEventInner(e)
+        } finally {
+            recordTouches(e)
+        }
+    }
+
+    private fun onTouchEventInner(e: MotionEvent): Boolean {
         // Protetor de mão: em coordenadas da tela (antes de desgirar).
         if (handleGuardDrag(e)) return true
         markGuardTouches(e)
@@ -1869,6 +1877,15 @@ class InfiniteCanvasView(context: Context) : View(context) {
     /** Quanto mais alto e mais longe do lado da mão, mais "caneta" (e menos palma). */
     private fun penScore(x: Float, y: Float) = -y + (if (leftHanded) x else -x) * 0.5f
 
+    /** Segundo toque durante um traço: fica em observação até se mexer (zoom) ou virar palma. */
+    private var pendingId = -1
+    private var pendingX = 0f
+    private var pendingY = 0f
+
+    private fun isPalmTool(e: MotionEvent, i: Int) = e.getToolType(i) == MotionEvent.TOOL_TYPE_PALM
+
+    private fun canceledFlag(e: MotionEvent) = (e.flags and MotionEvent.FLAG_CANCELED) != 0
+
     private fun palmFilter(e: MotionEvent) {
         val t = e.eventTime
         for (i in 0 until e.pointerCount) if (isPen(e, i)) lastPenTime = t
@@ -1876,7 +1893,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                 val i = e.actionIndex
                 val id = e.getPointerId(i)
-                if (e.actionMasked == MotionEvent.ACTION_DOWN) { accepted.clear(); ignored.clear() }
+                if (e.actionMasked == MotionEvent.ACTION_DOWN) { accepted.clear(); ignored.clear(); pendingId = -1 }
                 if (isPen(e, i)) {
                     // A caneta ganha: o que a mão estava fazendo é descartado.
                     if (accepted.isNotEmpty()) {
@@ -1886,11 +1903,12 @@ class InfiniteCanvasView(context: Context) : View(context) {
                         ignored.addAll(accepted)
                         accepted.clear()
                     }
+                    if (pendingId >= 0) { ignored.add(pendingId); pendingId = -1 }
                     accept(e, id)
                     return
                 }
                 val pen = accepted.firstOrNull()?.let { a -> e.findPointerIndex(a) }?.takeIf { it >= 0 && isPen(e, it) } != null
-                if (pen || inGuard(e, i) || (palmReject && (penRecent(t) || palmSized(e, i)))) {
+                if (pen || isPalmTool(e, i) || inGuard(e, i) || (palmReject && (penRecent(t) || palmSized(e, i)))) {
                     ignored.add(id)
                     return
                 }
@@ -1901,18 +1919,21 @@ class InfiniteCanvasView(context: Context) : View(context) {
                 if (palmReject && gesture == Gesture.DRAW) {
                     val old = e.findPointerIndex(accepted[0])
                     when {
-                        // Dois dedos quase juntos: é para mover/dar zoom.
-                        t - acceptedDownTime < TWO_FINGER_MS -> {
-                            accepted.add(id)
-                            send(e, MotionEvent.ACTION_POINTER_DOWN, id)
-                        }
+                        // A primeira era a palma (quase não andou) e a nova está onde fica a caneta:
+                        // descarta o risco da palma e quem escreve é a nova.
                         old >= 0 && penScore(e.getX(i), e.getY(i)) > penScore(e.getX(old), e.getY(old)) &&
-                            (t - acceptedDownTime < SWAP_MS || maxTravel < 14f * density) -> {
-                            // A primeira era a palma: descarta o risco dela e quem escreve é a nova.
+                            maxTravel < PALM_DRIFT_DP * density -> {
                             cancelGesture()
                             ignored.addAll(accepted)
                             accepted.clear()
+                            if (pendingId >= 0) { ignored.add(pendingId); pendingId = -1 }
                             accept(e, id)
+                        }
+                        // Pode ser o 2º dedo de um zoom ou a palma: observa antes de decidir.
+                        pendingId < 0 && t - acceptedDownTime < PENDING_MS -> {
+                            pendingId = id
+                            pendingX = e.getX(i)
+                            pendingY = e.getY(i)
                         }
                         else -> ignored.add(id)
                     }
@@ -1921,12 +1942,39 @@ class InfiniteCanvasView(context: Context) : View(context) {
                 accepted.add(id)
                 send(e, MotionEvent.ACTION_POINTER_DOWN, id)
             }
-            MotionEvent.ACTION_MOVE -> if (accepted.isNotEmpty()) send(e, MotionEvent.ACTION_MOVE, null)
+            MotionEvent.ACTION_MOVE -> {
+                if (pendingId >= 0) {
+                    val pi = e.findPointerIndex(pendingId)
+                    when {
+                        pi < 0 -> pendingId = -1
+                        t - acceptedDownTime >= PENDING_MS -> { ignored.add(pendingId); pendingId = -1 }
+                        hypot(e.getX(pi) - pendingX, e.getY(pi) - pendingY) > 24f * density && accepted.isNotEmpty() -> {
+                            // O segundo dedo se mexeu: é zoom/mover. O traço curto é descartado.
+                            val writer = accepted[0]
+                            val second = pendingId
+                            pendingId = -1
+                            cancelGesture()
+                            accept(e, writer)
+                            accepted.add(second)
+                            send(e, MotionEvent.ACTION_POINTER_DOWN, second)
+                        }
+                    }
+                }
+                if (accepted.isNotEmpty()) send(e, MotionEvent.ACTION_MOVE, null)
+            }
             MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_UP -> {
                 val id = e.getPointerId(e.actionIndex)
+                if (id == pendingId) pendingId = -1
                 if (ignored.remove(id)) return
-                if (!accepted.contains(id)) return
-                if (accepted.size == 1) {
+                if (!accepted.contains(id)) {
+                    if (e.actionMasked == MotionEvent.ACTION_UP) { accepted.clear(); ignored.clear() }
+                    return
+                }
+                if (canceledFlag(e) && accepted.size == 1) {
+                    // O próprio sistema disse que era a palma: descarta.
+                    cancelGesture()
+                    accepted.clear()
+                } else if (accepted.size == 1) {
                     send(e, MotionEvent.ACTION_UP, id)
                     accepted.clear()
                 } else {
@@ -1936,9 +1984,63 @@ class InfiniteCanvasView(context: Context) : View(context) {
                 if (e.actionMasked == MotionEvent.ACTION_UP) { accepted.clear(); ignored.clear() }
             }
             MotionEvent.ACTION_CANCEL -> {
-                if (accepted.isNotEmpty()) cancelGesture()
-                accepted.clear(); ignored.clear()
+                // O sistema cancelou (muitas vezes por causa da palma): o traço feito até aqui fica.
+                if (accepted.isNotEmpty()) {
+                    if (gesture == Gesture.DRAW && builder != null && accepted.size == 1) send(e, MotionEvent.ACTION_UP, accepted[0])
+                    else cancelGesture()
+                }
+                accepted.clear(); ignored.clear(); pendingId = -1
             }
+        }
+    }
+
+    // ---- Diagnóstico: mostrar os toques ----------------------------------------------------
+
+    /** Desenha cada toque com o tamanho e o tipo que o tablet informa (para entender a palma). */
+    var showTouches = false
+        set(v) { field = v; touchDots.clear(); invalidate() }
+    private class TouchDot(val x: Float, val y: Float, val major: Float, val tool: Int, val state: Int)
+    private val touchDots = ArrayList<TouchDot>()
+    private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val dotText = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
+
+    private fun recordTouches(e: MotionEvent) {
+        if (!showTouches) return
+        touchDots.clear()
+        val ending = e.actionMasked == MotionEvent.ACTION_UP || e.actionMasked == MotionEvent.ACTION_CANCEL
+        if (!ending) for (i in 0 until e.pointerCount) {
+            if (e.actionMasked == MotionEvent.ACTION_POINTER_UP && i == e.actionIndex) continue
+            val id = e.getPointerId(i)
+            val state = when {
+                accepted.contains(id) -> 1
+                id == pendingId -> 2
+                else -> 0
+            }
+            touchDots.add(TouchDot(e.getX(i), e.getY(i), e.getTouchMajor(i), e.getToolType(i), state))
+        }
+        invalidate()
+    }
+
+    private fun drawTouches(canvas: Canvas) {
+        if (!showTouches) return
+        dotText.textSize = 12f * density
+        for (d in touchDots) {
+            val r = max(14f * density, d.major / 2f)
+            dotPaint.style = Paint.Style.FILL
+            dotPaint.color = when (d.state) { 1 -> 0x5532B35A; 2 -> 0x55F2B705; else -> 0x55808080 }
+            canvas.drawCircle(d.x, d.y, r, dotPaint)
+            dotPaint.style = Paint.Style.STROKE
+            dotPaint.strokeWidth = 2f * density
+            dotPaint.color = when (d.state) { 1 -> 0xFF1E9E5A.toInt(); 2 -> 0xFFC79400.toInt(); else -> 0xFF606060.toInt() }
+            canvas.drawCircle(d.x, d.y, r, dotPaint)
+            val kind = when (d.tool) {
+                MotionEvent.TOOL_TYPE_STYLUS -> "caneta"
+                MotionEvent.TOOL_TYPE_ERASER -> "borracha"
+                MotionEvent.TOOL_TYPE_PALM -> "palma"
+                else -> "dedo"
+            }
+            val status = when (d.state) { 1 -> "escreve"; 2 -> "observando"; else -> "ignorado" }
+            canvas.drawText("$kind · ${(d.major / density).toInt()}dp · $status", d.x + r + 4f * density, d.y, dotText)
         }
     }
 
@@ -2744,6 +2846,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
         canvas.restore()
         // O protetor fica preso à tela (não gira com a nota).
         drawPalmGuard(canvas)
+        drawTouches(canvas)
     }
 
     /** Parte do mundo que aparece na tela: com a tela girada, envolve os 4 cantos. */
@@ -3152,10 +3255,10 @@ class InfiniteCanvasView(context: Context) : View(context) {
         private const val PEN_PALM_MS = 800L
         /** Contato maior que isso (dp) é palma. */
         private const val PALM_SIZE_DP = 110f
-        /** Segundo dedo até este tempo depois do primeiro: mover/zoom. */
-        private const val TWO_FINGER_MS = 150L
-        /** Até este tempo a "caneta" ainda pode tomar o lugar da palma que começou a riscar. */
-        private const val SWAP_MS = 350L
+        /** Segundo toque em observação: se não se mexer até aqui, é palma. */
+        private const val PENDING_MS = 500L
+        /** Quanto a palma parada "anda" (tremido do contato), em dp. */
+        private const val PALM_DRIFT_DP = 40f
         private const val MIN_SCALE = 0.03f
         private const val MAX_SCALE = 8f
         private const val MAX_UNDO = 300

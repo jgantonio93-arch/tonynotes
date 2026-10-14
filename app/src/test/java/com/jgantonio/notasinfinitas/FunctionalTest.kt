@@ -1634,13 +1634,13 @@ class FunctionalTest {
 
     private class P(val id: Int, val x: Float, val y: Float, val tool: Int, val major: Float = 0f)
 
-    private fun mev(action: Int, pts: List<P>, down: Long, gap: Long = 16): MotionEvent {
+    private fun mev(action: Int, pts: List<P>, down: Long, gap: Long = 16, flags: Int = 0): MotionEvent {
         val props = Array(pts.size) { i -> MotionEvent.PointerProperties().apply { id = pts[i].id; toolType = pts[i].tool } }
         val coords = Array(pts.size) { i ->
             MotionEvent.PointerCoords().apply { x = pts[i].x; y = pts[i].y; pressure = 0.8f; size = 0.1f; touchMajor = pts[i].major; touchMinor = pts[i].major }
         }
         time += gap
-        return MotionEvent.obtain(down, time, action, pts.size, props, coords, 0, 0, 1f, 1f, 0, 0, 0, 0)
+        return MotionEvent.obtain(down, time, action, pts.size, props, coords, 0, 0, 1f, 1f, 0, 0, 0, flags)
     }
 
     private fun idx(action: Int, i: Int) = action or (i shl MotionEvent.ACTION_POINTER_INDEX_SHIFT)
@@ -1772,5 +1772,65 @@ class FunctionalTest {
         tap(xx, xy, F)
         assertNull(canvas.palmGuard)
         assertEquals("off", app.getSharedPreferences("canetas", 0).getString("palm_guard_mode", null))
+    }
+
+    @Test
+    fun palma_que_encosta_logo_depois_da_caneta_nao_apaga_o_traco() {
+        palmOn(fingerDraws = true)
+        val z = canvas.zoomPercent
+        val down = time
+        val pen = line(300f, 700f, 700f, 760f, 20)
+        canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_DOWN, listOf(P(0, pen[0].first, pen[0].second, F)), down))
+        for (k in 1..2) canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_MOVE, listOf(P(0, pen[k].first, pen[k].second, F)), down))
+        // A mão encosta 50 ms depois, embaixo à direita, e fica parada (tremendo um pouco).
+        canvas.dispatchTouchEvent(mev(idx(MotionEvent.ACTION_POINTER_DOWN, 1), listOf(P(0, pen[2].first, pen[2].second, F), P(1, 900f, 1500f, F)), down))
+        for (k in 3 until pen.size) canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_MOVE,
+            listOf(P(0, pen[k].first, pen[k].second, F), P(1, 900f + (k % 3), 1500f - (k % 2), F)), down))
+        canvas.dispatchTouchEvent(mev(idx(MotionEvent.ACTION_POINTER_UP, 0), listOf(P(0, 700f, 760f, F), P(1, 900f, 1500f, F)), down))
+        canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_UP, listOf(P(1, 900f, 1500f, F)), down))
+        ShadowLooper.idleMainLooper()
+        assertEquals("o traço da caneta fica", 1, strokes().size)
+        assertTrue(strokes()[0].bounds.width() > 100f)
+        assertEquals("sem zoom", z, canvas.zoomPercent)
+    }
+
+    @Test
+    fun cancelamento_do_sistema_guarda_o_traco_e_palma_marcada_some() {
+        palmOn(fingerDraws = true)
+        val d1 = time
+        val pen = line(300f, 700f, 700f, 700f, 10)
+        canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_DOWN, listOf(P(0, pen[0].first, pen[0].second, F)), d1))
+        for (p in pen.drop(1)) canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_MOVE, listOf(P(0, p.first, p.second, F)), d1))
+        canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_CANCEL, listOf(P(0, 700f, 700f, F)), d1))
+        ShadowLooper.idleMainLooper()
+        assertEquals("CANCEL do sistema não apaga", 1, strokes().size)
+
+        // Toque que o próprio sistema solta como cancelado (palma): não fica traço.
+        val d2 = time
+        val palm = line(400f, 1400f, 500f, 1450f, 6)
+        canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_DOWN, listOf(P(0, palm[0].first, palm[0].second, F)), d2))
+        for (p in palm.drop(1)) canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_MOVE, listOf(P(0, p.first, p.second, F)), d2))
+        canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_UP, listOf(P(0, 500f, 1450f, F)), d2, flags = MotionEvent.FLAG_CANCELED))
+        ShadowLooper.idleMainLooper()
+        assertEquals(1, strokes().size)
+    }
+
+    @Test
+    fun palma_parada_ha_tempo_e_depois_a_caneta_escreve() {
+        palmOn(fingerDraws = true)
+        val down = time
+        canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_DOWN, listOf(P(0, 850f, 1600f, F)), down))
+        // Mão apoiada por 2 s, tremendo uns 25 dp.
+        val d = app.resources.displayMetrics.density
+        for (k in 0 until 20) canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_MOVE, listOf(P(0, 850f + (k % 5) * 5f * d, 1600f - (k % 4) * 4f * d, F)), down, gap = 100))
+        val pen = line(300f, 700f, 650f, 700f, 12)
+        canvas.dispatchTouchEvent(mev(idx(MotionEvent.ACTION_POINTER_DOWN, 1), listOf(P(0, 850f, 1600f, F), P(1, pen[0].first, pen[0].second, F)), down))
+        for (p in pen) canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_MOVE, listOf(P(0, 850f, 1600f, F), P(1, p.first, p.second, F)), down))
+        canvas.dispatchTouchEvent(mev(idx(MotionEvent.ACTION_POINTER_UP, 1), listOf(P(0, 850f, 1600f, F), P(1, 650f, 700f, F)), down))
+        canvas.dispatchTouchEvent(mev(MotionEvent.ACTION_UP, listOf(P(0, 850f, 1600f, F)), down))
+        ShadowLooper.idleMainLooper()
+        assertEquals("só o traço da caneta", 1, strokes().size)
+        val v = canvas.viewForTests
+        assertEquals(700f, strokes()[0].bounds.centerY() * v[2] + v[1], 30f)
     }
 }
