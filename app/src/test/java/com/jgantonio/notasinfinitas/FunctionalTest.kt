@@ -1164,70 +1164,122 @@ class FunctionalTest {
 
     /** Google Drive falso, em memória. */
     private class FakeDrive : DriveApi {
-        val files = LinkedHashMap<String, Pair<String, ByteArray>>() // id -> (path, bytes)
+        class F(var name: String, var parent: String, val mime: String, val props: Map<String, String>, var bytes: ByteArray)
+        val files = LinkedHashMap<String, F>()
         var creates = 0
         var updates = 0
         var deletes = 0
         private var next = 0
-        override fun folderId() = "pasta"
-        override fun list(folder: String) = files.map { (id, v) -> DriveApi.RemoteFile(id, v.first) }
-        override fun create(folder: String, name: String, path: String, bytes: ByteArray): String {
+        override fun folderId() = "raiz"
+        override fun createFolder(parent: String, name: String, props: Map<String, String>): String {
+            val id = "d${next++}"
+            files[id] = F(name, parent, "folder", props, ByteArray(0))
+            return id
+        }
+        override fun create(parent: String, name: String, mime: String, props: Map<String, String>, bytes: ByteArray): String {
             creates++
             val id = "f${next++}"
-            files[id] = path to bytes
+            files[id] = F(name, parent, mime, props, bytes)
             return id
         }
         override fun update(id: String, bytes: ByteArray) {
             updates++
-            val f = files[id] ?: throw java.io.IOException("404")
-            files[id] = f.first to bytes
+            (files[id] ?: throw java.io.IOException("404")).bytes = bytes
         }
-        override fun download(id: String) = files.getValue(id).second
+        override fun move(id: String, name: String, newParent: String, oldParent: String) {
+            val f = files[id] ?: throw java.io.IOException("404")
+            f.name = name
+            f.parent = newParent
+        }
+        override fun find(key: String, value: String) =
+            files.filter { it.value.props[key] == value }.map { (id, f) -> DriveApi.RemoteFile(id, f.name, f.props) }
+        override fun children(folder: String) =
+            files.filter { it.value.parent == folder }.map { (id, f) -> DriveApi.RemoteFile(id, f.name, f.props) }
+        override fun download(id: String) = files.getValue(id).bytes
         override fun delete(id: String) {
             deletes++
-            files.remove(id)
+            files.remove(id) ?: throw java.io.IOException("404")
+            files.entries.removeIf { it.value.parent == id }
+        }
+        fun named(n: String) = files.values.filter { it.name == n }
+        fun pathOf(f: F): String {
+            val parts = ArrayList<String>()
+            var p = f.parent
+            while (p != "raiz") { val d = files.getValue(p); parts.add(0, d.name); p = d.parent }
+            return (parts + f.name).joinToString("/")
         }
     }
 
     @Test
-    fun backup_no_drive_envia_so_o_que_mudou_e_restaura() {
+    fun backup_no_drive_vai_nota_por_nota_em_pdf_e_editavel() {
         drag(line(200f, 700f, 800f, 700f))
         controller.pause()
         Library.io.submit {}.get()
         val drive = FakeDrive()
+        // Restos do formato antigo (um arquivo por arquivo do app) são apagados.
+        drive.files["velho"] = FakeDrive.F("notes_x.jpg", "raiz", "image/jpeg", mapOf("path" to "notes/x/a.jpg"), ByteArray(3))
+        val folderName = Library.folder(note.folder)!!.name
         val r1 = DriveSync.backup(app, drive)
-        assertTrue("primeiro backup envia tudo", r1.uploaded >= 2 && drive.creates == r1.uploaded)
-        assertTrue(drive.files.values.any { it.first == "library.json" })
-        assertTrue(drive.files.values.any { it.first == "notes/${note.id}.ninf" })
+        assertEquals(1, r1.uploaded)
+        assertNull("formato antigo removido", drive.files["velho"])
+        val bundle = drive.named("Teste.rosanota").single()
+        val pdf = drive.named("Teste.pdf").single()
+        assertEquals("$folderName/Teste.rosanota", drive.pathOf(bundle))
+        assertEquals("$folderName/Teste.pdf", drive.pathOf(pdf))
+        assertTrue("é um PDF de verdade", pdf.bytes.decodeToString(0, 5) == "%PDF-")
+        assertTrue("nenhuma imagem solta", drive.files.values.none { it.mime.startsWith("image/") })
+        assertEquals(1, drive.named(DriveSync.INDEX_NAME).size)
 
         // Nada mudou: nada sobe.
         assertEquals(0, DriveSync.backup(app, drive).uploaded)
 
-        // Muda só a nota: sobe só ela (atualiza o mesmo arquivo).
+        // Muda a nota: atualiza os mesmos arquivos.
         val nf = Library.noteFile(note.id)
         nf.appendBytes(byteArrayOf(0))
         nf.setLastModified(System.currentTimeMillis() + 5000)
-        val r3 = DriveSync.backup(app, drive)
-        assertEquals(1, r3.uploaded)
-        assertEquals(1, drive.updates)
+        val before = drive.creates
+        assertEquals(1, DriveSync.backup(app, drive).uploaded)
+        assertEquals("não cria arquivos novos", before, drive.creates)
 
-        // Nota apagada de vez: some do Drive.
+        // Renomear a nota e a pasta renomeia lá também, sem reenviar.
+        Library.updateNote(Library.note(note.id)!!, title = "Aula 3")
+        Library.folder(note.folder)!!.name = "Bioquímica"
+        Library.save()
+        assertEquals(0, DriveSync.backup(app, drive).uploaded)
+        assertEquals("Bioquímica/Aula 3.rosanota", drive.pathOf(drive.named("Aula 3.rosanota").single()))
+        assertEquals(1, drive.named("Aula 3.pdf").size)
+
+        // Nota apagada de vez some do Drive.
         val other = Library.createNote(Library.folders.first().id, "Outra")
         NoteStorage.save(Library.noteFile(other.id), NoteData(emptyList(), null))
         DriveSync.backup(app, drive)
-        assertTrue(drive.files.values.any { it.first == "notes/${other.id}.ninf" })
+        assertEquals("nota vazia: só o editável", 1, drive.named("Outra.rosanota").size)
+        assertEquals(0, drive.named("Outra.pdf").size)
         Library.deleteNote(other.id)
         Library.io.submit {}.get()
         DriveSync.backup(app, drive)
-        assertTrue(drive.files.values.none { it.first == "notes/${other.id}.ninf" })
+        assertEquals(0, drive.named("Outra.rosanota").size)
 
-        // Restaurar num aparelho "limpo" traz a nota de volta.
+        // Restaurar num aparelho "limpo" traz a nota de volta, editável.
         app.filesDir.listFiles()?.forEach { it.deleteRecursively() }
         Library.init(app, reload = true)
-        DriveSync.restore(app, drive)
-        assertNotNull(Library.note(note.id))
-        assertNotNull(NoteStorage.load(Library.noteFile(note.id)))
+        assertEquals(1, DriveSync.restore(app, drive))
+        assertEquals("Aula 3", Library.note(note.id)?.title)
+        assertTrue(NoteStorage.load(Library.noteFile(note.id))!!.elements.isNotEmpty())
         assertEquals(0, DriveSync.backup(app, drive).uploaded)
+        assertEquals("sem duplicar no Drive", 1, drive.named("Aula 3.rosanota").size)
+    }
+
+    @Test
+    fun arquivo_rosanota_abre_como_nota_editavel() {
+        drag(line(200f, 700f, 800f, 700f))
+        controller.pause()
+        Library.io.submit {}.get()
+        val bytes = NoteFiles.bundle(Library.note(note.id)!!)
+        val n = NoteFiles.import(bytes.inputStream(), Library.folders.first().id)!!
+        assertEquals("Teste", n.title)
+        assertTrue(n.id != note.id)
+        assertEquals(1, NoteStorage.load(Library.noteFile(n.id))!!.elements.size)
     }
 
     @Test

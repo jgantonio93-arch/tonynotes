@@ -2239,41 +2239,8 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
 
     /** O PDF da nota (null, com aviso, se ela estiver vazia). Quem chama fecha o documento. */
     private fun buildPdf(): PdfDocument? {
-        val content = canvasView.contentBounds()
-        if (content == null) {
-            toast("A nota está vazia.")
-            return null
-        }
-        val doc = PdfDocument()
-        val pages = canvasView.usedPageRects()
-        if (pages.isNotEmpty()) {
-            // Folha do tamanho A4 (595 pt de largura em retrato).
-            val s = 595f / min(pages[0].width(), pages[0].height())
-            pages.forEachIndexed { i, r ->
-                val page = doc.startPage(PdfDocument.PageInfo.Builder((r.width() * s).toInt(), (r.height() * s).toInt(), i + 1).create())
-                val c = page.canvas
-                c.drawColor(canvasView.paperColor)
-                c.scale(s, s)
-                c.translate(-r.left, -r.top)
-                c.clipRect(r)
-                canvasView.drawTemplateForExport(c, r)
-                canvasView.drawContent(c, r)
-                doc.finishPage(page)
-            }
-        } else {
-            val pad = 40f
-            val w = content.width() + pad * 2
-            val h = content.height() + pad * 2
-            // Limite do PDF: 14400 pt por lado.
-            val s = min(1f, min(14400f / w, 14400f / h))
-            val page = doc.startPage(PdfDocument.PageInfo.Builder(max(1, (w * s).toInt()), max(1, (h * s).toInt()), 1).create())
-            val c = page.canvas
-            c.drawColor(canvasView.paperColor)
-            c.scale(s, s)
-            c.translate(pad - content.left, pad - content.top)
-            canvasView.drawContent(c, null)
-            doc.finishPage(page)
-        }
+        val doc = NoteFiles.pdf(canvasView)
+        if (doc == null) toast("A nota está vazia.")
         return doc
     }
 

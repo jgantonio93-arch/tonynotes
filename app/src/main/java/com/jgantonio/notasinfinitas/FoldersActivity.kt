@@ -676,10 +676,38 @@ class FoldersActivity : Activity() {
         val slides = (uris - pdfs.toSet()).filter { u ->
             PptxImporter.isPowerPoint(PdfImporter.displayName(this, u) ?: u.lastPathSegment, contentResolver.getType(u))
         }
-        val rest = uris - pdfs.toSet() - slides.toSet()
+        val bundles = (uris - pdfs.toSet() - slides.toSet()).filter { u ->
+            (PdfImporter.displayName(this, u) ?: u.lastPathSegment ?: "").lowercase().endsWith(".${NoteFiles.EXT}")
+        }
+        val rest = uris - pdfs.toSet() - slides.toSet() - bundles.toSet()
+        if (bundles.isNotEmpty()) importBundles(bundles)
         if (rest.isNotEmpty()) importSamsung(rest)
         if (pdfs.isNotEmpty()) importSharedPdf(pdfs.first(), pdfs.size)
         else if (slides.isNotEmpty()) importSharedPdf(slides.first(), slides.size, slides = true)
+    }
+
+    /** Notas .rosanota (do backup no Drive ou compartilhadas): voltam editáveis numa pasta escolhida. */
+    private fun importBundles(uris: List<android.net.Uri>) {
+        Pickers.folder(this, if (uris.size == 1) "Abrir a nota em" else "Abrir ${uris.size} notas em", allowRoot = false, exclude = null, current = null) { fid ->
+            val folder = fid ?: Library.folders.firstOrNull()?.id ?: return@folder
+            Library.io.execute {
+                val made = uris.mapNotNull { u ->
+                    try {
+                        contentResolver.openInputStream(u)?.use { NoteFiles.import(it, folder) }
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+                runOnUiThread {
+                    render()
+                    when {
+                        made.isEmpty() -> toast("Não foi possível abrir o arquivo .${NoteFiles.EXT}.")
+                        made.size == 1 -> startActivity(Intent(this, EditorActivity::class.java).putExtra(EditorActivity.EXTRA_NOTE, made[0].id))
+                        else -> toast("${made.size} notas importadas")
+                    }
+                }
+            }
+        }
     }
 
     /** PDF recebido: copia para o app (o acesso compartilhado expira), pergunta a pasta e abre a nota. */
@@ -1035,9 +1063,9 @@ class FoldersActivity : Activity() {
                     LinearLayout.LayoutParams(dpi(24f), dpi(24f)).apply { marginEnd = dpi(16f) })
                 addView(label(text, 15.5f, Ui.INK))
             }
-            box.addView(sectionLabel("Google Drive (arquivo por arquivo)"))
+            box.addView(sectionLabel("Google Drive (nota por nota)"))
             box.addView(label(when {
-                !connected -> "Cada nota, imagem e capa vai como um arquivo na pasta “RosaNotes” do seu Drive. Só sobe o que mudou."
+                !connected -> "Na pasta “RosaNotes” do seu Drive, com as mesmas pastas do app, cada nota vira um PDF (para ler) e um arquivo .${NoteFiles.EXT} (editável, abre de volta no RosaNotes). Só sobe o que mudou."
                 lastDrive == 0L -> "Conectado. Nenhum backup feito ainda."
                 else -> "Conectado. Último backup: " + fmt.format(Date(lastDrive))
             } + (DriveSync.lastError?.let { "\n⚠ $it" } ?: ""), 13f).apply {
@@ -1114,12 +1142,12 @@ class FoldersActivity : Activity() {
             val msg = try {
                 if (task == DriveTask.RESTORE) {
                     val n = DriveSync.restore(this, DriveRest(token))
-                    "Restaurado do Drive ($n arquivos)"
+                    if (n == 1) "Restaurado do Drive (1 nota)" else "Restaurado do Drive ($n notas)"
                 } else {
                     val r = DriveSync.backup(this, DriveRest(token))
                     if (task == DriveTask.CONNECT) DriveSync.setAuto(this, true)
                     if (r.uploaded == 0 && r.deleted == 0) "Backup em dia: nada mudou."
-                    else "Backup no Drive: ${r.uploaded} arquivo(s) enviado(s)" + (if (r.deleted > 0) ", ${r.deleted} removido(s)" else "")
+                    else "Backup no Drive: ${r.uploaded} nota(s) enviada(s)" + (if (r.deleted > 0) ", ${r.deleted} removida(s)" else "")
                 }
             } catch (e: Exception) {
                 "Não deu certo: ${e.message ?: "erro"}"

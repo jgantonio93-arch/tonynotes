@@ -33,12 +33,14 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
   dentro das notas, sem ligar para acentos.
 
 ### Backup no Google Drive
-- **Arquivo por arquivo (recomendado)**: na tela de Backup, "Conectar ao Google Drive" faz login com a
-  conta Google (escopo `drive.file`: o app só enxerga o que ele mesmo criou) e envia cada arquivo
-  (índice, notas, imagens, miniaturas, capas) para a pasta **RosaNotes** do Drive. Depois só sobe o
-  que mudou, apaga o que foi apagado de vez, e há backup automático ao sair de uma nota e
-  "Restaurar do Drive". Requer um projeto no Google Cloud com a Drive API e uma credencial OAuth
-  Android (pacote `com.jgantonio.notasinfinitas`, SHA-1 da chave `app/debug.keystore`).
+- **Nota por nota (recomendado)**: na tela de Backup, "Conectar ao Google Drive" faz login com a
+  conta Google (escopo `drive.file`: o app só enxerga o que ele mesmo criou). Na pasta **RosaNotes**
+  do Drive ficam as mesmas pastas do app e, para cada nota, um **PDF** (para ler no Drive) e um
+  arquivo **.rosanota** editável (zip com a nota e as imagens dela, que abre de volta no RosaNotes
+  pelo Drive/Compartilhar). Só sobe o que mudou; renomear ou mover renomeia/move lá; nota apagada
+  sai do Drive. Um arquivo de índice guarda pastas, cores e capas para o "Restaurar do Drive".
+  Backup automático ao sair de uma nota. Requer um projeto no Google Cloud com a Drive API e uma
+  credencial OAuth Android (pacote `com.jgantonio.notasinfinitas`, SHA-1 da chave `app/debug.keystore`).
 - **Arquivo único (.zip)**, como antes:
 - Botão de **backup** no topo da página inicial.
 - **Fazer backup agora**: o seletor do Android abre, você escolhe **Drive** (a sua própria
