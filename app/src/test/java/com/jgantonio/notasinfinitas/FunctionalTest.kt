@@ -49,7 +49,7 @@ class FunctionalTest {
         app.filesDir.listFiles()?.forEach { it.deleteRecursively() }
         // Os testes antigos simulam toques de dedo logo depois da caneta: rejeição de palma
         // desligada aqui; os testes dela ligam explicitamente.
-        app.getSharedPreferences("canetas", 0).edit().clear().putBoolean("palm_reject", false).commit()
+        app.getSharedPreferences("canetas", 0).edit().clear().putBoolean("palm_reject", false).putBoolean("doc_scroll_lock", false).commit()
         Library.init(app, reload = true)
         val folder = Library.folders.first()
         note = Library.createNote(folder.id, "Teste")
@@ -1832,5 +1832,60 @@ class FunctionalTest {
         assertEquals("só o traço da caneta", 1, strokes().size)
         val v = canvas.viewForTests
         assertEquals(700f, strokes()[0].bounds.centerY() * v[2] + v[1], 30f)
+    }
+
+    // ---- Rolagem presa em documentos ---------------------------------------------------------
+
+    private fun pdfColumn(layout: PdfImporter.Layout = PdfImporter.Layout.VERTICAL) {
+        canvas.addPages(PdfImporter.layout((1..4).map { PdfImporter.Page("pdf_trava_p$it.jpg", 595, 842) }, layout, 0f, 0f, "Aula.pdf"))
+        canvas.goToPage(canvas.pdfDocuments()[0].pages[1])
+        canvas.docScrollLock = true
+    }
+
+    @Test
+    fun rolagem_fica_presa_na_vertical_em_cima_do_pdf() {
+        pdfColumn()
+        val d = app.resources.displayMetrics.density
+        val v0 = canvas.viewForTests.copyOf()
+        // Sobe a página desviando 30 dp para o lado: só a vertical anda.
+        drag(line(540f, 1400f, 540f + 30f * d, 900f, 12), F)
+        val v1 = canvas.viewForTests.copyOf()
+        assertEquals("X preso", v0[0], v1[0], 0.5f)
+        assertEquals("Y andou", v0[1] - 500f, v1[1], 2f)
+        // Forçando 100 dp para o lado, solta e acompanha o dedo.
+        drag(line(540f, 1400f, 540f + 100f * d, 1300f, 12), F)
+        val v2 = canvas.viewForTests
+        assertEquals("X soltou", v1[0] + 100f * d, v2[0], 2f)
+    }
+
+    @Test
+    fun rolagem_livre_fora_do_pdf_e_com_ajuste_desligado() {
+        pdfColumn()
+        val d = app.resources.displayMetrics.density
+        canvas.docScrollLock = false
+        val v0 = canvas.viewForTests.copyOf()
+        drag(line(540f, 1400f, 540f + 30f * d, 900f, 12), F)
+        assertEquals("desligado: X anda", v0[0] + 30f * d, canvas.viewForTests[0], 2f)
+        // Ligado, mas com o centro da tela fora do documento: livre.
+        canvas.docScrollLock = true
+        drag(line(100f, 1000f, 1000f, 1000f, 12), F)
+        drag(line(100f, 1000f, 1000f, 1000f, 12), F)
+        val v1 = canvas.viewForTests.copyOf()
+        drag(line(540f, 1400f, 540f + 30f * d, 900f, 12), F)
+        assertEquals("fora do PDF: X anda", v1[0] + 30f * d, canvas.viewForTests[0], 2f)
+    }
+
+    @Test
+    fun pdf_lado_a_lado_trava_na_horizontal_e_pinca_da_zoom() {
+        pdfColumn(PdfImporter.Layout.HORIZONTAL)
+        val d = app.resources.displayMetrics.density
+        val v0 = canvas.viewForTests.copyOf()
+        drag(line(900f, 1000f, 400f, 1000f + 30f * d, 12), F)
+        val v1 = canvas.viewForTests.copyOf()
+        assertEquals("Y preso", v0[1], v1[1], 0.5f)
+        assertEquals("X andou", v0[0] - 500f, v1[0], 2f)
+        val z = canvas.zoomPercent
+        pinch(540f, 1000f, 100f, 300f)
+        assertTrue("pinça dá zoom", canvas.zoomPercent > z)
     }
 }

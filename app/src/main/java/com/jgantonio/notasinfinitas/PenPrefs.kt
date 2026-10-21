@@ -113,6 +113,11 @@ class PenPrefs(context: Context) {
         get() = sp.getBoolean("show_touches", false)
         set(v) = sp.edit().putBoolean("show_touches", v).apply()
 
+    /** Rolagem levemente presa no sentido das páginas em cima de documentos. */
+    var docScrollLock: Boolean
+        get() = sp.getBoolean("doc_scroll_lock", true)
+        set(v) = sp.edit().putBoolean("doc_scroll_lock", v).apply()
+
     var leftHanded: Boolean
         get() = sp.getBoolean("left_handed", false)
         set(v) = sp.edit().putBoolean("left_handed", v).apply()

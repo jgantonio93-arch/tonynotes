@@ -2209,6 +2209,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
         if (!pen && !fingerDraws && (selGesture == null || selGesture == Gesture.LASSO)) {
             gesture = Gesture.NAVIGATE
             resetNavigation(e, -1)
+            startScrollLock()
             return
         }
         val buttonErase = e.getToolType(0) == MotionEvent.TOOL_TYPE_ERASER ||
@@ -2376,6 +2377,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
                     abortToolGesture()
                     gesture = Gesture.NAVIGATE
                     resetNavigation(e, -1)
+                    startScrollLock()
                 }
                 // Com a S Pen em uso, ignoramos a palma/dedos.
             }
@@ -2744,8 +2746,49 @@ class InfiniteCanvasView(context: Context) : View(context) {
         lastSpan = span
     }
 
+    // ---- Rolagem "levemente presa" em documentos ----------------------------------------------
+    //
+    // Como o ímã do zoom em 100%: em cima de um PDF/PowerPoint ou das folhas, a tela só anda no
+    // sentido das páginas; empurrando o dedo bem para o lado, solta e acompanha.
+
+    /** Liga a trava suave (ajuste "Rolagem presa em documentos"). */
+    var docScrollLock = true
+    /** 0 = livre, 1 = presa na vertical, 2 = presa na horizontal. */
+    private var lockAxis = 0
+    private var lockDrift = 0f
+    private var lockSpan0 = 0f
+    internal val scrollLockAxisForTests get() = lockAxis
+
+    private fun startScrollLock() {
+        lockDrift = 0f
+        lockSpan0 = 0f
+        lockAxis = if (docScrollLock) lockAxisAt(wx(width / 2f), wy(height / 2f)) else 0
+    }
+
+    /** Sentido das páginas no ponto do mundo (x, y): 1 vertical, 2 horizontal, 0 nenhum. */
+    private fun lockAxisAt(x: Float, y: Float): Int {
+        val page = elements.lastOrNull { it is ImageElement && it.pdfPage > 0 && it.bounds.contains(x, y) } as? ImageElement
+        if (page != null) {
+            val doc = pdfDocuments().firstOrNull { d -> d.pages.any { it === page } } ?: return 1
+            val r = RectF(doc.pages[0].bounds)
+            for (p in doc.pages) r.union(p.bounds)
+            return if (doc.pages.size > 1 && r.width() > r.height()) 2 else 1
+        }
+        val l = pageLayout
+        if (l.hasPages) {
+            val i = l.indexAt(x, y)
+            if (i >= 0 && l.pageRect(i).contains(x, y)) return if (l.horizontal) 2 else 1
+        }
+        return 0
+    }
+
     private fun navigate(e: MotionEvent) {
         val (fx, fy, span) = focus(e, -1)
+        if (lockAxis != 0 && span > 10f) {
+            // Pinça: é zoom, solta a trava neste gesto.
+            if (lockSpan0 <= 0f) lockSpan0 = span
+            else if (abs(span / lockSpan0 - 1f) > 0.04f) lockAxis = 0
+        }
         if (lastSpan > 10f && span > 10f) {
             var newScale = (scale * span / lastSpan).coerceIn(MIN_SCALE, MAX_SCALE)
             // "Ímã" em 100%: fica fácil voltar ao tamanho real com a pinça.
@@ -2755,8 +2798,18 @@ class InfiniteCanvasView(context: Context) : View(context) {
             offsetY = lastFocusY - (lastFocusY - offsetY) * (newScale / scale)
             scale = newScale
         }
-        offsetX += fx - lastFocusX
-        offsetY += fy - lastFocusY
+        var dx = fx - lastFocusX
+        var dy = fy - lastFocusY
+        if (lockAxis != 0) {
+            // O lado travado acumula; passou do limite, solta e "pula" para o dedo.
+            if (lockAxis == 1) { lockDrift += dx; dx = 0f } else { lockDrift += dy; dy = 0f }
+            if (abs(lockDrift) > SCROLL_LOCK_DP * density) {
+                if (lockAxis == 1) dx = lockDrift else dy = lockDrift
+                lockAxis = 0
+            }
+        }
+        offsetX += dx
+        offsetY += dy
         lastFocusX = fx
         lastFocusY = fy
         lastSpan = span
@@ -3261,6 +3314,8 @@ class InfiniteCanvasView(context: Context) : View(context) {
         private const val PENDING_MS = 500L
         /** Quanto a palma parada "anda" (tremido do contato), em dp. */
         private const val PALM_DRIFT_DP = 40f
+        /** Quanto empurrar para o lado para soltar a rolagem presa (dp). */
+        private const val SCROLL_LOCK_DP = 56f
         private const val MIN_SCALE = 0.03f
         private const val MAX_SCALE = 8f
         private const val MAX_UNDO = 300

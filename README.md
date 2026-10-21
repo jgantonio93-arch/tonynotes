@@ -118,6 +118,8 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
 ### Áudio junto com a escrita
 - Menu ⋮ → **Gravar áudio com a escrita**. Cada traço feito durante a gravação guarda o
   momento do áudio.
+- **Rolagem presa em documentos** (⋮ › Ajustes, ligada): em cima de um PDF/PowerPoint ou das
+  folhas, arrastar a tela só anda no sentido das páginas; empurrando bem para o lado, solta.
 - **Rejeição de palma** (menu ⋮ › Ajustes, ligada por padrão): com caneta ativa, a caneta ganha
   da mão (a palma que encostou antes não mexe a tela) e a mão é ignorada enquanto a caneta está
   perto ou logo depois; escrevendo com dedo/caneta comum, toques grandes são ignorados e, com

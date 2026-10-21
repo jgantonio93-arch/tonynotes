@@ -433,6 +433,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         canvasView.fingerDraws = prefs.fingerDraws
         canvasView.palmReject = prefs.palmReject
         canvasView.leftHanded = prefs.leftHanded
+        canvasView.docScrollLock = prefs.docScrollLock
         canvasView.showTouches = prefs.showTouches
         applyPalmGuard()
         canvasView.autoShapes = prefs.autoShapes
@@ -1392,6 +1393,10 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             box.addView(menuSection("Ajustes"))
             box.addView(switchRow(Icon.TOUCH, "Escrever com o dedo", prefs.fingerDraws) {
                 prefs.fingerDraws = it
+                applyPrefs()
+            })
+            box.addView(switchRow(Icon.PAGES_V, "Rolagem presa em documentos (força para soltar)", prefs.docScrollLock) {
+                prefs.docScrollLock = it
                 applyPrefs()
             })
             box.addView(switchRow(Icon.TOUCH, "Rejeição de palma (ignorar a mão)", prefs.palmReject) {
