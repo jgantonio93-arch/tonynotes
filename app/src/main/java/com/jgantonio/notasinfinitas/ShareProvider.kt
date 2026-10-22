@@ -12,7 +12,8 @@ import java.io.File
 
 /**
  * Entrega a outros apps (WhatsApp, e-mail, Drive...) os arquivos gerados para compartilhar,
- * só leitura e só da pasta cache/share. O acesso é dado por intent (grantUriPermissions).
+ * só leitura e só da pasta cache/share. Exceção: a foto da câmera (camera_*.jpg), que o
+ * app de câmera grava. O acesso é dado por intent (grantUriPermissions).
  */
 class ShareProvider : ContentProvider() {
 
@@ -27,6 +28,11 @@ class ShareProvider : ContentProvider() {
 
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor? {
         val f = fileFor(uri) ?: throw java.io.FileNotFoundException(uri.toString())
+        if (mode.contains('w')) {
+            // Só a foto da câmera pode ser gravada (o app de câmera escreve nela).
+            if (!isCameraFile(f.name)) throw SecurityException("Somente leitura")
+            return ParcelFileDescriptor.open(f, ParcelFileDescriptor.parseMode(mode))
+        }
         return ParcelFileDescriptor.open(f, ParcelFileDescriptor.MODE_READ_ONLY)
     }
 
@@ -41,6 +47,7 @@ class ShareProvider : ContentProvider() {
     override fun getType(uri: Uri): String = when (uri.lastPathSegment?.substringAfterLast('.')?.lowercase()) {
         "pdf" -> "application/pdf"
         "png" -> "image/png"
+        "jpg", "jpeg" -> "image/jpeg"
         else -> "application/octet-stream"
     }
 
@@ -49,6 +56,7 @@ class ShareProvider : ContentProvider() {
     override fun update(uri: Uri, values: ContentValues?, selection: String?, selectionArgs: Array<out String>?) = 0
 
     companion object {
+        fun isCameraFile(name: String) = name.startsWith("camera_") && name.endsWith(".jpg")
         fun dir(c: Context) = File(c.cacheDir, "share").apply { mkdirs() }
         fun uriFor(c: Context, file: File): Uri = Uri.parse("content://${c.packageName}.share/${Uri.encode(file.name)}")
     }

@@ -145,6 +145,8 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
   (fica alguns segundos e desaparece). Nada disso entra na nota.
 
 ### Imagens e PDF
+- **Foto da câmera** (Inserir): abre a câmera e a foto entra na nota já em pé (as fotos da
+  galeria também respeitam a rotação do EXIF).
 - Toque na imagem com a seleção: girar livre (com ímã nos ângulos retos), recortar
   (livre, 1:1, 16:9, círculo, à mão livre), ajustes (filtros, brilho, contraste,
   saturação, opacidade), cantos, moldura, sombra, espelhar, travar, substituir,

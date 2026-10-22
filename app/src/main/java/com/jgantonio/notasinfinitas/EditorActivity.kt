@@ -1929,9 +1929,12 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
 
     // ---- Imagem -----------------------------------------------------------------
 
+    internal fun showInsertMenuForTests() = showInsertMenu()
+
     private fun showInsertMenu() {
         actionSheet("Inserir", listOf(
             SheetItem(Icon.IMAGE, "Imagem da galeria") { pickImage(REQ_IMAGE) },
+            SheetItem(Icon.CAMERA, "Foto da câmera") { takePhoto() },
             SheetItem(Icon.PDF, "PDF (todas as páginas)") { pickPdf() },
             SheetItem(Icon.SLIDES, "PowerPoint (todos os slides)") { pickPptx() },
             SheetItem(Icon.SHAPES, "Forma (retângulo, círculo, seta, tabela…)") { showShapeMenu() },
@@ -2035,6 +2038,10 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_CAMERA) {
+            onCameraResult(resultCode == RESULT_OK)
+            return
+        }
         if (resultCode != RESULT_OK) return
         val uri = data?.data ?: return
         when (requestCode) {
@@ -2146,6 +2153,72 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     }
 
     /** Copia a imagem para a pasta da nota (reduzida a no máximo 2048 px). */
+    /** Rotação/espelhamento que o EXIF da foto pede (null: já está certa). */
+    private fun exifMatrix(uri: Uri): android.graphics.Matrix? {
+        val o = try {
+            contentResolver.openInputStream(uri)?.use {
+                android.media.ExifInterface(it).getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, android.media.ExifInterface.ORIENTATION_NORMAL)
+            }
+        } catch (e: Exception) {
+            null
+        } ?: return null
+        val m = android.graphics.Matrix()
+        when (o) {
+            android.media.ExifInterface.ORIENTATION_ROTATE_90 -> m.postRotate(90f)
+            android.media.ExifInterface.ORIENTATION_ROTATE_180 -> m.postRotate(180f)
+            android.media.ExifInterface.ORIENTATION_ROTATE_270 -> m.postRotate(270f)
+            android.media.ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> m.postScale(-1f, 1f)
+            android.media.ExifInterface.ORIENTATION_FLIP_VERTICAL -> m.postScale(1f, -1f)
+            android.media.ExifInterface.ORIENTATION_TRANSPOSE -> { m.postRotate(90f); m.postScale(-1f, 1f) }
+            android.media.ExifInterface.ORIENTATION_TRANSVERSE -> { m.postRotate(270f); m.postScale(-1f, 1f) }
+            else -> return null
+        }
+        return m
+    }
+
+    // ---- Câmera ------------------------------------------------------------------------
+
+    private var cameraFile: File? = null
+    internal val cameraFileForTests get() = cameraFile
+
+    /** Abre o app de câmera; a foto volta em onActivityResult(REQ_CAMERA). */
+    private fun takePhoto() {
+        val f = File(ShareProvider.dir(this), "camera_${System.currentTimeMillis()}.jpg")
+        try { f.writeBytes(ByteArray(0)) } catch (e: Exception) { toast("Não foi possível abrir a câmera."); return }
+        val uri = ShareProvider.uriFor(this, f)
+        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+            putExtra(MediaStore.EXTRA_OUTPUT, uri)
+            clipData = android.content.ClipData.newRawUri("foto", uri)
+            addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        cameraFile = f
+        try {
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, REQ_CAMERA)
+        } catch (e: android.content.ActivityNotFoundException) {
+            f.delete()
+            cameraFile = null
+            toast("Nenhum app de câmera encontrado.")
+        }
+    }
+
+    private fun onCameraResult(ok: Boolean) {
+        val f = cameraFile ?: return
+        cameraFile = null
+        if (!ok || f.length() == 0L) { f.delete(); return }
+        Library.io.execute {
+            val result = try { importImage(Uri.fromFile(f)) } catch (e: Exception) { null }
+            f.delete()
+            main.post {
+                if (result == null) toast("Não foi possível usar a foto.")
+                else {
+                    canvasView.addImage(result.first, result.second, result.third)
+                    refresh()
+                }
+            }
+        }
+    }
+
     private fun importImage(uri: Uri): Triple<String, Int, Int>? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
@@ -2156,10 +2229,12 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
         } ?: return null
         val longSide = max(bmp0.width, bmp0.height)
-        val bmp = if (longSide > 2048) {
+        val scaled = if (longSide > 2048) {
             val f = 2048f / longSide
             Bitmap.createScaledBitmap(bmp0, (bmp0.width * f).toInt(), (bmp0.height * f).toInt(), true)
         } else bmp0
+        // Fotos de celular guardam a rotação no EXIF: endireita antes de salvar.
+        val bmp = exifMatrix(uri)?.let { m -> Bitmap.createBitmap(scaled, 0, 0, scaled.width, scaled.height, m, true) } ?: scaled
         val dir = Library.assetsDir(note.id).apply { mkdirs() }
         val png = bmp.hasAlpha()
         val name = UUID.randomUUID().toString().take(12) + if (png) ".png" else ".jpg"
@@ -2704,6 +2779,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         private const val REQ_REPLACE = 42
         private const val REQ_PDF = 43
         private const val REQ_PPTX = 49
+        private const val REQ_CAMERA = 50
         private const val REQ_MIC = 44
     }
 }

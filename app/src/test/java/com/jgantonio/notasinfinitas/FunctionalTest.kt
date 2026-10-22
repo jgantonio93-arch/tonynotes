@@ -1930,4 +1930,61 @@ class FunctionalTest {
         tap(canvas.width / 2f, canvas.height / 2f)
         assertEquals("desfazer volta a separar", 1, canvas.selectedItems.size)
     }
+
+    // ---- Foto da câmera ----------------------------------------------------------------------
+
+    @Test
+    fun foto_da_camera_entra_na_nota_em_pe() {
+        clickInsert("Foto da câmera")
+        val shadow = org.robolectric.Shadows.shadowOf(editor)
+        val req = shadow.nextStartedActivityForResult
+        assertEquals(android.provider.MediaStore.ACTION_IMAGE_CAPTURE, req.intent.action)
+        val out = req.intent.getParcelableExtra<android.net.Uri>(android.provider.MediaStore.EXTRA_OUTPUT)
+        assertNotNull(out)
+        // A "câmera" grava uma foto deitada (200x100) com EXIF dizendo "girar 90°".
+        val f = editor.cameraFileForTests!!
+        val bmp = Bitmap.createBitmap(200, 100, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
+        f.outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+        android.media.ExifInterface(f.path).apply {
+            setAttribute(android.media.ExifInterface.TAG_ORIENTATION, android.media.ExifInterface.ORIENTATION_ROTATE_90.toString())
+            saveAttributes()
+        }
+        shadow.receiveResult(req.intent, android.app.Activity.RESULT_OK, null)
+        val end = System.currentTimeMillis() + 10000
+        while (items().none { it is ImageElement } && System.currentTimeMillis() < end) {
+            Library.io.submit {}.get()
+            ShadowLooper.idleMainLooper()
+        }
+        val img = items().filterIsInstance<ImageElement>().single()
+        assertTrue("em pé: ${img.rect}", img.rect.height() > img.rect.width())
+        assertTrue("temporário apagado", !f.exists())
+    }
+
+    @Test
+    fun camera_cancelada_nao_insere_e_provider_so_grava_a_foto() {
+        clickInsert("Foto da câmera")
+        val shadow = org.robolectric.Shadows.shadowOf(editor)
+        val req = shadow.nextStartedActivityForResult
+        val f = editor.cameraFileForTests!!
+        shadow.receiveResult(req.intent, android.app.Activity.RESULT_CANCELED, null)
+        ShadowLooper.idleMainLooper()
+        assertTrue(items().none { it is ImageElement })
+        assertTrue(!f.exists())
+
+        val provider = Robolectric.setupContentProvider(ShareProvider::class.java, "com.jgantonio.notasinfinitas.share")
+        val other = File(ShareProvider.dir(app), "nota.pdf").apply { writeText("x") }
+        try {
+            provider.openFile(ShareProvider.uriFor(app, other), "w")
+            throw AssertionError("deveria recusar escrita")
+        } catch (e: SecurityException) {
+        }
+        val cam = File(ShareProvider.dir(app), "camera_1.jpg").apply { writeBytes(ByteArray(0)) }
+        provider.openFile(ShareProvider.uriFor(app, cam), "w")!!.close()
+    }
+
+    private fun clickInsert(text: String) {
+        editor.showInsertMenuForTests()
+        ShadowLooper.idleMainLooper()
+        clickInDialog(text)
+    }
 }
