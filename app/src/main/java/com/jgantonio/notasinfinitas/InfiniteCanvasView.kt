@@ -2802,7 +2802,11 @@ class InfiniteCanvasView(context: Context) : View(context) {
         var dy = fy - lastFocusY
         if (lockAxis != 0) {
             // O lado travado acumula; passou do limite, solta e "pula" para o dedo.
+            // Rolando no sentido das páginas, o desvio lateral "vaza": descer torto não solta.
+            val along = if (lockAxis == 1) abs(dy) else abs(dx)
             if (lockAxis == 1) { lockDrift += dx; dx = 0f } else { lockDrift += dy; dy = 0f }
+            val leak = along * SCROLL_LOCK_LEAK
+            lockDrift = if (abs(lockDrift) <= leak) 0f else lockDrift - kotlin.math.sign(lockDrift) * leak
             if (abs(lockDrift) > SCROLL_LOCK_DP * density) {
                 if (lockAxis == 1) dx = lockDrift else dy = lockDrift
                 lockAxis = 0
@@ -3315,7 +3319,9 @@ class InfiniteCanvasView(context: Context) : View(context) {
         /** Quanto a palma parada "anda" (tremido do contato), em dp. */
         private const val PALM_DRIFT_DP = 40f
         /** Quanto empurrar para o lado para soltar a rolagem presa (dp). */
-        private const val SCROLL_LOCK_DP = 56f
+        private const val SCROLL_LOCK_DP = 110f
+        /** Parte do movimento no sentido das páginas que desconta o desvio lateral. */
+        private const val SCROLL_LOCK_LEAK = 0.6f
         private const val MIN_SCALE = 0.03f
         private const val MAX_SCALE = 8f
         private const val MAX_UNDO = 300

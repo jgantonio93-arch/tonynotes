@@ -1852,10 +1852,14 @@ class FunctionalTest {
         val v1 = canvas.viewForTests.copyOf()
         assertEquals("X preso", v0[0], v1[0], 0.5f)
         assertEquals("Y andou", v0[1] - 500f, v1[1], 2f)
-        // Forçando 100 dp para o lado, solta e acompanha o dedo.
-        drag(line(540f, 1400f, 540f + 100f * d, 1300f, 12), F)
-        val v2 = canvas.viewForTests
-        assertEquals("X soltou", v1[0] + 100f * d, v2[0], 2f)
+        // Rolagem longa com o dedo torto (60 dp para o lado ao longo do caminho): continua presa.
+        drag(line(540f, 1800f, 540f + 60f * d, 300f, 30), F)
+        val v2 = canvas.viewForTests.copyOf()
+        assertEquals("rolagem longa não solta", v1[0], v2[0], 0.5f)
+        assertEquals(v1[1] - 1500f, v2[1], 2f)
+        // Empurrão claro de 130 dp para o lado: solta e acompanha o dedo.
+        drag(line(300f, 1400f, 300f + 130f * d, 1400f, 12), F)
+        assertEquals("X soltou", v2[0] + 130f * d, canvas.viewForTests[0], 2f)
     }
 
     @Test
