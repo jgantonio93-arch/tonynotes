@@ -399,6 +399,8 @@ class ImageElement(
     val pdfPage: Int = 0,
     /** Nome do documento (PDF/PowerPoint) de onde a página veio; "" em notas antigas. */
     val doc: String = "",
+    /** Página de PDF separada do grupo (por padrão as páginas de um documento andam juntas). */
+    val ungrouped: Boolean = false,
 ) : Element() {
 
     fun with(
@@ -421,8 +423,9 @@ class ImageElement(
         locked: Boolean = this.locked,
         pdfPage: Int = this.pdfPage,
         doc: String = this.doc,
+        ungrouped: Boolean = this.ungrouped,
     ) = ImageElement(file, RectF(rect), normalizeAngle(rotation), flipH, flipV, RectF(crop), mask, freeMask, opacity,
-        filter, brightness, contrast, saturation, borderWidth, borderColor, shadow, locked, pdfPage, doc)
+        filter, brightness, contrast, saturation, borderWidth, borderColor, shadow, locked, pdfPage, doc, ungrouped)
 
     val centerX get() = rect.centerX()
     val centerY get() = rect.centerY()

@@ -1016,6 +1016,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         val txt = canvasView.selectedText
         selectionLabel.text = when {
             items.isEmpty() -> "Área"
+            canvasView.selectionHasPdfGroup && items.all { it is ImageElement && it.pdfPage > 0 } -> "Documento · ${items.size} páginas"
             img != null && img.pdfPage > 0 -> "Página ${img.pdfPage}"
             img != null -> "Imagem"
             txt != null -> "Texto"
@@ -1025,6 +1026,12 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         row.addView(selectionLabel, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             marginEnd = dpi(6f)
         })
+        // Páginas de PDF andam juntas; desagrupar deixa escolher página por página.
+        if (canvasView.selectionHasPdfGroup) row.addView(pillButton(Icon.PAGES_V, "Desagrupar páginas") {
+            canvasView.ungroupSelection()
+            toast("Páginas separadas: toque numa página para escolher só ela.")
+        })
+        if (canvasView.selectionIsUngroupedPage) row.addView(pillButton(Icon.PAGES_V, "Agrupar páginas") { canvasView.regroupSelection() })
         // Área marcada com o laço/retângulo: print só do que está dentro dela.
         if (canvasView.hasRegion) row.addView(pillButton(Icon.CROP, "Print da área") { printRegion() })
         row.addView(pillButton(Icon.CARDS, if (pendingQuestion == null) "Criar cartão" else "Usar como resposta") { cardStep() })

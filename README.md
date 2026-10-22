@@ -157,6 +157,9 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
   o Google converte em PDF com visual idêntico (arquivo temporário apagado logo depois);
   sem Drive ou sem internet, o leitor próprio desenha offline fundo, formas, textos,
   imagens e tabelas (aproximado). `.ppt` antigo só abre pelo Google.
+- **Páginas agrupadas**: as páginas de um PDF/PowerPoint andam juntas (tocar seleciona o documento
+  inteiro). "Desagrupar páginas" na barra da seleção deixa escolher página por página; "Agrupar
+  páginas" junta de novo.
 - **Páginas numeradas e sumário**: cada página de PDF/PowerPoint mostra "3 / 12" no canto
   (só na tela, não sai na exportação). O botão **Sumário** na barra de cima (aparece quando a
   nota tem documentos) lista os documentos com miniatura e abre a grade de páginas; tocar numa

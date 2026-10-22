@@ -2472,7 +2472,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
         ) {
             // Toque de dedo com a seleção ativa: seleciona o item tocado.
             val hit = hitTest(wx(downX), wy(downY))
-            if (hit != null) setSelection(listOf(hit)) else clearSelection()
+            if (hit != null) setSelection(withGroups(listOf(hit))) else clearSelection()
         }
         if (gesture != Gesture.NAVIGATE && gesture != Gesture.NONE) finishGesture(e)
         gesture = Gesture.NONE
@@ -2522,7 +2522,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
                 if (tapped) {
                     // Toque simples: seleciona o item tocado (inclusive imagens travadas).
                     val hit = hitTest(wx(downX), wy(downY))
-                    if (hit != null) setSelection(listOf(hit)) else clearSelection()
+                    if (hit != null) setSelection(withGroups(listOf(hit))) else clearSelection()
                 } else {
                     region = when {
                         selectRect && lassoXs.size >= 2 -> Lasso.rect(lassoXs[0], lassoYs[0], lassoXs[1], lassoYs[1])
@@ -2535,7 +2535,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
                         else -> null
                     }
                     if (lasso != null) {
-                        setSelection(elements.filter { if (selectPartial) it.touchesLasso(lasso) else it.insideLasso(lasso) }, keepRegion = true)
+                        setSelection(withGroups(elements.filter { if (selectPartial) it.touchesLasso(lasso) else it.insideLasso(lasso) }), keepRegion = true)
                     }
                 }
                 lassoPath.reset()
@@ -2547,7 +2547,9 @@ class InfiniteCanvasView(context: Context) : View(context) {
                     // Toque dentro da seleção: troca para o item tocado, se for outro.
                     val hit = hitTest(wx(downX), wy(downY))
                     val single = selection.singleOrNull()
-                    if (hit != null && selection.size > 1) setSelection(listOf(hit))
+                    val group = hit?.let { withGroups(listOf(it)) }
+                    val sameGroup = group != null && group.size == selection.size && group.all { it in selectionSet }
+                    if (hit != null && selection.size > 1 && !sameGroup) setSelection(group!!)
                     // Tocar de novo num texto selecionado abre a edição (como no Samsung Notes).
                     else if (single is TextElement && hit === single) listener?.onTextRequest(single.x, single.y, single)
                 } else {
@@ -3197,6 +3199,42 @@ class InfiniteCanvasView(context: Context) : View(context) {
      * Agrupa as páginas por documento: pelo lote da importação no nome do arquivo
      * (pdf_<lote>_p3.jpg, pptx_<lote>_s3.jpg) ou, sem lote, pelo nome do documento.
      */
+    /** Junta às páginas de PDF da lista as outras páginas agrupadas do mesmo documento. */
+    private fun withGroups(list: List<Element>): List<Element> {
+        if (list.none { it is ImageElement && it.pdfPage > 0 && !it.ungrouped }) return list
+        val out = LinkedHashSet<Element>(list)
+        for (d in pdfDocuments()) {
+            val grouped = d.pages.filter { !it.ungrouped }
+            if (grouped.any { it in out }) out.addAll(grouped)
+        }
+        // Mantém a ordem da nota (importa para mover/ordenar).
+        return elements.filter { it in out }
+    }
+
+    /** As páginas selecionadas estão agrupadas (há o que desagrupar)? */
+    val selectionHasPdfGroup get() = selection.count { it is ImageElement && it.pdfPage > 0 && !it.ungrouped } > 1
+
+    /** A página selecionada (sozinha) pertence a um documento e está separada? */
+    val selectionIsUngroupedPage get() = (selection.singleOrNull() as? ImageElement)?.let { it.pdfPage > 0 && it.ungrouped } == true
+
+    /** Desagrupa os documentos da seleção: cada página passa a ser escolhida sozinha. */
+    fun ungroupSelection() {
+        val pages = selection.filterIsInstance<ImageElement>().filter { it.pdfPage > 0 && !it.ungrouped }
+        if (pages.isEmpty()) return
+        replaceAll(pages.map { it to it.with(ungrouped = true) })
+        clearSelection()
+    }
+
+    /** Junta de novo todas as páginas do documento da página selecionada. */
+    fun regroupSelection() {
+        val page = selection.singleOrNull() as? ImageElement ?: return
+        val doc = pdfDocuments().firstOrNull { d -> d.pages.any { it === page } } ?: return
+        val pairs = doc.pages.filter { it.ungrouped }.map { it to it.with(ungrouped = false) }
+        if (pairs.isEmpty()) return
+        replaceAll(pairs)
+        setSelection(withGroups(listOf(pairs.first().second)))
+    }
+
     fun pdfDocuments(): List<PdfDoc> {
         var sig = elements.size.toLong()
         for (e in elements) if (e is ImageElement && e.pdfPage > 0) sig = sig * 31 + System.identityHashCode(e)

@@ -1892,4 +1892,42 @@ class FunctionalTest {
         pinch(540f, 1000f, 100f, 300f)
         assertTrue("pinça dá zoom", canvas.zoomPercent > z)
     }
+
+    // ---- Páginas de PDF agrupadas ------------------------------------------------------------
+
+    @Test
+    fun paginas_do_pdf_vem_agrupadas_e_da_para_desagrupar() {
+        canvas.addPages(PdfImporter.layout((1..3).map { PdfImporter.Page("pdf_grupo_p$it.jpg", 595, 842) },
+            PdfImporter.Layout.VERTICAL, 0f, 0f, "Aula.pdf"))
+        val p2 = canvas.pdfDocuments()[0].pages[1]
+        canvas.goToPage(p2)
+        canvas.tool = InfiniteCanvasView.Tool.SELECT
+        val cx = canvas.width / 2f
+        val cy = canvas.height / 2f
+        tap(cx, cy)
+        assertEquals("o documento inteiro", 3, canvas.selectedItems.size)
+        assertTrue(canvas.selectionHasPdfGroup)
+
+        canvas.ungroupSelection()
+        tap(cx, cy)
+        assertEquals("desagrupado: só a página", 1, canvas.selectedItems.size)
+        assertEquals(2, (canvas.selectedItems[0] as ImageElement).pdfPage)
+        assertTrue(canvas.selectionIsUngroupedPage)
+
+        // Desagrupado continua assim ao reabrir a nota.
+        controller.pause()
+        Library.io.submit {}.get()
+        openEditor()
+        canvas.tool = InfiniteCanvasView.Tool.SELECT
+        canvas.goToPage(canvas.pdfDocuments()[0].pages[1])
+        tap(canvas.width / 2f, canvas.height / 2f)
+        assertEquals(1, canvas.selectedItems.size)
+
+        // Agrupar de novo.
+        canvas.regroupSelection()
+        assertEquals(3, canvas.selectedItems.size)
+        canvas.undo()
+        tap(canvas.width / 2f, canvas.height / 2f)
+        assertEquals("desfazer volta a separar", 1, canvas.selectedItems.size)
+    }
 }

@@ -89,10 +89,11 @@ class NoteData(
  * Versão 7: preenchimentos do balde (tipo 6).
  * Versão 8: fitas para esconder (tipo 7) e, no fim, marcadores e cartões de estudo.
  * Versão 9: nome do documento (PDF/PowerPoint) depois do número da página.
+ * Versão 10: página de PDF desagrupada (boolean) depois do nome do documento.
  */
 object NoteStorage {
     private const val MAGIC = 0x4E494E46 // "NINF"
-    private const val VERSION = 9
+    private const val VERSION = 10
 
     private const val TYPE_STROKE = 1
     private const val TYPE_TEXT = 2
@@ -169,6 +170,7 @@ object NoteStorage {
                     out.writeBoolean(e.shadow); out.writeBoolean(e.locked)
                     out.writeInt(e.pdfPage)
                     out.writeUTF(e.doc.take(200))
+                    out.writeBoolean(e.ungrouped)
                 }
                 is FillElement -> {
                     out.writeByte(TYPE_FILL)
@@ -215,6 +217,7 @@ object NoteStorage {
                     6, 7 -> readV2(input, true, hasRotation = true)
                     8 -> readV2(input, true, hasRotation = true, hasStudy = true)
                     9 -> readV2(input, true, hasRotation = true, hasStudy = true, hasDoc = true)
+                    10 -> readV2(input, true, hasRotation = true, hasStudy = true, hasDoc = true, hasGroup = true)
                     else -> null
                 }
             }
@@ -241,7 +244,7 @@ object NoteStorage {
         return NoteData(elements, state)
     }
 
-    private fun readV2(input: DataInputStream, hasLayout: Boolean, hasRotation: Boolean = false, hasStudy: Boolean = false, hasDoc: Boolean = false): NoteData {
+    private fun readV2(input: DataInputStream, hasLayout: Boolean, hasRotation: Boolean = false, hasStudy: Boolean = false, hasDoc: Boolean = false, hasGroup: Boolean = false): NoteData {
         val state = ViewState(input.readFloat(), input.readFloat(), input.readFloat(),
             if (hasRotation) input.readFloat() else 0f)
         val style = PageStyle.entries.getOrElse(input.readInt()) { PageStyle.DOTS }
@@ -320,6 +323,7 @@ object NoteStorage {
                         shadow = input.readBoolean(), locked = input.readBoolean(),
                         pdfPage = input.readInt(),
                         doc = if (hasDoc) input.readUTF() else "",
+                        ungrouped = hasGroup && input.readBoolean(),
                     ))
                 }
                 else -> throw IllegalStateException("tipo de elemento desconhecido")
