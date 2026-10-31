@@ -118,6 +118,9 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
 ### Áudio junto com a escrita
 - Menu ⋮ → **Gravar áudio com a escrita**. Cada traço feito durante a gravação guarda o
   momento do áudio.
+- **Modo leitor no PDF**: com a rolagem presa num documento, a tela desliza com inércia e para
+  no começo e no fim dele; uma barra de rolagem aparece ao mexer (some parada ou fora do PDF) e
+  dá para arrastar o polegar, com o balão da página.
 - **Rolagem presa em documentos** (⋮ › Ajustes, ligada): em cima de um PDF/PowerPoint ou das
   folhas, arrastar a tela só anda no sentido das páginas (descer torto não solta); um empurrão
   claro de ~110 dp para o lado solta.

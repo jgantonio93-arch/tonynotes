@@ -13,6 +13,7 @@ import android.graphics.Typeface
 import android.os.Build
 import android.os.SystemClock
 import android.view.MotionEvent
+import android.view.VelocityTracker
 import android.view.View
 import java.io.File
 import kotlin.math.abs
@@ -1780,6 +1781,8 @@ class InfiniteCanvasView(context: Context) : View(context) {
     }
 
     private fun onTouchEventInner(e: MotionEvent): Boolean {
+        // Barra de rolagem do documento (arrastar = rolagem rápida).
+        if (handleScrollbarDrag(e)) return true
         // Protetor de mão: em coordenadas da tela (antes de desgirar).
         if (handleGuardDrag(e)) return true
         markGuardTouches(e)
@@ -2179,6 +2182,10 @@ class InfiniteCanvasView(context: Context) : View(context) {
     private fun wy(sy: Float) = (sy - offsetY) / scale
 
     private fun onDown(e: MotionEvent) {
+        // Encostar na tela para a inércia da rolagem.
+        if (!scroller.isFinished) scroller.forceFinished(true)
+        velocity?.recycle()
+        velocity = VelocityTracker.obtain().also { it.addMovement(e) }
         activePointerId = e.getPointerId(0)
         maxPointers = 1
         maxTravel = 0f
@@ -2387,6 +2394,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
     private fun onMove(e: MotionEvent) {
         if (e.pointerCount > 0) maxTravel = max(maxTravel, hypot(e.getX(0) - downX, e.getY(0) - downY))
         if (gesture == Gesture.NAVIGATE) {
+            velocity?.addMovement(e)
             navigate(e)
             return
         }
@@ -2467,6 +2475,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
 
     private fun onUp(e: MotionEvent) {
         removeCallbacks(holdToStraighten)
+        if (gesture == Gesture.NAVIGATE) startReaderFling(e)
         if (gesture == Gesture.NAVIGATE && tool == Tool.SELECT && maxPointers == 1 &&
             max(maxTravel, hypot(e.x - downX, e.y - downY)) < 10f * density
         ) {
@@ -2784,6 +2793,197 @@ class InfiniteCanvasView(context: Context) : View(context) {
         return 0
     }
 
+    // ---- Modo leitor: inércia, limites e barra de rolagem ------------------------------------
+
+    private val scroller = android.widget.OverScroller(context)
+    private var velocity: VelocityTracker? = null
+    private var flingAxis = 0
+    private var flingLast = 0
+
+    /** Retângulo (mundo) do documento sob o centro da tela, ou null. */
+    private fun readerDoc(): PdfDoc? {
+        if (viewRotation != 0f) return null
+        val x = wx(width / 2f)
+        val y = wy(height / 2f)
+        val page = elements.lastOrNull { it is ImageElement && it.pdfPage > 0 && it.bounds.contains(x, y) } as? ImageElement ?: return null
+        return pdfDocuments().firstOrNull { d -> d.pages.any { it === page } }
+    }
+
+    private fun docRect(d: PdfDoc): RectF {
+        val r = RectF(d.pages[0].bounds)
+        for (p in d.pages) r.union(p.bounds)
+        return r
+    }
+
+    private fun readerDocRect(): RectF? = readerDoc()?.let { docRect(it) }
+
+    /** Eixo do documento: 1 vertical, 2 horizontal. */
+    private fun docAxis(d: PdfDoc, r: RectF = docRect(d)) = if (d.pages.size > 1 && r.width() > r.height()) 2 else 1
+
+    /** Limites do deslocamento no eixo para o documento [r] (folga de 40% da tela). */
+    private fun docBounds(r: RectF, axis: Int): Pair<Float, Float> {
+        val view = if (axis == 1) height.toFloat() else width.toFloat()
+        val slack = view * 0.4f
+        val start = if (axis == 1) r.top else r.left
+        val end = if (axis == 1) r.bottom else r.right
+        // offset máximo: o começo do documento no máximo [slack] abaixo do topo da tela.
+        val hi = slack - start * scale
+        val lo = view - slack - end * scale
+        return if (lo <= hi) lo to hi else hi to lo
+    }
+
+    private fun clampToDoc() {
+        val d = readerDoc() ?: return
+        val r = docRect(d)
+        val (lo, hi) = docBounds(r, lockAxis)
+        if (lockAxis == 1) offsetY = offsetY.coerceIn(lo, hi) else offsetX = offsetX.coerceIn(lo, hi)
+    }
+
+    private fun startReaderFling(e: MotionEvent) {
+        val vt = velocity ?: return
+        vt.addMovement(e)
+        vt.computeCurrentVelocity(1000)
+        val axis = lockAxis
+        velocity = null
+        val v = if (axis == 1) vt.yVelocity else if (axis == 2) vt.xVelocity else 0f
+        vt.recycle()
+        if (axis == 0 || abs(v) < 300f * density / 2f) return
+        val d = readerDoc() ?: return
+        val (lo, hi) = docBounds(docRect(d), axis)
+        val cur = (if (axis == 1) offsetY else offsetX).toInt()
+        flingAxis = axis
+        flingLast = cur
+        scroller.fling(0, cur, 0, v.toInt(), 0, 0, lo.toInt(), hi.toInt())
+        postInvalidateOnAnimation()
+    }
+
+    override fun computeScroll() {
+        if (flingAxis == 0 || !scroller.computeScrollOffset()) return
+        val y = scroller.currY
+        if (flingAxis == 1) offsetY = y.toFloat() else offsetX = y.toFloat()
+        flingLast = y
+        showScrollbar()
+        listener?.onStateChanged()
+        postInvalidateOnAnimation()
+        if (scroller.isFinished) flingAxis = 0
+    }
+
+    internal val flingingForTests get() = flingAxis != 0 && !scroller.isFinished
+
+    private var barShownAt = Long.MIN_VALUE / 2
+    private var barDrag = false
+    private var barGrab = 0f
+    internal val scrollbarVisibleForTests get() = docScrollLock && scrollbarAlpha() > 0f && readerDoc() != null
+
+    private fun showScrollbar() {
+        barShownAt = SystemClock.uptimeMillis()
+        invalidate()
+    }
+
+    private fun scrollbarAlpha(): Float {
+        if (barDrag) return 1f
+        val age = SystemClock.uptimeMillis() - barShownAt
+        return when {
+            age < BAR_SHOW_MS -> 1f
+            age < BAR_SHOW_MS + BAR_FADE_MS -> 1f - (age - BAR_SHOW_MS).toFloat() / BAR_FADE_MS
+            else -> 0f
+        }
+    }
+
+    private class Bar(val track: RectF, val thumb: RectF, val axis: Int, val doc: PdfDoc, val docRect: RectF)
+
+    /** Trilho e polegar da barra na tela (null: fora de documento). */
+    private fun scrollbarGeometry(): Bar? {
+        val d = readerDoc() ?: return null
+        val r = docRect(d)
+        val axis = docAxis(d, r)
+        val m = 10f * density
+        val thick = (if (barDrag) 10f else 6f) * density
+        val view = if (axis == 1) height.toFloat() else width.toFloat()
+        val docLen = (if (axis == 1) r.height() else r.width()) * scale
+        if (docLen <= 0f) return null
+        val visStart = -(if (axis == 1) offsetY + r.top * scale else offsetX + r.left * scale)
+        val trackLen = view - 2 * m
+        val thumbLen = (trackLen * view / docLen).coerceIn(36f * density, trackLen)
+        val frac = (visStart / (docLen - view).coerceAtLeast(1f)).coerceIn(0f, 1f)
+        val pos = m + (trackLen - thumbLen) * frac
+        return if (axis == 1) Bar(RectF(width - m - thick, m, width - m, height - m), RectF(width - m - thick, pos, width - m, pos + thumbLen), axis, d, r)
+        else Bar(RectF(m, height - m - thick, width - m, height - m), RectF(pos, height - m - thick, pos + thumbLen, height - m), axis, d, r)
+    }
+
+    internal fun scrollbarThumbForTests(): RectF? = scrollbarGeometry()?.thumb
+
+    private val barPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val barText = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; textAlign = Paint.Align.CENTER; typeface = Typeface.DEFAULT_BOLD }
+
+    private fun drawScrollbar(canvas: Canvas) {
+        if (!docScrollLock) return
+        val a = scrollbarAlpha()
+        if (a <= 0f) return
+        val b = scrollbarGeometry() ?: return
+        val rad = b.thumb.width().coerceAtMost(b.thumb.height()) / 2
+        barPaint.color = 0x22000000
+        barPaint.alpha = (0x22 * a).toInt()
+        canvas.drawRoundRect(b.track, rad, rad, barPaint)
+        barPaint.color = Ui.ACCENT
+        barPaint.alpha = (220 * a).toInt()
+        canvas.drawRoundRect(b.thumb, rad, rad, barPaint)
+        if (barDrag) {
+            // Balão com a página.
+            val vis = if (b.axis == 1) wy(height / 2f) else wx(width / 2f)
+            val page = b.doc.pages.minByOrNull { p -> abs((if (b.axis == 1) p.rect.centerY() else p.rect.centerX()) - vis) }
+            val text = "${page?.pdfPage ?: 1} / ${b.doc.total}"
+            barText.textSize = 14f * density
+            val w = barText.measureText(text) + 20f * density
+            val h = 30f * density
+            val cx = if (b.axis == 1) b.thumb.left - 12f * density - w / 2 else b.thumb.centerX()
+            val cy = if (b.axis == 1) b.thumb.centerY() else b.thumb.top - 12f * density - h / 2
+            val bubble = RectF(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2)
+            barPaint.color = 0xE0303036.toInt()
+            canvas.drawRoundRect(bubble, h / 2, h / 2, barPaint)
+            canvas.drawText(text, cx, cy - (barText.descent() + barText.ascent()) / 2, barText)
+        }
+        if (!barDrag) postInvalidateDelayed(32)
+    }
+
+    /** Arrastar o polegar da barra: vai a qualquer ponto do documento. */
+    private fun handleScrollbarDrag(e: MotionEvent): Boolean {
+        when (e.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                if (!docScrollLock || isPen(e, 0) || scrollbarAlpha() <= 0f) return false
+                val b = scrollbarGeometry() ?: return false
+                val grab = RectF(b.thumb).apply { inset(-28f * density, -12f * density) }
+                if (!grab.contains(e.x, e.y)) return false
+                if (!scroller.isFinished) scroller.forceFinished(true)
+                barDrag = true
+                barGrab = if (b.axis == 1) e.y - b.thumb.top else e.x - b.thumb.left
+                invalidate()
+                return true
+            }
+            MotionEvent.ACTION_MOVE -> if (barDrag) {
+                val b = scrollbarGeometry() ?: return true
+                val trackStart = if (b.axis == 1) b.track.top else b.track.left
+                val trackLen = if (b.axis == 1) b.track.height() else b.track.width()
+                val thumbLen = if (b.axis == 1) b.thumb.height() else b.thumb.width()
+                val pos = (if (b.axis == 1) e.y else e.x) - barGrab - trackStart
+                val frac = (pos / (trackLen - thumbLen).coerceAtLeast(1f)).coerceIn(0f, 1f)
+                val view = if (b.axis == 1) height.toFloat() else width.toFloat()
+                val docLen = (if (b.axis == 1) b.docRect.height() else b.docRect.width()) * scale
+                val visStart = frac * (docLen - view).coerceAtLeast(0f)
+                if (b.axis == 1) offsetY = -visStart - b.docRect.top * scale else offsetX = -visStart - b.docRect.left * scale
+                showScrollbar()
+                listener?.onStateChanged()
+                return true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> if (barDrag) {
+                barDrag = false
+                showScrollbar()
+                return true
+            }
+        }
+        return barDrag
+    }
+
     private fun navigate(e: MotionEvent) {
         val (fx, fy, span) = focus(e, -1)
         if (lockAxis != 0 && span > 10f) {
@@ -2810,12 +3010,16 @@ class InfiniteCanvasView(context: Context) : View(context) {
             val leak = along * SCROLL_LOCK_LEAK
             lockDrift = if (abs(lockDrift) <= leak) 0f else lockDrift - kotlin.math.sign(lockDrift) * leak
             if (abs(lockDrift) > SCROLL_LOCK_DP * density) {
-                if (lockAxis == 1) dx = lockDrift else dy = lockDrift
+                // Solta sem pulo: a tela passa a acompanhar o dedo a partir daqui.
                 lockAxis = 0
+                lockDrift = 0f
             }
         }
         offsetX += dx
         offsetY += dy
+        // Modo leitor: não passa do começo nem do fim do documento.
+        if (lockAxis != 0) clampToDoc()
+        if (docScrollLock && (lockAxis != 0 || readerDocRect() != null)) showScrollbar()
         lastFocusX = fx
         lastFocusY = fy
         lastSpan = span
@@ -2906,6 +3110,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
         // O protetor fica preso à tela (não gira com a nota).
         drawPalmGuard(canvas)
         drawTouches(canvas)
+        drawScrollbar(canvas)
     }
 
     /** Parte do mundo que aparece na tela: com a tela girada, envolve os 4 cantos. */
@@ -3358,6 +3563,9 @@ class InfiniteCanvasView(context: Context) : View(context) {
         private const val PALM_DRIFT_DP = 40f
         /** Quanto empurrar para o lado para soltar a rolagem presa (dp). */
         private const val SCROLL_LOCK_DP = 110f
+        /** Barra de rolagem: fica visível este tempo depois de parar e some neste fade. */
+        private const val BAR_SHOW_MS = 1200L
+        private const val BAR_FADE_MS = 300L
         /** Parte do movimento no sentido das páginas que desconta o desvio lateral. */
         private const val SCROLL_LOCK_LEAK = 0.6f
         private const val MIN_SCALE = 0.03f

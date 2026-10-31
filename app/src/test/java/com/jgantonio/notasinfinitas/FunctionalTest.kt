@@ -1857,9 +1857,10 @@ class FunctionalTest {
         val v2 = canvas.viewForTests.copyOf()
         assertEquals("rolagem longa não solta", v1[0], v2[0], 0.5f)
         assertEquals(v1[1] - 1500f, v2[1], 2f)
-        // Empurrão claro de 130 dp para o lado: solta e acompanha o dedo.
+        // Empurrão claro de 130 dp para o lado: solta e acompanha o dedo, sem pulo.
         drag(line(300f, 1400f, 300f + 130f * d, 1400f, 12), F)
-        assertEquals("X soltou", v2[0] + 130f * d, canvas.viewForTests[0], 2f)
+        val moved = canvas.viewForTests[0] - v2[0]
+        assertTrue("X soltou sem pulo: $moved", moved > 5f * d && moved < 130f * d - 20f)
     }
 
     @Test
@@ -1986,5 +1987,66 @@ class FunctionalTest {
         editor.showInsertMenuForTests()
         ShadowLooper.idleMainLooper()
         clickInDialog(text)
+    }
+
+    // ---- Modo leitor: limites, inércia e barra -------------------------------------------------
+
+    private fun docBottomOnScreen(): Float {
+        val pages = canvas.pdfDocuments()[0].pages
+        val v = canvas.viewForTests
+        return pages.maxOf { it.bounds.bottom } * v[2] + v[1]
+    }
+
+    @Test
+    fun leitor_para_no_fim_do_documento() {
+        pdfColumn()
+        repeat(6) { drag(line(540f, 1800f, 540f, 300f, 20), F) }
+        val b = docBottomOnScreen()
+        assertTrue("o fim do documento fica na tela: $b", b >= canvas.height * 0.6f - 2f && b <= canvas.height.toFloat())
+    }
+
+    @Test
+    fun leitor_continua_rolando_com_inercia() {
+        pdfColumn()
+        val down = time
+        val pts = line(540f, 1500f, 540f, 900f, 6)
+        canvas.dispatchTouchEvent(event(MotionEvent.ACTION_DOWN, listOf(pts[0]), F, down))
+        for (p in pts.drop(1)) canvas.dispatchTouchEvent(event(MotionEvent.ACTION_MOVE, listOf(p), F, down))
+        canvas.dispatchTouchEvent(event(MotionEvent.ACTION_UP, listOf(pts.last()), F, down))
+        val y0 = canvas.viewForTests[1]
+        assertTrue("inércia começou", canvas.flingingForTests)
+        repeat(20) {
+            org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofMillis(16))
+            canvas.computeScroll()
+        }
+        assertTrue("andou além do dedo", canvas.viewForTests[1] < y0 - 50f)
+        // Encostar para a inércia.
+        val y1 = canvas.viewForTests[1]
+        canvas.dispatchTouchEvent(event(MotionEvent.ACTION_DOWN, listOf(540f to 1000f), F, time))
+        org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofMillis(100))
+        canvas.computeScroll()
+        assertEquals(y1, canvas.viewForTests[1], 0.5f)
+        canvas.dispatchTouchEvent(event(MotionEvent.ACTION_UP, listOf(540f to 1000f), F, time))
+    }
+
+    @Test
+    fun barra_aparece_ao_rolar_some_parada_e_arrasta_ate_o_fim() {
+        pdfColumn()
+        assertTrue(!canvas.scrollbarVisibleForTests)
+        drag(line(540f, 1400f, 540f, 1300f, 5), F)
+        assertTrue("aparece ao rolar", canvas.scrollbarVisibleForTests)
+        org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofSeconds(2))
+        assertTrue("some parada", !canvas.scrollbarVisibleForTests)
+        // Arrasta o polegar até o fim: a última página aparece.
+        drag(line(540f, 1400f, 540f, 1350f, 3), F)
+        val t = canvas.scrollbarThumbForTests()!!
+        drag(line(t.centerX(), t.centerY(), t.centerX(), canvas.height - 5f, 10), F)
+        val b = docBottomOnScreen()
+        assertTrue("fim do documento na tela: $b", b <= canvas.height + 2f)
+        // Saindo do PDF, a barra some.
+        drag(line(100f, 1000f, 1000f, 1000f, 12), F)
+        drag(line(100f, 1000f, 1000f, 1000f, 12), F)
+        drag(line(100f, 1000f, 1000f, 1000f, 12), F)
+        assertTrue("fora do PDF não aparece", !canvas.scrollbarVisibleForTests)
     }
 }
