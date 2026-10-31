@@ -13,7 +13,6 @@ import android.graphics.Typeface
 import android.os.Build
 import android.os.SystemClock
 import android.view.MotionEvent
-import android.view.VelocityTracker
 import android.view.View
 import java.io.File
 import kotlin.math.abs
@@ -2183,9 +2182,8 @@ class InfiniteCanvasView(context: Context) : View(context) {
 
     private fun onDown(e: MotionEvent) {
         // Encostar na tela para a inércia da rolagem.
-        if (!scroller.isFinished) scroller.forceFinished(true)
-        velocity?.recycle()
-        velocity = VelocityTracker.obtain().also { it.addMovement(e) }
+        stopFling()
+        trackReset()
         activePointerId = e.getPointerId(0)
         maxPointers = 1
         maxTravel = 0f
@@ -2394,8 +2392,8 @@ class InfiniteCanvasView(context: Context) : View(context) {
     private fun onMove(e: MotionEvent) {
         if (e.pointerCount > 0) maxTravel = max(maxTravel, hypot(e.getX(0) - downX, e.getY(0) - downY))
         if (gesture == Gesture.NAVIGATE) {
-            velocity?.addMovement(e)
             navigate(e)
+            if (lockAxis != 0) trackAdd(e.eventTime, if (lockAxis == 1) offsetY else offsetX) else trackReset()
             return
         }
         val idx = e.findPointerIndex(activePointerId)
@@ -2795,10 +2793,40 @@ class InfiniteCanvasView(context: Context) : View(context) {
 
     // ---- Modo leitor: inércia, limites e barra de rolagem ------------------------------------
 
-    private val scroller = android.widget.OverScroller(context)
-    private var velocity: VelocityTracker? = null
+    // Inércia própria (sem depender do VelocityTracker): últimos pontos do dedo e um
+    // deslizamento que freia exponencialmente.
+    private val trackT = LongArray(8)
+    private val trackP = FloatArray(8)
+    private var trackN = 0
     private var flingAxis = 0
-    private var flingLast = 0
+    private var flingV = 0f
+    private var flingTime = 0L
+    private var flingLo = 0f
+    private var flingHi = 0f
+
+    private fun trackReset() { trackN = 0 }
+
+    private fun trackAdd(t: Long, p: Float) {
+        if (trackN == trackT.size) {
+            System.arraycopy(trackT, 1, trackT, 0, trackN - 1)
+            System.arraycopy(trackP, 1, trackP, 0, trackN - 1)
+            trackN--
+        }
+        trackT[trackN] = t; trackP[trackN] = p; trackN++
+    }
+
+    /** Velocidade (px/s) dos últimos ~100 ms. */
+    private fun trackVelocity(): Float {
+        if (trackN < 2) return 0f
+        val tEnd = trackT[trackN - 1]
+        var i = trackN - 1
+        while (i > 0 && tEnd - trackT[i - 1] <= 100) i--
+        if (i == trackN - 1) i = trackN - 2
+        val dt = (tEnd - trackT[i]).coerceAtLeast(1)
+        return (trackP[trackN - 1] - trackP[i]) * 1000f / dt
+    }
+
+    private fun stopFling() { flingAxis = 0 }
 
     /** Retângulo (mundo) do documento sob o centro da tela, ou null. */
     private fun readerDoc(): PdfDoc? {
@@ -2840,35 +2868,42 @@ class InfiniteCanvasView(context: Context) : View(context) {
     }
 
     private fun startReaderFling(e: MotionEvent) {
-        val vt = velocity ?: return
-        vt.addMovement(e)
-        vt.computeCurrentVelocity(1000)
         val axis = lockAxis
-        velocity = null
-        val v = if (axis == 1) vt.yVelocity else if (axis == 2) vt.xVelocity else 0f
-        vt.recycle()
-        if (axis == 0 || abs(v) < 300f * density / 2f) return
+        // Dedo parado antes de soltar: sem inércia.
+        val v = if (trackN > 0 && e.eventTime - trackT[trackN - 1] > 80) 0f else trackVelocity()
+        trackReset()
+        if (axis == 0 || abs(v) < 150f * density) return
         val d = readerDoc() ?: return
         val (lo, hi) = docBounds(docRect(d), axis)
-        val cur = (if (axis == 1) offsetY else offsetX).toInt()
         flingAxis = axis
-        flingLast = cur
-        scroller.fling(0, cur, 0, v.toInt(), 0, 0, lo.toInt(), hi.toInt())
+        flingV = v.coerceIn(-12000f * density / 3f, 12000f * density / 3f)
+        flingLo = lo
+        flingHi = hi
+        flingTime = SystemClock.uptimeMillis()
         postInvalidateOnAnimation()
     }
 
     override fun computeScroll() {
-        if (flingAxis == 0 || !scroller.computeScrollOffset()) return
-        val y = scroller.currY
-        if (flingAxis == 1) offsetY = y.toFloat() else offsetX = y.toFloat()
-        flingLast = y
+        if (flingAxis == 0) return
+        val now = SystemClock.uptimeMillis()
+        val dt = ((now - flingTime).coerceIn(0, 100)) / 1000f
+        flingTime = now
+        if (dt <= 0f) { postInvalidateOnAnimation(); return }
+        // Freia como num leitor: perde ~95% da velocidade por segundo.
+        val decay = kotlin.math.exp(-dt / FLING_TAU)
+        val move = flingV * FLING_TAU * (1f - decay)
+        flingV *= decay
+        val cur = if (flingAxis == 1) offsetY else offsetX
+        val next = (cur + move).coerceIn(flingLo, flingHi)
+        if (flingAxis == 1) offsetY = next else offsetX = next
+        if (next == flingLo || next == flingHi || abs(flingV) < 40f * density) flingAxis = 0
         showScrollbar()
         listener?.onStateChanged()
-        postInvalidateOnAnimation()
-        if (scroller.isFinished) flingAxis = 0
+        invalidate()
+        if (flingAxis != 0) postInvalidateOnAnimation()
     }
 
-    internal val flingingForTests get() = flingAxis != 0 && !scroller.isFinished
+    internal val flingingForTests get() = flingAxis != 0
 
     private var barShownAt = Long.MIN_VALUE / 2
     private var barDrag = false
@@ -2954,7 +2989,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
                 val b = scrollbarGeometry() ?: return false
                 val grab = RectF(b.thumb).apply { inset(-28f * density, -12f * density) }
                 if (!grab.contains(e.x, e.y)) return false
-                if (!scroller.isFinished) scroller.forceFinished(true)
+                stopFling()
                 barDrag = true
                 barGrab = if (b.axis == 1) e.y - b.thumb.top else e.x - b.thumb.left
                 invalidate()
@@ -3566,6 +3601,8 @@ class InfiniteCanvasView(context: Context) : View(context) {
         /** Barra de rolagem: fica visível este tempo depois de parar e some neste fade. */
         private const val BAR_SHOW_MS = 1200L
         private const val BAR_FADE_MS = 300L
+        /** Constante de tempo da inércia (s): maior = desliza mais. */
+        private const val FLING_TAU = 0.33f
         /** Parte do movimento no sentido das páginas que desconta o desvio lateral. */
         private const val SCROLL_LOCK_LEAK = 0.6f
         private const val MIN_SCALE = 0.03f
