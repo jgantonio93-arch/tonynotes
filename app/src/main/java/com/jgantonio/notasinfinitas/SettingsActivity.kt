@@ -82,7 +82,7 @@ class SettingsActivity : Activity() {
             lateinit var styleValue: TextView
             styleValue = choice(Icon.PAGE, "Tipo de página", { prefs.defaultStyle.label }) {
                 actionSheet("Tipo de página", PageStyle.entries.map { st ->
-                    SheetItem(if (st == prefs.defaultStyle) Icon.CHECK else Icon.PAGE, st.label) {
+                    Ui.SheetItem(if (st == prefs.defaultStyle) Icon.CHECK else Icon.PAGE, st.label) {
                         prefs.defaultStyle = st
                         styleValue.text = st.label
                     }
@@ -92,7 +92,7 @@ class SettingsActivity : Activity() {
             fun paperName() = Panels.PAPER_COLORS.firstOrNull { it.second == prefs.defaultPaper }?.first ?: "Personalizada"
             paperValue = choice(Icon.PALETTE, "Cor do papel", ::paperName) {
                 actionSheet("Cor do papel", Panels.PAPER_COLORS.map { (name, col) ->
-                    SheetItem(if (col == prefs.defaultPaper) Icon.CHECK else Icon.PALETTE, name) {
+                    Ui.SheetItem(if (col == prefs.defaultPaper) Icon.CHECK else Icon.PALETTE, name) {
                         prefs.defaultPaper = col
                         paperValue.text = name
                     }
@@ -143,7 +143,7 @@ class SettingsActivity : Activity() {
             guardValue = choice(Icon.PAGE, "Protetor de mão", ::guardName) {
                 actionSheet("Protetor de mão", listOf("off" to "Desligado", "bottom" to "Faixa embaixo (horizontal)",
                     "side" to "Faixa na lateral (vertical)", "free" to "Ilha livre (arraste e mude o tamanho)").map { (k, n) ->
-                    SheetItem(if (prefs.palmGuardMode == k) Icon.CHECK else Icon.PAGE, n) {
+                    Ui.SheetItem(if (prefs.palmGuardMode == k) Icon.CHECK else Icon.PAGE, n) {
                         prefs.palmGuardMode = k
                         guardValue.text = guardName()
                     }
