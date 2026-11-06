@@ -19,7 +19,7 @@ enum class Icon {
     ROTATE, LOCK, UNLOCK, CROP, FLIP_H, FLIP_V, ADJUST, TO_FRONT, TO_BACK, DOWNLOAD, RESET, ZOOM, SELECT_ALL,
     SEARCH, MARKER, ALIGN_LEFT, ALIGN_CENTER, ALIGN_RIGHT, TEXT_BIGGER, TEXT_SMALLER,
     RECT_SELECT, PARTIAL, STRAIGHT, GRIP, INFINITE, PAGES_V, PAGES_H, DOCK_TOP, DOCK_LEFT, DOCK_RIGHT,
-    SUN, MOON, THEME_AUTO, PAGE_PORTRAIT, PAGE_LANDSCAPE, FULLSCREEN, FULLSCREEN_EXIT, MIC, EYEDROPPER, BUCKET, TAPE, BOOKMARK, CARDS, RULER, SLIDES, CONTENTS, PLAY, PAUSE, MINIMIZE, CAMERA
+    SUN, MOON, THEME_AUTO, PAGE_PORTRAIT, PAGE_LANDSCAPE, FULLSCREEN, FULLSCREEN_EXIT, MIC, EYEDROPPER, BUCKET, TAPE, BOOKMARK, CARDS, RULER, SLIDES, CONTENTS, PLAY, PAUSE, MINIMIZE, CAMERA, SETTINGS
 }
 
 /** Rótulo em português para leitores de tela (botões só com ícone). */
@@ -45,7 +45,7 @@ val Icon.label: String
         Icon.TEXT_BIGGER -> "Aumentar"; Icon.TEXT_SMALLER -> "Diminuir"
         Icon.FULLSCREEN -> "Tela cheia"; Icon.FULLSCREEN_EXIT -> "Sair da tela cheia"; Icon.MIC -> "Áudio"
         Icon.EYEDROPPER -> "Conta-gotas"; Icon.BUCKET -> "Balde"
-        Icon.TAPE -> "Fita para esconder"; Icon.BOOKMARK -> "Marcadores"; Icon.CARDS -> "Cartões"; Icon.RULER -> "Régua"; Icon.SLIDES -> "PowerPoint"; Icon.CONTENTS -> "Sumário"; Icon.PLAY -> "Tocar"; Icon.PAUSE -> "Pausar"; Icon.MINIMIZE -> "Minimizar"; Icon.CAMERA -> "Câmera"
+        Icon.TAPE -> "Fita para esconder"; Icon.BOOKMARK -> "Marcadores"; Icon.CARDS -> "Cartões"; Icon.RULER -> "Régua"; Icon.SLIDES -> "PowerPoint"; Icon.CONTENTS -> "Sumário"; Icon.PLAY -> "Tocar"; Icon.PAUSE -> "Pausar"; Icon.MINIMIZE -> "Minimizar"; Icon.CAMERA -> "Câmera"; Icon.SETTINGS -> "Configurações"
     }
 
 class IconDrawable(
@@ -282,6 +282,26 @@ class IconDrawable(
                 arcTo(RectF(4f, 4f, 20f, 20f), 200f, -290f, true)
                 moveTo(3.5f, 4.5f); lineTo(4.4f, 9.4f); lineTo(9.2f, 8.4f)
             }, stroke)
+            Icon.SETTINGS -> {
+                // Engrenagem: 8 dentes em volta de um círculo.
+                c.drawPath(path {
+                    for (k in 0 until 8) {
+                        val a = Math.toRadians(k * 45.0)
+                        val a1 = a - 0.22
+                        val a2 = a + 0.22
+                        val ri = 7.2
+                        val ro = 9.6
+                        val p1x = 12 + ri * kotlin.math.cos(a1 - 0.18); val p1y = 12 + ri * kotlin.math.sin(a1 - 0.18)
+                        val p2x = 12 + ro * kotlin.math.cos(a1); val p2y = 12 + ro * kotlin.math.sin(a1)
+                        val p3x = 12 + ro * kotlin.math.cos(a2); val p3y = 12 + ro * kotlin.math.sin(a2)
+                        val p4x = 12 + ri * kotlin.math.cos(a2 + 0.18); val p4y = 12 + ri * kotlin.math.sin(a2 + 0.18)
+                        if (k == 0) moveTo(p1x.toFloat(), p1y.toFloat()) else lineTo(p1x.toFloat(), p1y.toFloat())
+                        lineTo(p2x.toFloat(), p2y.toFloat()); lineTo(p3x.toFloat(), p3y.toFloat()); lineTo(p4x.toFloat(), p4y.toFloat())
+                    }
+                    close()
+                }, stroke)
+                c.drawCircle(12f, 12f, 3.2f, stroke)
+            }
             Icon.CAMERA -> {
                 c.drawPath(path {
                     moveTo(3.5f, 8.5f); quadTo(3.5f, 7f, 5f, 7f); lineTo(7.5f, 7f); lineTo(9f, 4.8f); lineTo(15f, 4.8f)

@@ -132,6 +132,13 @@ class FoldersActivity : Activity() {
         if (savedInstanceState == null && folderId == null) {
             sharedUris(intent).takeIf { it.isNotEmpty() }?.let { uris -> root.post { handleShared(uris) } }
         }
+        if (savedInstanceState == null && intent.getBooleanExtra(EXTRA_OPEN_BACKUP, false)) root.post { backupMenu() }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_OPEN_BACKUP, false)) backupMenu()
+        else if (folderId == null) sharedUris(intent).takeIf { it.isNotEmpty() }?.let { handleShared(it) }
     }
 
     override fun onResume() {
@@ -196,7 +203,9 @@ class FoldersActivity : Activity() {
             }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             brand.addView(iconButton(Icon.DOWNLOAD, Ui.MUTED, 40f, "Importar do Samsung Notes") { samsungImportHelp() })
             brand.addView(iconButton(Icon.EXPORT, Ui.MUTED, 40f, "Backup no Google Drive") { backupMenu() })
-            brand.addView(iconButton(if (Ui.isDark) Icon.MOON else Icon.SUN, Ui.MUTED, 40f, "Tema") { Ui.showThemeMenu(this) })
+            brand.addView(iconButton(Icon.SETTINGS, Ui.MUTED, 40f, "Configurações") {
+                startActivity(Intent(this, SettingsActivity::class.java))
+            })
             head.addView(brand)
             head.addView(title("Suas pastas", 40f).apply { setPadding(0, dpi(4f), 0, dpi(2f)) })
             homeCount = label("", 14f)
@@ -617,12 +626,11 @@ class FoldersActivity : Activity() {
         }
         val fid = folderId ?: return
         if (requestCode != REQ_PDF) return
-        // Nota nova com o nome do arquivo; o editor importa as páginas ao abrir.
-        val title = (PdfImporter.displayName(this, uri) ?: "PDF").removeSuffix(".pdf").removeSuffix(".PDF")
-        val n = Library.createNote(fid, title)
-        startActivity(Intent(this, EditorActivity::class.java)
-            .putExtra(EditorActivity.EXTRA_NOTE, n.id)
-            .putExtra(EditorActivity.EXTRA_PDF, uri.toString())
+        // O mesmo painel do Compartilhar: nome, pasta (esta) e como abrir o PDF.
+        startActivity(Intent(this, ImportActivity::class.java)
+            .setAction(Intent.ACTION_VIEW)
+            .setDataAndType(uri, "application/pdf")
+            .putExtra(ImportActivity.EXTRA_FOLDER, fid)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
     }
 
@@ -1227,6 +1235,8 @@ class FoldersActivity : Activity() {
 
     companion object {
         const val EXTRA_FOLDER = "folder"
+        /** Abrir direto a tela de Backup (atalho das Configurações). */
+        const val EXTRA_OPEN_BACKUP = "open_backup"
         private const val REQ_PDF = 51
         private const val REQ_COVER = 52
         private const val REQ_BACKUP_NOW = 53

@@ -22,6 +22,10 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
 - As notas aparecem com miniatura e data da última alteração.
 - **Capa da pasta**: segure a pasta → **Colocar imagem na capa** (galeria ou arquivos).
   A imagem aparece no cartão e no topo da pasta; dá para trocar ou tirar.
+- **Configurações** (engrenagem no topo): predefinições das notas novas (tipo de página,
+  cor do papel, tela infinita ou folhas, em pé/deitada), como abrir PDF (perguntar, páginas
+  do PDF ou tela infinita), arranjo e agrupamento das páginas, caneta e toque, tema,
+  barra de ferramentas, backup e versão.
 
 ### Etiquetas, favoritas e fixadas
 - Segure uma nota → **Fixar no topo**, **Favoritar** ou **Etiquetas** (separadas por vírgula).
@@ -148,6 +152,10 @@ As capturas em `docs/screenshots` são geradas pelo CI (Robolectric) a cada muda
   (fica alguns segundos e desaparece). Nada disso entra na nota.
 
 ### Imagens e PDF
+- **Abrir/encaminhar PDF**: aparece o painel **Abrir no RosaNotes** (nome, pasta e
+  **Páginas do PDF** ou **Tela infinita**). Em *Páginas do PDF* cada página vira uma folha do
+  tamanho dela, e a contagem/exportação sai com o mesmo número de páginas. Dá para trocar
+  depois em ⋮ › Página › Documento (a escrita em cima de cada página vai junto).
 - **Foto da câmera** (Inserir): abre a câmera e a foto entra na nota já em pé (as fotos da
   galeria também respeitam a rotação do EXIF).
 - Toque na imagem com a seleção: girar livre (com ímã nos ângulos retos), recortar

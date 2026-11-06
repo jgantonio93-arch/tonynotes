@@ -33,6 +33,12 @@ object Updates {
     /** A versão publicada é mais nova que a instalada? Builds locais (0) nunca avisam. */
     fun isNewer(remote: Int?, local: Int): Boolean = local > 0 && remote != null && remote > local
 
+    /** "Procurar atualização" nas Configurações: confere de novo agora. */
+    fun checkNow(activity: Activity) {
+        checked = false
+        check(activity)
+    }
+
     fun check(activity: Activity) {
         if (checked || BuildConfig.BUILD_NUMBER <= 0) return
         checked = true

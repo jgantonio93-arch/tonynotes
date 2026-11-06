@@ -320,9 +320,15 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
 
         val saved = NoteStorage.load(Library.noteFile(note.id))
         if (saved != null) canvasView.load(saved)
-        else PageLayout.decodePref(prefs.defaultPageLayout)?.takeIf { it.paged }?.let { l ->
-            // Nota nova: começa no último modo de página escolhido.
-            canvasView.setPageLayout(true, l.horizontal, l.landscape, l.endless, 1)
+        else {
+            // Nota nova: tipo de página e papel das Configurações.
+            canvasView.pageStyle = prefs.defaultStyle
+            canvasView.paperColor = prefs.defaultPaper
+            // Abrindo um PDF como nota, o modo vem da escolha feita ao abrir.
+            val pdfMode = intent.getStringExtra(EXTRA_PDF_MODE)
+            if (pdfMode == null) PageLayout.decodePref(prefs.defaultPageLayout)?.takeIf { it.paged }?.let { l ->
+                canvasView.setPageLayout(true, l.horizontal, l.landscape, l.endless, 1)
+            }
         }
         layoutDock()
         if (prefs.fullscreen) setFullscreen(true)
@@ -334,12 +340,14 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             intent.removeExtra(EXTRA_PDF)
             // Espera a tela ter tamanho para enquadrar as páginas.
             val name = intent.getStringExtra(EXTRA_DOC_NAME)
-            canvasView.post { importPdf(Uri.parse(u), PdfImporter.Layout.VERTICAL, docName = name) }
+            val sheets = intent.getStringExtra(EXTRA_PDF_MODE) == "pages"
+            canvasView.post { importPdf(Uri.parse(u), PdfImporter.Layout.VERTICAL, docName = name, asSheets = sheets) }
         }
         intent.getStringExtra(EXTRA_PPTX)?.let { u ->
             intent.removeExtra(EXTRA_PPTX)
             val name = intent.getStringExtra(EXTRA_DOC_NAME)
-            canvasView.post { importPdf(Uri.parse(u), PdfImporter.Layout.VERTICAL, slides = true, docName = name) }
+            val sheets = intent.getStringExtra(EXTRA_PDF_MODE) == "pages"
+            canvasView.post { importPdf(Uri.parse(u), PdfImporter.Layout.VERTICAL, slides = true, docName = name, asSheets = sheets) }
         }
     }
 
@@ -2066,12 +2074,14 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
     /** Pergunta como organizar as páginas e importa. */
     private fun askPdfLayout(uri: Uri, slides: Boolean = false) {
         val name = PdfImporter.displayName(this, uri) ?: if (slides) "Apresentação" else "PDF"
-        var layout = PdfImporter.Layout.VERTICAL
+        var layout = PdfImporter.Layout.entries.getOrElse(prefs.pdfArrange) { PdfImporter.Layout.VERTICAL }
         Ui.run {
             sheet(if (slides) "Importar PowerPoint" else "Importar PDF") { box, dialog ->
                 box.addView(label(name, 14f).apply { setPadding(0, 0, 0, dpi(12f)) })
                 box.addView(label(if (slides) "Como organizar os slides?" else "Como organizar as páginas?", 15f, Ui.INK))
-                box.addView(segmented(PdfImporter.Layout.entries.map { it.label }, 0) { i ->
+                if (canvasView.pageLayout.hasPages) {
+                    box.addView(label("A nota está em folhas: cada página entra numa folha nova, do tamanho dela.", 14f, Ui.INK))
+                } else box.addView(segmented(PdfImporter.Layout.entries.map { it.label }, layout.ordinal) { i ->
                     layout = PdfImporter.Layout.entries[i]
                 }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                     topMargin = dpi(10f)
@@ -2086,7 +2096,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         }
     }
 
-    private fun importPdf(uri: Uri, layout: PdfImporter.Layout, slides: Boolean = false, docName: String? = null) {
+    private fun importPdf(uri: Uri, layout: PdfImporter.Layout, slides: Boolean = false, docName: String? = null, asSheets: Boolean = false) {
         val doc = docName ?: PdfImporter.displayName(this, uri) ?: if (slides) "Apresentação" else "PDF"
         var cancelled = false
         lateinit var status: TextView
@@ -2142,7 +2152,10 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             main.post {
                 if (dialog.isShowing) dialog.dismiss()
                 if (!result.isNullOrEmpty()) {
-                    canvasView.addPages(PdfImporter.layout(result, layout, x0, y0, doc))
+                    val pages = PdfImporter.layout(result, if (asSheets) PdfImporter.Layout.VERTICAL else layout, x0, y0, doc)
+                        .map { if (prefs.pdfGrouped) it else it.with(ungrouped = true) }
+                    // "Páginas do PDF" (ou nota já em folhas): uma folha por página, do tamanho dela.
+                    if (asSheets || canvasView.pageLayout.hasPages) canvasView.addPdfAsSheets(pages) else canvasView.addPages(pages)
                     if (slides) toast((if (result.size == 1) "1 slide importado" else "${result.size} slides importados") +
                         if (viaGoogle) "" else ". Aberto no modo offline: o visual pode ficar um pouco diferente.")
                     else toast(if (result.size == 1) "1 página importada" else "${result.size} páginas importadas")
@@ -2775,6 +2788,8 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         const val EXTRA_PDF = "pdf"
         const val EXTRA_PPTX = "pptx"
         const val EXTRA_DOC_NAME = "doc_name"
+        /** "pages" (páginas do PDF como folhas) ou "infinite" (tela infinita). */
+        const val EXTRA_PDF_MODE = "pdf_mode"
         private const val REQ_IMAGE = 41
         private const val REQ_REPLACE = 42
         private const val REQ_PDF = 43

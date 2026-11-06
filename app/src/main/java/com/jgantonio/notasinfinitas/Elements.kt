@@ -706,6 +706,8 @@ object Geometry {
 sealed class Op {
     class Insert(val index: Int, val element: Element) : Op()
     class Remove(val index: Int, val element: Element) : Op()
+    /** Troca do arranjo de folhas (para desfazer junto com as páginas que mudaram de lugar). */
+    class Layout(val before: PageLayout, val after: PageLayout) : Op()
 }
 
 /** Uma ação do usuário = sequência de operações. Desfazer aplica o inverso, de trás para frente. */
@@ -714,6 +716,7 @@ class EditAction(val ops: List<Op>) {
         for (op in ops) when (op) {
             is Op.Insert -> list.add(op.index.coerceIn(0, list.size), op.element)
             is Op.Remove -> list.remove(op.element)
+            is Op.Layout -> Unit
         }
     }
 
@@ -721,6 +724,7 @@ class EditAction(val ops: List<Op>) {
         for (op in ops.asReversed()) when (op) {
             is Op.Insert -> list.remove(op.element)
             is Op.Remove -> list.add(op.index.coerceIn(0, list.size), op.element)
+            is Op.Layout -> Unit
         }
     }
 }

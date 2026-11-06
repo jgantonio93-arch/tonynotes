@@ -287,6 +287,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
         cancelCrop()
         clearSelection()
         action.undo(elements)
+        action.ops.filterIsInstance<Op.Layout>().firstOrNull()?.let { pageLayout = it.before; pageCountCache = -1 }
         redoStack.add(action)
         changed()
     }
@@ -297,6 +298,7 @@ class InfiniteCanvasView(context: Context) : View(context) {
         cancelCrop()
         clearSelection()
         action.redo(elements)
+        action.ops.filterIsInstance<Op.Layout>().lastOrNull()?.let { pageLayout = it.after; pageCountCache = -1 }
         undoStack.add(action)
         changed()
     }
@@ -428,6 +430,117 @@ class InfiniteCanvasView(context: Context) : View(context) {
         scale = fit
         offsetX = width / 2f - r.centerX() * scale
         offsetY = max(96f * density, height / 2f - r.height() * scale / 2f) - r.top * scale
+        invalidate()
+        listener?.onStateChanged()
+    }
+
+    // ---- Páginas do PDF como folhas ----------------------------------------------------------
+
+    /** Página encaixada (centrada e reduzida se preciso) na folha [r]. */
+    private fun fitIntoSheet(p: ImageElement, r: RectF): ImageElement {
+        val s = min(r.width() / p.rect.width(), r.height() / p.rect.height())
+        val w = p.rect.width() * s
+        val h = p.rect.height() * s
+        return p.with(rect = RectF(r.centerX() - w / 2, r.centerY() - h / 2, r.centerX() + w / 2, r.centerY() + h / 2), shadow = false)
+    }
+
+    /**
+     * Modo "Páginas do PDF": cada página vira uma folha do tamanho dela, na mesma quantidade.
+     * Numa nota que já tem folhas, as páginas entram em folhas novas depois do conteúdo.
+     */
+    fun addPdfAsSheets(pages: List<ImageElement>) {
+        if (pages.isEmpty()) return
+        val l = pageLayout
+        val content = contentBounds()
+        val first = pages[0].rect
+        val start: Int
+        val base: PageLayout
+        if (l.hasPages) {
+            start = if (content == null) 0 else (l.indexAt(content.right - 0.5f, content.bottom - 0.5f) + 1).coerceAtLeast(0)
+            base = l
+        } else {
+            start = 0
+            base = PageLayout(true, false, first.width() > first.height(), false, 1, first.width(), first.height(),
+                content?.left ?: 0f, content?.let { it.bottom + 200f } ?: 0f)
+        }
+        val placed = pages.mapIndexed { k, p -> fitIntoSheet(p, base.pageRect(start + k)) }
+        val newLayout = if (base.endless && l.hasPages) base else base.copy(paged = true, endless = false,
+            count = max(if (l.hasPages) base.count else 0, start + pages.size).coerceIn(1, MAX_PAGES))
+        begin()
+        placed.forEachIndexed { i, p -> insertAt(i, p) }
+        recording?.add(Op.Layout(l, newLayout))
+        commit()
+        pageLayout = newLayout
+        pageCountCache = -1
+        dirty = true
+        fitToPage(start)
+        invalidate()
+        listener?.onStateChanged()
+    }
+
+    /** As folhas da nota são as páginas do PDF? */
+    val isPdfSheetMode: Boolean
+        get() {
+            val l = pageLayout
+            if (!l.hasPages) return false
+            val pages = elements.filterIsInstance<ImageElement>().filter { it.pdfPage > 0 }
+            return pages.isNotEmpty() && pages.all { p -> l.pageRect(l.indexAt(p.rect.centerX(), p.rect.centerY())).contains(p.rect.centerX(), p.rect.centerY()) }
+        }
+
+    /**
+     * Troca entre "Páginas do PDF" (cada página na sua folha, levando junto o que foi escrito
+     * em cima dela) e "Tela infinita" (as folhas somem, nada se move).
+     */
+    fun setDocumentMode(pdfPages: Boolean) {
+        if (!pdfPages) {
+            if (pageLayout.hasPages) {
+                val before = pageLayout
+                pageLayout = pageLayout.copy(paged = false)
+                pushAction(EditAction(listOf(Op.Layout(before, pageLayout))))
+                pageCountCache = -1
+                dirty = true
+                invalidate()
+                listener?.onStateChanged()
+            }
+            return
+        }
+        val pages = pdfDocuments().flatMap { it.pages }
+        if (pages.isEmpty()) return
+        val first = pages[0].rect
+        val layout = PageLayout(true, false, first.width() > first.height(), false, pages.size.coerceAtMost(MAX_PAGES),
+            first.width(), first.height(), first.left, first.top)
+        // O que está em cima de cada página vai junto com ela.
+        val moves = HashMap<Element, Transform>()
+        pages.forEachIndexed { i, p ->
+            val target = fitIntoSheet(p, layout.pageRect(i)).rect
+            val sc = target.width() / p.rect.width()
+            val t = Transform(scale = sc, ox = p.rect.left, oy = p.rect.top, dx = target.left - p.rect.left, dy = target.top - p.rect.top)
+            moves[p] = t
+            for (e in elements) {
+                if (e is ImageElement && e.pdfPage > 0) continue
+                val b = e.bounds
+                if (e !in moves && p.rect.contains(b.centerX(), b.centerY())) moves[e] = t
+            }
+        }
+        val pairs = moves.mapNotNull { (e, t) ->
+            val n = if (e is ImageElement && e.pdfPage > 0) fitIntoSheet(e, layout.pageRect(pages.indexOf(e))) else e.transformed(t)
+            if (n === e) null else e to n
+        }
+        val before = pageLayout
+        begin()
+        for ((old, new) in pairs) {
+            val i = elements.indexOf(old)
+            if (i < 0) continue
+            removeAt(i)
+            insertAt(i, new)
+        }
+        recording?.add(Op.Layout(before, layout))
+        commit()
+        pageLayout = layout
+        pageCountCache = -1
+        dirty = true
+        clearSelection()
+        fitToPage(0)
         invalidate()
         listener?.onStateChanged()
     }

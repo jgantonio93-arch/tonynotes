@@ -118,6 +118,30 @@ class PenPrefs(context: Context) {
         get() = sp.getBoolean("doc_scroll_lock", true)
         set(v) = sp.edit().putBoolean("doc_scroll_lock", v).apply()
 
+    /** Notas novas: tipo de página e cor do papel. */
+    var defaultStyle: PageStyle
+        get() = PageStyle.entries.firstOrNull { it.name == sp.getString("default_style", null) } ?: PageStyle.DOTS
+        set(v) = sp.edit().putString("default_style", v.name).apply()
+
+    var defaultPaper: Int
+        get() = sp.getInt("default_paper", Color.WHITE)
+        set(v) = sp.edit().putInt("default_paper", v).apply()
+
+    /** Abrir/encaminhar PDF: "ask" (perguntar), "pages" (páginas do PDF) ou "infinite". */
+    var pdfOpenMode: String
+        get() = sp.getString("pdf_open_mode", "ask") ?: "ask"
+        set(v) = sp.edit().putString("pdf_open_mode", v).apply()
+
+    /** Arranjo das páginas ao inserir PDF numa nota de tela infinita. */
+    var pdfArrange: Int
+        get() = sp.getInt("pdf_arrange", 0)
+        set(v) = sp.edit().putInt("pdf_arrange", v).apply()
+
+    /** Páginas de um PDF entram agrupadas. */
+    var pdfGrouped: Boolean
+        get() = sp.getBoolean("pdf_grouped", true)
+        set(v) = sp.edit().putBoolean("pdf_grouped", v).apply()
+
     var leftHanded: Boolean
         get() = sp.getBoolean("left_handed", false)
         set(v) = sp.edit().putBoolean("left_handed", v).apply()

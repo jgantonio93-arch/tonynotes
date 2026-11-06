@@ -481,7 +481,18 @@ object Panels {
         var curStyle = canvas.pageStyle
         var curPaper = canvas.paperColor
 
-        context.sheet("Página") { box, _ ->
+        context.sheet("Página") { box, sheetDialog ->
+            // Nota com PDF/PowerPoint: usar as páginas do documento como folhas ou a tela infinita.
+            if (canvas.pdfPageCount > 0) {
+                box.addView(context.sectionLabel("Documento"))
+                box.addView(context.segmented(listOf("Páginas do PDF", "Tela infinita"), if (canvas.isPdfSheetMode) 0 else 1) { i ->
+                    canvas.setDocumentMode(i == 0)
+                    onChanged()
+                    sheetDialog.dismiss()
+                })
+                box.addView(context.label("Páginas do PDF: uma folha por página, do tamanho dela, levando junto o que foi escrito em cima. " +
+                    "Tela infinita: espaço livre em volta. Dá para desfazer.", 13f).apply { setPadding(0, context.dpi(8f), 0, context.dpi(10f)) })
+            }
             val pageOptions = context.vertical()
             val countRow = context.horizontal()
             lateinit var countLabel: TextView

@@ -2049,4 +2049,117 @@ class FunctionalTest {
         drag(line(100f, 1000f, 1000f, 1000f, 12), F)
         assertTrue("fora do PDF não aparece", !canvas.scrollbarVisibleForTests)
     }
+
+    // ---- Abrir PDF: painel, Páginas do PDF × tela infinita, Configurações --------------------
+
+    private fun sharedPdf(name: String = "aula.pdf"): File =
+        File(app.cacheDir, name).apply { writeBytes("%PDF-1.4 teste".toByteArray()) }
+
+    private fun waitIo() {
+        Library.io.submit {}.get()
+        ShadowLooper.idleMainLooper()
+    }
+
+    @Test
+    fun pdf_encaminhado_pergunta_o_modo_e_sobrevive_a_recriar() {
+        val f = sharedPdf()
+        val intent = Intent(Intent.ACTION_SEND).setType("application/pdf").putExtra(Intent.EXTRA_STREAM, android.net.Uri.fromFile(f))
+        val c = Robolectric.buildActivity(ImportActivity::class.java, intent).setup()
+        waitIo()
+        assertTrue("painel aparece", c.get().formShownForTests)
+        val texts = findAll(c.get().window.decorView).filterIsInstance<android.widget.TextView>().map { it.text.toString() }
+        assertTrue(texts.toString(), texts.containsAll(listOf("Abrir no RosaNotes", "Páginas do PDF", "Tela infinita", "Abrir")))
+        // Girar/trocar o tema no meio não perde o arquivo.
+        c.recreate()
+        ShadowLooper.idleMainLooper()
+        val act = c.get()
+        assertTrue("continua depois de recriar", act.formShownForTests)
+        act.chooseSheetsForTests(true)
+        val before = Library.notes.size
+        act.openForTests("Aula de bioquímica")
+        val started = org.robolectric.Shadows.shadowOf(act).nextStartedActivity
+        assertEquals(EditorActivity::class.java.name, started.component!!.className)
+        assertEquals("pages", started.getStringExtra(EditorActivity.EXTRA_PDF_MODE))
+        assertTrue(started.getStringExtra(EditorActivity.EXTRA_PDF)!!.startsWith("file:"))
+        assertEquals(before + 1, Library.notes.size)
+        assertNotNull(Library.notes.firstOrNull { it.title == "Aula de bioquímica" })
+    }
+
+    @Test
+    fun configuracao_sempre_tela_infinita_pula_a_pergunta() {
+        PenPrefs(app).pdfOpenMode = "infinite"
+        val f = sharedPdf("slides.pdf")
+        val c = Robolectric.buildActivity(ImportActivity::class.java,
+            Intent(Intent.ACTION_VIEW).setDataAndType(android.net.Uri.fromFile(f), "application/pdf")).setup()
+        waitIo()
+        val texts = findAll(c.get().window.decorView).filterIsInstance<android.widget.TextView>().map { it.text.toString() }
+        assertTrue("sem a pergunta", "Páginas do PDF" !in texts)
+        c.get().openForTests("Slides")
+        assertEquals("infinite", org.robolectric.Shadows.shadowOf(c.get()).nextStartedActivity.getStringExtra(EditorActivity.EXTRA_PDF_MODE))
+    }
+
+    @Test
+    fun paginas_do_pdf_viram_folhas_e_contam_certo() {
+        canvas.addPdfAsSheets(PdfImporter.layout((1..3).map { PdfImporter.Page("pdf_fl_p$it.jpg", 595, 842) },
+            PdfImporter.Layout.VERTICAL, 0f, 0f, "Aula.pdf"))
+        val l = canvas.pageLayout
+        assertTrue(l.hasPages)
+        assertEquals(3, canvas.pageCount)
+        assertEquals("exporta 3 páginas", 3, canvas.usedPageRects().size)
+        val pages = canvas.pdfDocuments()[0].pages
+        pages.forEachIndexed { i, p ->
+            val r = l.pageRect(i)
+            assertEquals(r.left, p.rect.left, 0.5f); assertEquals(r.top, p.rect.top, 0.5f)
+            assertEquals(r.width(), p.rect.width(), 0.5f); assertEquals(r.height(), p.rect.height(), 0.5f)
+        }
+        assertTrue(canvas.isPdfSheetMode)
+        // Inserir outro PDF (deitado) numa nota em folhas: folhas novas no fim, páginas encaixadas.
+        canvas.addPdfAsSheets(PdfImporter.layout((1..2).map { PdfImporter.Page("pdf_fl2_p$it.jpg", 842, 595) },
+            PdfImporter.Layout.VERTICAL, 0f, 0f, "Outro.pdf"))
+        assertEquals(5, canvas.pageCount)
+        assertEquals(5, canvas.usedPageRects().size)
+        val novas = canvas.pdfDocuments().first { it.name == "Outro.pdf" }.pages
+        novas.forEachIndexed { k, p ->
+            val r = canvas.pageLayout.pageRect(3 + k)
+            assertTrue("dentro da folha ${3 + k}", r.contains(p.rect.centerX(), p.rect.centerY()) && p.rect.width() <= r.width() + 0.5f)
+        }
+    }
+
+    @Test
+    fun trocar_entre_paginas_do_pdf_e_tela_infinita_leva_a_escrita_junto() {
+        canvas.addPages(PdfImporter.layout((1..3).map { PdfImporter.Page("pdf_tr_p$it.jpg", 595, 842) },
+            PdfImporter.Layout.VERTICAL, 0f, 0f, "Aula.pdf"))
+        val p2 = canvas.pdfDocuments()[0].pages[1]
+        val cx = p2.rect.centerX()
+        val cy = p2.rect.centerY()
+        canvas.addForTests(listOf(StrokeElement(BrushType.PEN, Color.BLACK, 255,
+            floatArrayOf(cx - 50f, cx + 50f), floatArrayOf(cy, cy), floatArrayOf(4f, 4f))))
+        canvas.setDocumentMode(true)
+        assertTrue(canvas.isPdfSheetMode)
+        val sheet2 = canvas.pageLayout.pageRect(1)
+        val stroke = strokes().single()
+        assertTrue("o traço foi junto com a página 2", sheet2.contains(stroke.bounds.centerX(), stroke.bounds.centerY()))
+        val moved = RectF(stroke.bounds)
+        canvas.setDocumentMode(false)
+        assertTrue(!canvas.pageLayout.hasPages)
+        assertEquals("nada se move", moved.centerY(), strokes().single().bounds.centerY(), 0.5f)
+        canvas.undo()
+        assertTrue("desfazer volta às folhas", canvas.pageLayout.hasPages)
+        canvas.undo()
+        assertTrue("desfazer de novo volta à tela infinita", !canvas.pageLayout.hasPages)
+        assertEquals(cy, strokes().single().bounds.centerY(), 1f)
+    }
+
+    @Test
+    fun configuracoes_definem_a_pagina_das_notas_novas() {
+        Robolectric.buildActivity(SettingsActivity::class.java).setup()
+        val p = PenPrefs(app)
+        p.defaultStyle = PageStyle.LINES
+        p.defaultPaper = Panels.PAPER_COLORS[1].second
+        note = Library.createNote(Library.folders.first().id, "Nova")
+        controller.pause().stop().destroy()
+        openEditor()
+        assertEquals(PageStyle.LINES, canvas.pageStyle)
+        assertEquals(Panels.PAPER_COLORS[1].second, canvas.paperColor)
+    }
 }

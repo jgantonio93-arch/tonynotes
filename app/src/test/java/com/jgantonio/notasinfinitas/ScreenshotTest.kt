@@ -289,6 +289,22 @@ class ScreenshotTest {
         }
     }
 
+    /** Painel "Abrir no RosaNotes" (PDF encaminhado) e a tela de Configurações. */
+    @Test
+    fun captureImportAndSettings() {
+        val app = ApplicationProvider.getApplicationContext<android.app.Application>()
+        Library.init(app, reload = true)
+        seed(app)
+        val f = File(app.cacheDir, "Aula de bioquímica.pdf").apply { writeBytes("%PDF-1.4".toByteArray()) }
+        val imp = Robolectric.buildActivity(ImportActivity::class.java,
+            Intent(Intent.ACTION_SEND).setType("application/pdf").putExtra(Intent.EXTRA_STREAM, android.net.Uri.fromFile(f))).setup().get()
+        Library.io.submit {}.get()
+        ShadowLooper.idleMainLooper()
+        save(snap(imp), "30-abrir-pdf")
+        val st = Robolectric.buildActivity(SettingsActivity::class.java).setup().get()
+        save(snap(st), "31-configuracoes")
+    }
+
     private fun save(b: Bitmap, name: String) {
         FileOutputStream(File(outDir, "$name.png")).use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }
         println("captura: $name.png ${b.width}x${b.height}")
