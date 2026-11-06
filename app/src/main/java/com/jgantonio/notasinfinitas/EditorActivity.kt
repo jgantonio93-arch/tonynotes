@@ -134,6 +134,16 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
             return
         }
         note = n
+        // A mesma nota aberta em outra janela (ex.: aberta pelo WhatsApp numa tarefa e pelo app em
+        // outra): a antiga salva e fecha, senão a cópia velha sobrescreveria a nova ao sair.
+        openEditors[n.id]?.get()?.takeIf { it !== this && !it.isFinishing }?.let { old ->
+            if (old::canvasView.isInitialized) old.save()
+            old.replaced = true
+            old.finish()
+        }
+        openEditors[n.id] = java.lang.ref.WeakReference(this)
+        // Espera qualquer gravação pendente desta nota antes de ler o arquivo.
+        flushSaves(10_000)
         prefs = PenPrefs(this)
         requestMaxRefreshRate()
 
@@ -368,6 +378,8 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
 
     override fun onResume() {
         super.onResume()
+        main.removeCallbacks(autoSave)
+        main.postDelayed(autoSave, AUTOSAVE_MS)
         updatePastePill()
         if (wetStale) {
             wetStale = false
@@ -381,6 +393,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         if (::textEditor.isInitialized && textEditor.isActive) textEditor.finish()
         // A gravação para quando a nota sai da tela (o áudio já fica salvo).
         audioNotes?.let { if (it.isRecording) { it.stop(); updateAudioPill() } }
+        main.removeCallbacks(autoSave)
         if (::canvasView.isInitialized) save()
         Backup.autoBackupIfDue(this)
         DriveSync.autoIfDue(this)
@@ -2259,7 +2272,11 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
 
     // ---- Salvar e exportar ---------------------------------------------------------
 
+    /** Outra janela abriu esta nota: esta não grava mais (só a nova é a dona do arquivo). */
+    private var replaced = false
+
     private fun save() {
+        if (replaced) return
         val data = canvasView.snapshot()
         val wasDirty = canvasView.dirty
         canvasView.markSaved()
@@ -2656,7 +2673,30 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         main.postDelayed(audioTicker, 250)
     }
 
+    /** Salva sozinho enquanto a nota está aberta (sem depender de sair dela). */
+    private val autoSave = object : Runnable {
+        override fun run() {
+            if (::canvasView.isInitialized && canvasView.dirty && !(::textEditor.isInitialized && textEditor.isActive)) save()
+            main.postDelayed(this, AUTOSAVE_MS)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Fechar o app pela lista de recentes (ou fechar o WhatsApp que abriu a nota) mata o
+        // processo logo depois: espera a gravação terminar antes disso.
+        flushSaves(4_000)
+    }
+
+    private fun flushSaves(timeoutMs: Long) {
+        try { Library.io.submit {}.get(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS) } catch (_: Exception) {}
+    }
+
+    internal fun autoSaveForTests() = autoSave.run()
+
     override fun onDestroy() {
+        main.removeCallbacks(autoSave)
+        if (::note.isInitialized && openEditors[note.id]?.get() === this) openEditors.remove(note.id)
         audioNotes?.release()
         main.removeCallbacks(audioTicker)
         super.onDestroy()
@@ -2796,5 +2836,7 @@ class EditorActivity : Activity(), InfiniteCanvasView.Listener {
         private const val REQ_PPTX = 49
         private const val REQ_CAMERA = 50
         private const val REQ_MIC = 44
+        private const val AUTOSAVE_MS = 15_000L
+        private val openEditors = HashMap<String, java.lang.ref.WeakReference<EditorActivity>>()
     }
 }

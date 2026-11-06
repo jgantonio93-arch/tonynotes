@@ -2162,4 +2162,38 @@ class FunctionalTest {
         assertEquals(PageStyle.LINES, canvas.pageStyle)
         assertEquals(Panels.PAPER_COLORS[1].second, canvas.paperColor)
     }
+
+    // ---- Não perder a nota ---------------------------------------------------------------
+
+    private fun line(y: Float) = StrokeElement(BrushType.PEN, Color.BLACK, 255,
+        floatArrayOf(100f, 300f), floatArrayOf(y, y), floatArrayOf(4f, 4f))
+
+    @Test
+    fun salva_sozinho_sem_sair_da_nota() {
+        canvas.addForTests(listOf(line(200f)))
+        editor.autoSaveForTests()
+        Library.io.submit {}.get()
+        val saved = NoteStorage.load(Library.noteFile(note.id))!!
+        assertEquals(1, saved.elements.filterIsInstance<StrokeElement>().size)
+        assertTrue(!canvas.dirty)
+    }
+
+    @Test
+    fun mesma_nota_aberta_duas_vezes_nao_perde_escrita() {
+        // Janela 1 (ex.: aberta pelo WhatsApp) com um traço ainda não salvo.
+        val first = editor
+        canvas.addForTests(listOf(line(200f)))
+        // Janela 2 abre a mesma nota: a 1 salva e fecha, e a 2 já mostra o traço.
+        val second = Robolectric.buildActivity(EditorActivity::class.java,
+            Intent(app, EditorActivity::class.java).putExtra(EditorActivity.EXTRA_NOTE, note.id)).setup()
+        assertTrue("a janela antiga fecha", first.isFinishing)
+        val c2 = second.get().canvasForTests
+        assertEquals(1, c2.elementsSnapshot().filterIsInstance<StrokeElement>().size)
+        // Escrever na nova e sair: o arquivo tem os dois traços (a antiga não sobrescreve).
+        c2.addForTests(listOf(line(400f)))
+        second.pause().stop()
+        controller.pause().stop().destroy()
+        Library.io.submit {}.get()
+        assertEquals(2, NoteStorage.load(Library.noteFile(note.id))!!.elements.filterIsInstance<StrokeElement>().size)
+    }
 }
